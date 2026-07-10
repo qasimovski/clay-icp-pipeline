@@ -1,0 +1,77 @@
+# Entity-type config: Exhibitors
+#
+# Fills the {{...}} placeholders in template/BUILD_PROMPT.template.md that
+# vary by *data source* (which raw CSV/columns exist), not by ICP.
+# This entity type is already built and rolled out (77 event workbooks as of
+# 2026-07-09) — treat as the "mature" reference; do not change its live
+# tables to match future edits here without a deliberate rollout.
+
+entity_type: Exhibitors
+
+source_csv: Exhibitors_normalized.csv
+
+tables:
+  main: Exhibitors_normalized
+  seller: Sellers
+  buyer: Buyers
+  seller_contacts: "Contacts – Sellers"
+  buyer_contacts: "Contacts – Buyers"
+
+# Columns present in the raw imported CSV, in source order.
+raw_columns:
+  - Event
+  - Company Name
+  - Profile URL
+  - Booth
+  - Year
+  - Description
+  - Address Line 1
+  - City
+  - Postal Code
+  - Country
+  - Phone
+  - Email
+  - Website
+
+# Which raw column feeds each pipeline-generic step (see
+# docs/PIPELINE_ARCHITECTURE.md for what each of these does).
+field_sources:
+  country_source_field: Country
+  description_source_field: Description
+  website_source_field: Website
+
+# Fuller passthrough set — see docs/KNOWN_ISSUES.md #3 (this is the
+# canonical/mature set; some live Sponsors tables drifted to a narrower one).
+enrich_company_fields:
+  - Name
+  - Website
+  - Employee Count
+  - Size
+  - Type
+  - Domain
+  - Founded
+  - Industry
+  - LinkedIn URL
+  - Annual Revenue
+  - Primary Offerings
+  - Company Specialties
+  - Sub-Industry
+  - Business Stage
+  - Total Funding Amount
+  - Description
+
+# Whether Send Table Data actions are gated on {{Side}} — see
+# docs/KNOWN_ISSUES.md #2 and #4. Exhibitors is the mature/correct reference.
+gating:
+  official_domain_skip_if_domain_known: true
+  fanout_gated_on_side: true
+
+# Seller-only. Exhibitors uses the full 2D Fit x Country Fit matrix.
+composite_tier:
+  seller_mode: fit_and_country_fit   # AA/AB->1, AC/BA/BB->2, BC/CA/CB/CC->3
+
+notes: >
+  Already built and rolled out across 77 event workbooks (2026-07-07 to
+  2026-07-09). Never touch Exhibitors_normalized.csv or rename/alter its
+  live tables — this config documents the existing, correct pipeline for
+  reference and for building the same pattern for a new entity type.

@@ -1,0 +1,82 @@
+# Entity-type config: Sponsors
+#
+# Fills the {{...}} placeholders in template/BUILD_PROMPT.template.md that
+# vary by *data source*. Sponsors is the newer pipeline (36 event folders
+# have Sponsors_normalized.csv as of 2026-07-09) — built into the *same*
+# per-event workbook as Exhibitors, using the table names below so nothing
+# collides. Shares the fit_lookup / seller_sublevels / seller_contact_titles
+# / buyer_contact_titles reference tables with Exhibitors — reuse them
+# rather than re-importing if the workbook already has them.
+
+entity_type: Sponsors
+
+source_csv: Sponsors_normalized.csv
+
+tables:
+  main: Sponsors_normalized
+  seller: "Sponsors - Sellers"
+  buyer: "Sponsors - Buyers"
+  seller_contacts: "Sponsors-Contacts-Sellers"
+  buyer_contacts: "Sponsors-Contacts-Buyers"
+
+# Sponsors' raw CSV shape is flatter than Exhibitors' — no separate
+# City/Postal Code/Phone/Email, a single Address and a single Location field
+# used as the country source, and "Company Description" instead of
+# "Description".
+raw_columns:
+  - Event
+  - Company Name
+  - Address
+  - Website
+  - Location
+  - Company Description
+  - Year
+
+field_sources:
+  country_source_field: Location
+  description_source_field: Company Description
+  website_source_field: Website
+
+# Canonical/mature field set (matches Exhibitors) — see docs/KNOWN_ISSUES.md
+# #3. Some live Sponsors replica tables only pass through Name/Website/
+# Employee Count; that's drift, not an intentional Sponsors-specific choice.
+enrich_company_fields:
+  - Name
+  - Website
+  - Employee Count
+  - Size
+  - Type
+  - Domain
+  - Founded
+  - Industry
+  - LinkedIn URL
+  - Annual Revenue
+  - Primary Offerings
+  - Company Specialties
+  - Sub-Industry
+  - Business Stage
+  - Total Funding Amount
+  - Description
+
+# Canonical/mature gating (matches Exhibitors) — see docs/KNOWN_ISSUES.md #2
+# and #4. Some live Sponsors replica tables are missing these gates; that's
+# drift to fix on those tables separately, not the intended behavior.
+gating:
+  official_domain_skip_if_domain_known: true
+  fanout_gated_on_side: true
+
+# The one rule that genuinely differs from Exhibitors (not drift — this is
+# how the Labs ICP workbook itself defines Sponsors sellside tiering):
+# Category Fit is not combined with Country Fit into a 2D matrix for
+# Sponsors sellers. Country Fit alone drives the tier; JT Fit is applied
+# separately at the contact level via Seller JTs - tiered.
+composite_tier:
+  seller_mode: country_fit_only   # A->1, B->2, C->3
+
+notes: >
+  Newer pipeline, rolling out alongside the already-live Exhibitors
+  pipeline in the same event workbooks. This is the entity-type config to
+  copy as a starting point for a third entity type (e.g. Speakers) since
+  its raw_columns shape is the more likely template — Speakers data is
+  typically person-level with a flatter schema too, but confirm against a
+  real Speakers_normalized.csv before assuming the shape matches.

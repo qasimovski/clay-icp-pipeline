@@ -1,0 +1,26 @@
+# Real business/ICP data — never commit (see docs/SENSITIVE_DATA.md)
+config/icps/*/lookups/*.csv
+!config/icps/*/lookups/*.example.csv
+*.xlsx
+config/local.yaml
+
+# Automation run artifacts (logs, state, screenshots, sessions, queue)
+automation/**/shots/
+automation/**/rollout_shots/
+automation/**/rollout_logs/
+automation/**/rollout_state*.json
+automation/**/queue/
+automation/**/*.log
+automation/**/*.err
+automation/clay_sync/*session*.json
+automation/clay_sync/*.state.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db

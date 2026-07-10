@@ -1,0 +1,58 @@
+# Entity-type config template — copy to <new-entity>.yaml and fill in.
+#
+# An "entity type" is a data source shape (Exhibitors, Sponsors, Speakers,
+# Attendees, ...). Adding a new one means answering: what raw columns exist,
+# what are they called, and which fields feed the pipeline-generic steps in
+# docs/PIPELINE_ARCHITECTURE.md? The pipeline logic itself does NOT change.
+#
+# TODO: before filling this in, get one real normalized CSV for this entity
+# type (e.g. Speakers_normalized.csv) and read its actual header row — do
+# not guess the shape from Exhibitors/Sponsors.
+
+entity_type: REPLACE_ME   # e.g. Speakers
+
+source_csv: REPLACE_ME_normalized.csv
+
+tables:
+  main: REPLACE_ME_normalized
+  seller: "REPLACE_ME - Sellers"       # or just "Sellers" if this is the only pipeline in the workbook
+  buyer: "REPLACE_ME - Buyers"
+  seller_contacts: "REPLACE_ME-Contacts-Sellers"
+  buyer_contacts: "REPLACE_ME-Contacts-Buyers"
+
+# TODO: list every column in the raw imported CSV, in source order.
+raw_columns:
+  - TODO
+
+# TODO: which raw column feeds each pipeline-generic step.
+field_sources:
+  country_source_field: TODO   # e.g. "Country" or "Location"
+  description_source_field: TODO   # e.g. "Description" or "Company Description"
+  website_source_field: TODO
+
+# TODO: usually copy the canonical/mature set from exhibitors.yaml unless
+# this entity type genuinely has no meaningful company-level enrichment
+# (e.g. a person-level entity type might enrich the person instead/as well
+# — see docs/examples/aviation-reference-notes.md for a person-level
+# "Enrich person" step pattern if this entity type is person-level, not
+# company-level).
+enrich_company_fields:
+  - TODO
+
+# TODO: usually leave both true (the canonical/mature behavior) unless you
+# have a specific reason not to gate for this entity type.
+gating:
+  official_domain_skip_if_domain_known: true
+  fanout_gated_on_side: true
+
+# TODO: usually fit_and_country_fit (the 2D matrix) unless the ICP workbook
+# defines a different Seller tiering rule for this entity type specifically
+# (see sponsors.yaml's composite_tier note for why that can legitimately
+# differ — it's an ICP-workbook rule, not something to invent here).
+composite_tier:
+  seller_mode: TODO   # fit_and_country_fit | country_fit_only
+
+notes: >
+  TODO: anything a future builder should know before working on this
+  entity type — is it person-level or company-level, how many event
+  folders currently have this CSV, any known data-quality caveats.

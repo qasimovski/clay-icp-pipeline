@@ -1,0 +1,4 @@
+Job Title Keyword,Match Type,JT Fit,Tier,Sector Filter Required
+CEO,Must Match Exactly,B,1,No
+Chief Executive Officer,Must Match Exactly,B,1,No
+Business Development,Contains,C,2,Yes

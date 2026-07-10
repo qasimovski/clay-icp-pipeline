@@ -1,0 +1,57 @@
+# ICP config template — copy to config/icps/<new-icp>/icp.yaml and fill in.
+# Also create config/icps/<new-icp>/context.md and
+# config/icps/<new-icp>/lookups/ (populate locally, gitignored — see
+# config/icps/labs/lookups/README.md for the pattern to follow).
+#
+# An "ICP" is a vertical (Labs, Solar, Aviation, ...). Adding a new one means
+# writing a new Buyer/Seller classification taxonomy and the country/fit
+# tier lists that go with it — the pipeline mechanics (docs/PIPELINE_
+# ARCHITECTURE.md) do NOT change.
+#
+# TODO: before filling this in, get the vertical's ICP playbook workbook
+# (or equivalent source of truth) and pull the taxonomy/tiers from it —
+# do not invent categories from scratch.
+
+icp_name: REPLACE_ME   # e.g. "Solar Tiered ICP"
+
+classifier:
+  name: REPLACE_ME   # e.g. "Solar Series Registrar" — mirror the Labs naming pattern
+  model: gpt-4.1-mini   # cheapest model that reliably classifies — see docs/GTM_METHODOLOGY.md #6
+  max_cost_usd: 0.05
+  taxonomy:
+    buyer:
+      - label: TODO
+        examples: TODO
+        fit: TODO   # A | B | C
+    seller:
+      - label: TODO
+        fit: TODO
+  tie_break_rules:
+    - "TODO: list special-case classification rules, e.g. how to handle distributors, investors, consultants, ambiguous conglomerates."
+
+# TODO: map this vertical's raw country-string variants to canonical names.
+country_normalization:
+  "TODO raw value": "TODO canonical value"
+
+# TODO: which countries count as A (home-tier), B (travel-range), else C —
+# for Seller and Buyer sides. See config/icps/labs/icp.yaml for the shape;
+# see context.md (to be written) for per-edition breakdowns if this ICP also
+# has multiple event editions.
+country_fit:
+  seller:
+    a: []
+    b: []
+  buyer:
+    a: []
+    b: []
+
+# TODO: usually a straightforward AA/AB->1, AC/BA/BB->2, else->3 2D matrix —
+# but confirm against this ICP's own tiering model rather than assuming
+# Labs' matrix applies.
+composite_tier_seller_matrix:
+  "AA": 1
+
+composite_tier_buyer_matrix:
+  "AAA": 1
+
+known_issues: {}

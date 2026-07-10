@@ -1,0 +1,8 @@
+# Local, account-specific config — copy to config/local.yaml (gitignored)
+# and fill in your own values. These identify YOUR live Clay
+# workspace/account, not the reusable process, so they don't belong in git.
+
+workspace_url: "https://app.clay.com/workspaces/REPLACE_ME/home/REPLACE_ME"
+workspace_name: "REPLACE_ME"          # e.g. "Labs [2026 - Qasim - Fable]"
+events_folder: "Competitive Events"    # folder holding one workbook per event
+blocklist_table: "REPLACE_ME - Blocklist - Companies"   # one level up from events_folder

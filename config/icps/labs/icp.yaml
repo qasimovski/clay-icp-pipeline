@@ -1,0 +1,161 @@
+# ICP config: Labs Tiered ICP
+#
+# Fills the {{...}} placeholders in template/BUILD_PROMPT.template.md that
+# vary by *vertical* — the classification taxonomy, fit lists, country
+# tiers, and composite-tier matrices. See docs/GTM_METHODOLOGY.md for how
+# these fit together, and config/icps/labs/context.md for the Labs-specific
+# editions/country lists this ICP applies at build time.
+
+icp_name: Labs Tiered ICP
+
+classifier:
+  name: Labs Series Registrar
+  model: gpt-4.1-mini
+  max_cost_usd: 0.05
+  # Full prompt body — see template/BUILD_PROMPT.template.md for how this is
+  # interpolated. Kept verbatim here so it travels with the config, not just
+  # the doc.
+  taxonomy:
+    buyer:
+      - label: "Medical, Diagnostics & Healthcare"
+        examples: "Medical and Diagnostic Labs, Hospitals, Medical Practices, Veterinary, Healthcare"
+        fit: A
+      - label: "Chemicals, Petrochemicals & Materials"
+        examples: "Chemical Manufacturing, Oil/Gas/Mining, Plastics/Rubber, Metal, Glass/Ceramics"
+        fit: B
+      - label: "Food & Agriculture"
+        examples: "Food/Beverage Manufacturing, Dairy, Meat, Seafood, Farming, Horticulture"
+        fit: B
+      - label: FMCG
+        examples: "Cosmetics, Consumer Goods, Personal Care, Soap/Cleaning Manufacturing"
+        fit: B
+      - label: "Environment, Water & Energy"
+        examples: "Environmental Services, Water Supply/Irrigation, Waste Treatment, Utilities, Renewables"
+        fit: B
+      - label: "Laboratories & Research Organisations"
+        examples: "Research Services, Research, Testing, Inspection & Certification"
+        fit: A
+      - label: "Government & Public Sector"
+        examples: "Government Administration, Public Policy, Public Safety, Public Health"
+        fit: C
+      - label: Forensics
+        examples: "Law Enforcement, Forensic Science Labs"
+        fit: B
+      - label: "Pharma & Biotech"
+        examples: "Biotechnology Research, Pharmaceutical Manufacturing, Biotechnology"
+        fit: A
+      - label: Academic
+        examples: "Higher Education, Education Management"
+        fit: B
+      - label: "Investors & Venture Capital"
+        examples: "VC/PE Principals, Investment Management, Funds & Trusts"
+        fit: C
+      - label: "Non-industry Specific JT Searches"
+        examples: "Catchall lab-keyword searches across all industries"
+        fit: B
+    seller:
+      - label: "Lab Equipment & Instrumentation Suppliers"
+        fit: A
+      - label: "Laboratory Data, Integration & Connectivity Software"
+        fit: A
+      - label: "Laboratory Automation & Robotics"
+        fit: A
+      - label: "Testing & Diagnostics"
+        fit: A
+      - label: "Chemicals & Reagents"
+        fit: A
+      - label: "Digital & AI Services"
+        fit: B
+      - label: "Material Sciences"
+        fit: B
+      - label: "Food and Agri tech & monitoring"
+        fit: B
+      - label: "FMCG testing solutions"
+        fit: B
+      - label: "Environment and energy tech & monitoring"
+        fit: B
+      - label: "Cleanroom Technology"
+        fit: B
+      - label: Sustainability
+        fit: B
+      - label: "Distributors of lab equipment"
+        fit: B
+      - label: "Real Estate, Facilities, Architecture"
+        fit: C
+      - label: "Strategic Management Consultants"
+        fit: C
+      - label: "Forensics & Security"
+        fit: C
+  tie_break_rules:
+    - "Distributors: classify as Seller -> Distributors of lab equipment."
+    - "Strategic Management Consultants: classify as Seller -> Strategic Management Consultants, unless clearly attending purely as a buy-side researcher for a client."
+    - "Investors & VC: classify as Buyer -> Investors & Venture Capital for funds/PE/VC when titles like Partner/Principal/Analyst/Associate are indicated; overrides the general tie-break step."
+    - "CROs/Contract Testing Organisations: if sourcing for own lab -> Buyer (Pharma & Biotech or Laboratories & Research Organisations). If exhibiting to sell testing services -> Seller -> Testing & Diagnostics."
+    - "Academic institutions: default Buyer -> Academic, even when a department maps to a vertical."
+    - "Real estate/architecture firms: always Seller -> Real Estate, Facilities, Architecture."
+    - "Catchall: only use Buyer -> Non-industry Specific JT Searches when the company and any title clues still do not resolve to a clear vertical after all other rules (true cross-vertical conglomerates, students, media/trade associations, generic distributors without vertical focus)."
+
+# Country canonicalization — identical mechanism across entity types, this
+# is the ICP-agnostic-looking table that's actually kept here because a
+# different ICP/vertical could plausibly need different raw-value mappings
+# (e.g. different source data uses different country string variants).
+country_normalization:
+  "Great Britain": "United Kingdom"
+  "China PR": "China"
+  "Czech Rep.": "Czech Republic"
+  "Türkiye": "Turkey"
+  "USA": "United States"
+  "United Arab Emirates": "UAE"
+  "Hongkong, PR China": "China"
+
+# Country Fit tier lists — general-purpose (cross-edition) union, not a
+# single event edition's list. See context.md for the per-edition T1/T2
+# lists this is derived from.
+country_fit:
+  seller:
+    a: ["United Kingdom", "UAE", "Saudi Arabia", "United States", "Netherlands"]
+    b: ["United States", "Germany", "Japan", "China"]
+    # else -> C
+  buyer:
+    a: ["United Kingdom", "UAE", "Saudi Arabia", "United States", "Netherlands"]
+    b: ["Ireland", "Belgium", "France", "Luxembourg", "Switzerland", "Qatar",
+        "Kuwait", "Bahrain", "Oman", "Jordan", "Lebanon", "Canada", "Mexico",
+        "Austria", "Czech Republic", "Denmark", "Finland", "Greece",
+        "Hungary", "Italy", "Norway", "Poland", "Portugal", "Spain", "Sweden"]
+    # else -> C
+
+# Seller composite tier (2D Fit x Country Fit matrix) — used when the
+# entity type's composite_tier.seller_mode is fit_and_country_fit
+# (Exhibitors). See sponsors.yaml for the country_fit_only variant.
+composite_tier_seller_matrix:
+  "AA": 1
+  "AB": 1
+  "AC": 2
+  "BA": 2
+  "BB": 2
+  "BC": 3
+  "CA": 3
+  "CB": 3
+  "CC": 3
+
+# Buyer composite tier (3D: company Fit x contact JT Fit x company Country
+# Fit) — applied at the contacts-table level once a real contact's JT Fit
+# is known. Combinations not listed fall back per known_issues.cab_discrepancy.
+composite_tier_buyer_matrix:
+  "AAA": 1
+  "ABA": 1
+  "BAA": 1
+  "BAB": 2
+  "BBA": 2
+  "CAB": 2   # see known_issues.cab_discrepancy below
+  "CAA": 3
+  "CBB": 3
+
+known_issues:
+  cab_discrepancy: >
+    Tiering Model sheet states CAB (Industry=C, JT=A, Country=B) is Tier 3.
+    The 23 CAB rows actually applied in BuySide ICP - tiered show Tier 2.
+    Built to match the applied data (Tier 2) for the 8 combinations present
+    in real data; falls back to the Tiering Model sheet's stated value for
+    combinations not yet present. NOT resolved — needs a decision from
+    whoever owns the ICP. See docs/KNOWN_ISSUES.md #1.

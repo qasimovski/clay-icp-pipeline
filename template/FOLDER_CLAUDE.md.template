@@ -1,0 +1,47 @@
+# {{WORKSPACE_NAME}} — Clay Workflow
+
+> Copy this into the scraper-side folder for a given ICP build (mirrors the
+> pattern of `scrapers/Exhibitors_Clay/CLAUDE.md` / `scrapers/Sponsors_Clay/CLAUDE.md`
+> from the original Labs build) so an agent working in that folder has the
+> same standing instructions without re-deriving them each time.
+
+## Workspace
+
+Clay workspace: {{WORKSPACE_URL}} — "{{WORKSPACE_NAME}}"
+
+## Folder structure (always true, don't re-derive this)
+
+- `{{EVENTS_FOLDER}}`: one workbook per competitor event, named **exactly**
+  after its scraper folder. No reformatting, no added suffixes.
+- `{{BLOCKLIST_TABLE}}`: lives **one level up** from `{{EVENTS_FOLDER}}`,
+  not inside it. Shared cross-event registry (Company Name, Company Domain)
+  — every company that passes through this pipeline's main table gets
+  logged here.
+
+## The one hard rule: what's allowed to actually run
+
+Only three things call a paid provider per row — **configure these but
+never trigger a full run**: any Claygent/AI column, the `Enrich Company`
+action, and any Find People run.
+
+Everything else — creating tables and workbooks, importing CSVs, formula
+columns, Send Table Data actions — should be **created and actually
+executed**. None of it costs credits, so there's no reason to leave it
+configured-but-dormant.
+
+## Full build procedure
+
+Rendered per-event build spec: run
+`python template/render_build_prompt.py --entity <entity> --icp <icp>`
+from this repo, or read `docs/PIPELINE_ARCHITECTURE.md` for the generic
+version. Any ICP-specific open issues (e.g. an unresolved tiering
+discrepancy) are in `config/icps/<icp>/icp.yaml: known_issues` and
+`docs/KNOWN_ISSUES.md` — don't silently resolve those.
+
+## Source files expected in this folder
+
+- The ICP playbook workbook (source of truth for taxonomies,
+  segment/category names, and tier logic) — kept local, not in git; see
+  `docs/SENSITIVE_DATA.md`.
+- Per-event scraper folders, each containing its own normalized CSV for
+  this entity type.
