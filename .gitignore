@@ -15,6 +15,13 @@ automation/**/*.err
 automation/clay_sync/*session*.json
 automation/clay_sync/*.state.json
 
+# Cleanup / rollout passes — every generated .json (manifests, inventories,
+# per-run state, targets, batch/shard lists) carries live workspace + workbook
+# ids, and every *_logs/ dir is a run artifact. Regenerate manifests with the
+# build_*.py scripts. Committed code (*.py + people_fill_lib.js) is portable.
+automation/cleanup/*.json
+automation/cleanup/*_logs/
+
 # Python
 __pycache__/
 *.pyc

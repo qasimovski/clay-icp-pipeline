@@ -36,12 +36,47 @@ def shot(page, name):
     return path
 
 
+# Clay bot-blocks Playwright-launched browsers (serves the logged-out marketing
+# page even with valid cookies). Driving a REAL user-launched Chrome over CDP is
+# treated as a normal user and works. Launch that Chrome with:
+#   chrome.exe --remote-debugging-port=9222 --user-data-dir=C:\clay-debug
+#             --window-size=1720,1000
+# and log into Clay in it. Set CLAY_CDP to override the endpoint.
+CDP_ENDPOINT = os.environ.get("CLAY_CDP", "http://127.0.0.1:9222")
+
+
 @contextlib.contextmanager
 def clay_page(headless=True):
-    """Yield a logged-in Clay page using the saved _clay_sync session."""
-    if not os.path.exists(clay_sync.SESSION_PATH):
-        raise SystemExit(f"No Clay session at {clay_sync.SESSION_PATH}; run clay_login.py")
+    """Yield a logged-in Clay page. Prefer driving a real Chrome over CDP (not
+    bot-blocked); fall back to launching a bundled browser with the saved
+    session if no CDP browser is available."""
     with sync_playwright() as p:
+        browser = None
+        if os.environ.get("CLAY_USE_CDP"):
+            try:
+                browser = p.chromium.connect_over_cdp(CDP_ENDPOINT, timeout=5000)
+            except Exception:
+                browser = None
+        if browser is not None:
+            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+            page = ctx.new_page()
+            try:
+                page.set_viewport_size({"width": 1720, "height": 980})
+            except Exception:
+                pass
+            try:
+                yield page
+            finally:
+                try:
+                    page.close()          # close only our tab; leave Chrome open
+                except Exception:
+                    pass
+                # NOTE: do NOT call browser.close() here — on a CDP connection it
+                # can terminate the user's real Chrome. Just let the driver detach.
+            return
+        # fallback: bundled browser + saved session
+        if not os.path.exists(clay_sync.SESSION_PATH):
+            raise SystemExit(f"No Clay session at {clay_sync.SESSION_PATH}; run clay_login.py")
         browser = p.chromium.launch(
             headless=headless,
             args=["--disable-blink-features=AutomationControlled"])
