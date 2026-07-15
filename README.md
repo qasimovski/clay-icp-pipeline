@@ -40,9 +40,17 @@ Blocklist send (cross-event dedupe registry)
   destination table names.
 - `config/icps/*/icp.yaml` — what changes per **vertical** (Labs vs a
   future Solar): the classification taxonomy, fit lists, country tiers.
-- `automation/` — the Playwright scripts that actually built the live Labs
-  tables, kept as reference/manual-run code (not config-driven this round
-  — see `automation/README.md`).
+- `docs/RUNBOOK.md` — the operational end-to-end sequence (import → template
+  passes → Sellers-People → Buyers-People), the variables, and how to re-run
+  the whole flow for a different entity (Sponsors) or ICP.
+- `automation/build_automation/` — the Playwright scripts that built the live
+  Labs column pipeline, kept as reference/manual-run code (Interphex-shaped,
+  not config-driven — see `automation/README.md`).
+- `automation/cleanup/` — the repeatable **per-event passes** (trim → apply
+  templates → filters → Sellers-People → Buyers-People). These **are**
+  config-driven: `--entity` / `--icp` (or `CLAY_PIPELINE_ENTITY` /
+  `CLAY_PIPELINE_ICP`) select the target via `pipeline_config.py`. See
+  `automation/cleanup/README.md`.
 
 ## Quickstart: render a build spec for an existing entity type + ICP
 

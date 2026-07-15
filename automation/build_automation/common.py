@@ -79,7 +79,12 @@ def clay_page(headless=True):
             raise SystemExit(f"No Clay session at {clay_sync.SESSION_PATH}; run clay_login.py")
         browser = p.chromium.launch(
             headless=headless,
-            args=["--disable-blink-features=AutomationControlled"])
+            args=["--disable-blink-features=AutomationControlled",
+                  # memory-savers so the worker survives on a low-RAM machine
+                  "--disable-dev-shm-usage", "--disable-gpu",
+                  "--disable-extensions", "--disable-background-networking",
+                  "--disable-features=site-per-process,TranslateUI",
+                  "--renderer-process-limit=2"])
         ctx = browser.new_context(storage_state=clay_sync.SESSION_PATH,
                                   user_agent=clay_sync.UA,
                                   viewport={"width": 1720, "height": 980})

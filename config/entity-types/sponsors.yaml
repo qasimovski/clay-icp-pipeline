@@ -18,6 +18,17 @@ tables:
   buyer: "Sponsors - Buyers"
   seller_contacts: "Sponsors-Contacts-Sellers"
   buyer_contacts: "Sponsors-Contacts-Buyers"
+  # Per-event Find-People output tables — namespaced with the "Sponsors -" prefix
+  # so they never collide with the Exhibitors people tables in the same workbook.
+  seller_people: "Sponsors - Sellers - People"
+  buyer_people: "Sponsors - Buyers - People"
+
+# Saved Clay template names applied by the per-event passes (apply_v1 / apply_lookup).
+# These Sponsors templates must exist in Clay (built from this entity's raw_columns —
+# the schema differs from Exhibitors, so it is NOT the same template renamed).
+templates:
+  all_columns: "Sponsors - All Columns - v1"
+  lookup: "Sponsors - Lookup & Send Table Data - v1"
 
 # Sponsors' raw CSV shape is flatter than Exhibitors' — no separate
 # City/Postal Code/Phone/Email, a single Address and a single Location field

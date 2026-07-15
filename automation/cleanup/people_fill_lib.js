@@ -33,7 +33,6 @@ const LOCATION_VALUES = [
   "Saudi Arabia",
   "United States",
   "Netherlands",
-  "Germany",
   "Japan",
   "China",
 ];
@@ -542,7 +541,7 @@ async function fillCountries(countries, fuzzy, onProgress) {
   for (const country of countries) {
     robustClick(field);
     field.focus();
-    await sleep(jitter(150, 400));
+    await sleep(jitter(60, 150));
     await typeIntoField(field, country);
 
     // Wait for a matching suggestion to appear, then click it. Fall back to
@@ -557,11 +556,13 @@ async function fillCountries(countries, fuzzy, onProgress) {
       dispatchKey(field, "Enter", 13);
     }
 
-    await sleep(500);
-
-    // Success signal: the input cleared after committing a chip. If text is
-    // still sitting in the box, nothing got added.
-    const committed = getFieldValue(field).trim() === "";
+    // Poll (up to ~800ms) for the chip to commit — the input clears when it
+    // does. Faster than a fixed wait and avoids false "not found" on slow commits.
+    let committed = false;
+    for (let _p = 0; _p < 8; _p++) {
+      await sleep(100);
+      if (getFieldValue(field).trim() === "") { committed = true; break; }
+    }
     if (committed) {
       added.push(country);
     } else {
@@ -582,7 +583,7 @@ async function fillCountries(countries, fuzzy, onProgress) {
       });
     }
 
-    await sleep(jitter(400, 900));
+    await sleep(jitter(100, 250));
   }
 
   return { added, notFound, diagnostics };

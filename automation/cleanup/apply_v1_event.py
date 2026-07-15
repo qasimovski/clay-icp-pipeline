@@ -13,15 +13,21 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 AUTO_DIR = os.path.dirname(SCRIPT_DIR)
+sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
 import common         # noqa: E402
 import build_lib as B  # noqa: E402
+import pipeline_config as PC  # noqa: E402
 
-TABLE = "Exhibitors_normalized"
-TEMPLATE = "Exhibitors - All Columns - v1"
+# Entity/ICP-driven (defaults exhibitors/labs; override via CLAY_PIPELINE_ENTITY
+# env or the rollout's --entity). Template content is entity-specific — see the
+# note in config/entity-types/<entity>.yaml: templates.
+_CFG = PC.load()
+TABLE = _CFG.main_table
+TEMPLATE = _CFG.templates.get("all_columns", "Exhibitors - All Columns - v1")
 FILL = [("Country", "Country"), ("Description", "Description")]
 # a column v1 adds that the reverted base lacks — its presence => already applied
 V1_SIGNATURE = "Official Domain"

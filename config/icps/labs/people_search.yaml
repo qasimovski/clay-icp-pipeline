@@ -1,0 +1,602 @@
+# Find-People search config for the Labs ICP.
+# Consumed by automation/cleanup/people_builds.py (Sellers - People) and
+# buyer_builds.py (Buyers - People). Entity-agnostic: the SAME lists apply
+# whether the source is Exhibitors_normalized or Sponsors_normalized — only
+# the table names (config/entity-types/<entity>.yaml: tables) change per entity.
+#
+# seniority: the 11 Find-People seniority levels (shared seller+buyer).
+# seller.builds: the 3 sequential 'Find people' seller searches (exact/contains).
+# buyer.segments: per-Classification job-title lists; each runs an exact then a
+#   contains Find-People search (Clay's Job Title field is single-mode).
+# *.location_countries: the Find-People Location filter (Germany intentionally excluded).
+
+seniority:
+- Founder
+- Owner
+- Board Member
+- Partner
+- C-suite
+- VP
+- Director
+- Head
+- Manager
+- Senior
+- Mid-level
+seller:
+  location_countries:
+  - United Kingdom
+  - United Arab Emirates
+  - Saudi Arabia
+  - United States
+  - Netherlands
+  - Japan
+  - China
+  builds:
+  - name: 1st
+    job_title_mode: exact
+    job_titles:
+    - CEO
+    - Chief Executive Officer
+    - MD
+    - Managing Director
+    - Managing Partner
+    - President
+    - Vice President
+    - Regional Vice President
+    - Founder
+    - GM
+    - CCO
+    - CMO
+    - Chief Strategy Officer
+    - Regional Director
+    - Country Manager
+    - BDM
+  - name: 2nd
+    job_title_mode: contains
+    job_titles:
+    - Executive Director
+    - General Manager
+    - COO
+    - Chief Operating Officer
+    - Chief Business Officer
+    - CTO
+    - Chief Technology Officer
+    - Owner
+  - name: 3rd
+    job_title_mode: contains
+    job_titles:
+    - Business Development
+    - Channel
+    - Commercial
+    - Distribution
+    - Events
+    - Exhibitions
+    - Go-to-market
+    - Growth
+    - Healthcare Solutions
+    - Marketing
+    - Partner
+    - Partnerships
+    - Product
+    - Sales
+    - Strategy
+    - Trade Show
+    - Middle East
+    - EMEA
+    - MENA
+    - MEA
+    - APAC
+    - Americas
+    experience: lab, laboratory, life science, pharma, scientific, analytical, biotech, diagnostics, R&D,
+      research
+buyer:
+  location_countries:
+  - Austria
+  - Bahrain
+  - Bangladesh
+  - Belgium
+  - Canada
+  - China
+  - Czech Republic
+  - Denmark
+  - Egypt
+  - Finland
+  - France
+  - Greece
+  - Hungary
+  - India
+  - Indonesia
+  - Iraq
+  - Ireland
+  - Italy
+  - Japan
+  - Jordan
+  - Kenya
+  - Kuwait
+  - Lebanon
+  - Luxembourg
+  - Malaysia
+  - Mexico
+  - Morocco
+  - Netherlands
+  - Nigeria
+  - Norway
+  - Oman
+  - Pakistan
+  - Philippines
+  - Poland
+  - Portugal
+  - Qatar
+  - Saudi Arabia
+  - Singapore
+  - South Africa
+  - South Korea
+  - Spain
+  - Sweden
+  - Switzerland
+  - Taiwan
+  - Thailand
+  - Turkey
+  - United Arab Emirates
+  - United Kingdom
+  - United States
+  - Vietnam
+  segments:
+  - segment: Diagnostics & Healthcare
+    exact:
+    - CEO
+    - COO
+    - CFO
+    - CTO
+    - CIO
+    - CDO
+    - CSO
+    - CMO
+    contains:
+    - Chief Executive Officer
+    - Chief Operating Officer
+    - Chief Financial Officer
+    - Chief Technology Officer
+    - Chief Information Officer
+    - Chief Digital Officer
+    - Chief Data Officer
+    - Chief Transformation Officer
+    - Chief Strategy Officer
+    - Chief Scientific Officer
+    - Chief Medical Officer
+    - Head of AI
+    - Clinical AI
+    - Analytical
+    - Automation
+    - Biomedical engineer
+    - Buyer
+    - Clinical
+    - Compliance
+    - Data Science
+    - Diagnostics
+    - Digital Transformation
+    - Facilities
+    - Immunologist
+    - Immunology
+    - Informatics
+    - Innovation
+    - Lab
+    - Laboratory
+    - labs
+    - LIMS
+    - Machine Learning
+    - Maintenance
+    - Medical technologist
+    - Operations
+    - Pathologist
+    - Pathology
+    - Pharmacist
+    - Precision Medicine
+    - Process engineer
+    - Procurement
+    - Purchasing
+    - QA
+    - QC
+    - Quality
+    - R&D
+    - Research
+    - Scientific
+    - Scientist
+    - Service engineer
+    - Sourcing
+    - Supply chain
+    - VP Engineering
+  - segment: Petrochemicals & Materials
+    exact:
+    - CEO
+    - COO
+    - CFO
+    - CTO
+    - CIO
+    - CSO
+    contains:
+    - Chief Executive Officer
+    - Chief Operating Officer
+    - Chief Financial Officer
+    - Chief Technology Officer
+    - Chief Information Officer
+    - Chief Digital Officer
+    - Chief Transformation Officer
+    - Chief Strategy Officer
+    - Chief Scientific Officer
+    - Analytical
+    - Buyer
+    - Chemicals
+    - Chemist
+    - Chemistry
+    - Coatings
+    - Compliance
+    - Digital Transformation
+    - Formulation
+    - Innovation
+    - Inspection
+    - Lab
+    - Laboratory
+    - labs
+    - Manufacturing
+    - Materials
+    - Operations
+    - Petrochemicals
+    - Polymer
+    - Process
+    - Procurement
+    - Purchasing
+    - QA
+    - QC
+    - QHSE
+    - Quality
+    - R&D
+    - Research
+    - Scientist
+    - Sourcing
+    - Superintendent
+    - Supply chain
+    - Surface
+    - Testing
+  - segment: Food & Agriculture
+    exact:
+    - CEO
+    - COO
+    - CFO
+    - CTO
+    - CIO
+    - CSO
+    contains:
+    - Chief Executive Officer
+    - Chief Operating Officer
+    - Chief Financial Officer
+    - Chief Technology Officer
+    - Chief Information Officer
+    - Chief Transformation Officer
+    - Chief Strategy Officer
+    - Chief Scientific Officer
+    - agriculture
+    - analytical
+    - Buyer
+    - chemist
+    - chemistry
+    - compliance
+    - Food safety
+    - food technologist
+    - Food testing
+    - formulation
+    - Innovation
+    - Lab
+    - Laboratory
+    - manufacturing
+    - microbiologist
+    - microbiology
+    - operations
+    - process
+    - Procurement
+    - product development
+    - production
+    - Purchasing
+    - QA
+    - QC
+    - Quality
+    - R&D
+    - regulatory
+    - research
+    - scientist
+    - Sourcing
+    - Supply chain
+    - sustainability
+  - segment: FMCG
+    exact:
+    - CEO
+    - COO
+    - CFO
+    - CTO
+    - CIO
+    - CSO
+    contains:
+    - Chief Executive Officer
+    - Chief Operating Officer
+    - Chief Financial Officer
+    - Chief Technology Officer
+    - Chief Information Officer
+    - Chief Transformation Officer
+    - Chief Strategy Officer
+    - Chief Scientific Officer
+    - Buyer
+    - chemist
+    - chemistry
+    - compliance
+    - formulation
+    - Innovation
+    - Lab
+    - Laboratory
+    - manufacturing
+    - operations
+    - packaging
+    - process
+    - Procurement
+    - product development
+    - production
+    - Purchasing
+    - QA
+    - QC
+    - Quality
+    - R&D
+    - regulatory
+    - research
+    - scientist
+    - Sourcing
+    - Supply chain
+    - sustainability
+  - segment: Water & Energy
+    exact:
+    - CEO
+    - COO
+    - CFO
+    - CTO
+    - CIO
+    - CSO
+    - CMO
+    contains:
+    - Chief Executive Officer
+    - Chief Operating Officer
+    - Chief Financial Officer
+    - Chief Technology Officer
+    - Chief Information Officer
+    - Chief Digital Officer
+    - Chief Transformation Officer
+    - Chief Strategy Officer
+    - Chief Scientific Officer
+    - Chief Medical Officer
+    - analytical
+    - asset
+    - Buyer
+    - chemist
+    - chemistry
+    - compliance
+    - energy
+    - environment
+    - environmental
+    - ESG
+    - facilities
+    - hydrologist
+    - Innovation
+    - Lab
+    - Laboratory
+    - maintenance
+    - operations
+    - plant manager
+    - Procurement
+    - Purchasing
+    - QA
+    - QC
+    - quality
+    - R&D
+    - regulatory
+    - renewables
+    - scientist
+    - Sourcing
+    - Supply chain
+    - sustainability
+    - wastewater
+    - water
+  - segment: Laboratories & Research Organisations
+    exact:
+    - CEO
+    - COO
+    - CFO
+    - CTO
+    - CIO
+    - CDO
+    - CSO
+    - CMO
+    contains:
+    - Chief Executive Officer
+    - Chief Operating Officer
+    - Chief Financial Officer
+    - Chief Technology Officer
+    - Chief Information Officer
+    - Chief Digital Officer
+    - Chief Data Officer
+    - Chief Transformation Officer
+    - Chief Strategy Officer
+    - Chief Scientific Officer
+    - Chief Medical Officer
+    - analytical
+    - automation
+    - Buyer
+    - chemical
+    - compliance
+    - digital
+    - informatics
+    - Innovation
+    - ISO accreditation
+    - Lab
+    - Laboratory
+    - Labs
+    - maintenance
+    - Operations
+    - physical testing
+    - Process engineer
+    - Procurement
+    - Purchasing
+    - QA
+    - QC
+    - Quality
+    - R&D
+    - Research
+    - scientist
+    - Service engineer
+    - Sourcing
+    - Supply chain
+    - testing
+    - validation
+  - segment: Government & Public Sector
+    exact: []
+    contains:
+    - Lab
+    - certification
+    - clinical
+    - compliance
+    - contracts
+    - diagnostics
+    - environment
+    - environmental
+    - health
+    - healthcare
+    - inspection
+    - inspector
+    - Laboratory
+    - quality
+    - regulation
+    - regulatory
+    - R&D
+    - research
+    - science
+    - scientific
+    - sourcing
+    - Testing
+    - water
+  - segment: Forensics
+    exact: []
+    contains:
+    - ballistics
+    - crime
+    - digital
+    - DNA
+    - evidence
+    - fingerprint
+    - forensic
+    - forensics
+    - genetics
+    - informatics
+    - lab
+    - laboratory
+    - scientific
+    - scientist
+    - testing
+    - toxicology
+  - segment: Pharma & Biotech
+    exact:
+    - CEO
+    - COO
+    - CFO
+    - CTO
+    - CIO
+    - CDO
+    - CSO
+    - CMO
+    contains:
+    - Chief Executive Officer
+    - Chief Operating Officer
+    - Chief Financial Officer
+    - Chief Technology Officer
+    - Chief Information Officer
+    - Chief Digital Officer
+    - Chief Data Officer
+    - Chief Transformation Officer
+    - AI
+    - Machine Learning
+    - Chief Strategy Officer
+    - Chief Scientific Officer
+    - Chief Medical Officer
+    - analytical
+    - assay
+    - automation
+    - bioanalysis
+    - biologics
+    - bioprocessing
+    - biotechnology
+    - Buyer
+    - Category manager
+    - cell therapy
+    - characterisation
+    - compliance
+    - data analytics
+    - digital lab
+    - drug development
+    - drug discovery
+    - ELN
+    - gene therapy
+    - genomics
+    - informatics
+    - Innovation
+    - lab
+    - laboratory
+    - LIMS
+    - omics
+    - pharma
+    - pharmaceuticals
+    - Procurement
+    - proteomics
+    - Purchasing
+    - QA
+    - QC
+    - quality
+    - R&D
+    - research
+    - robotics
+    - science
+    - scientific
+    - scientist
+    - Sourcing
+    - Supply chain
+    - validation
+  - segment: Academic
+    exact: []
+    contains:
+    - Lab
+    - Laboratory
+    - R&D
+    - Research
+    - Scientific
+    - Science
+    - Scientist
+    - Chemistry
+    - Chemist
+    - Biology
+    - Grants
+    - Funding
+    - Principal Investigator
+    - Chief technician
+    - Technical manager
+    - Life sciences
+  - segment: Non-industry Specific JT Searches
+    exact: []
+    contains:
+    - Lab
+    - Laboratory
+    - Chemist
+    - Forensic Scientist
+    - Quality Control
+    - QC
+    - Quality Assurance
+    - QA
+    - Instrumentation Manager
+    - Biotechnologist
+    - Pathologist
+    - Microbiologist
+    - Toxicologist
+    - Chief Scientific Officer

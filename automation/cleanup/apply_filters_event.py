@@ -13,14 +13,17 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 AUTO_DIR = os.path.dirname(SCRIPT_DIR)
+sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
 import common         # noqa: E402
 import build_lib as B  # noqa: E402
+import pipeline_config as PC  # noqa: E402
 
-TABLE = "Exhibitors_normalized"
+# Entity/ICP-driven (defaults exhibitors/labs; override via CLAY_PIPELINE_ENTITY).
+TABLE = PC.load().main_table
 
 # ---- geometry helpers (filter panel rows) ---------------------------------
 # The panel sits at the top of the grid. Rows are ~48px apart. A credit-limit

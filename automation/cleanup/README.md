@@ -67,16 +67,37 @@ pass writes its own `*_state_*.json` (skips already-done) and `*_logs/`.
 - `apply_filters_*` — set the two view filters (`Side = Seller` AND
   `Send table data has results`); supports `--ids-file` + `--state-suffix` for
   parallel shards.
-- `people_builds.py` + `people_rollout.py` — run the 3 "Find people at these
-  companies" builds into a per-event **"Sellers - People"** table (build 1 →
-  new table + rename; builds 2 & 3 → append). Scope: `people_targets.json`.
-  Filter-fill logic is vendored in `people_fill_lib.js` (override with
-  `CLAY_PEOPLE_FILL_JS`). Run in batches; a run cut off mid-event resumes/salvages
-  cleanly (no duplicate tables).
+- `people_builds.py` + `people_rollout.py` — the "Find people at these companies"
+  seller builds into a per-event **seller people** table (build 1 → new table +
+  rename; later builds → append). Filter-fill logic is vendored in
+  `people_fill_lib.js` (override with `CLAY_PEOPLE_FILL_JS`).
+- `buyer_builds.py` + `buyer_rollout.py` — the buyer counterpart: flip the Side
+  view filter Seller→Buyer, then per ICP `Classification` segment run an
+  exact-match then a contains-match Find-People search into one per-event
+  **buyer people** table. `--shards N`/`--shard i` for parallel workers +
+  `merge_shards.py` to fold shard state back. Resumable per segment; salvages an
+  unrenamed table from a killed run instead of duplicating.
+
+### Entity/ICP parameterization
+
+`people_rollout.py` and `buyer_rollout.py` take **`--entity`** (default
+`exhibitors`) and **`--icp`** (default `labs`); the earlier passes
+(`trim_cols` / `apply_v1` / `apply_lookup` / `apply_filters`) read the same via
+`CLAY_PIPELINE_ENTITY` / `CLAY_PIPELINE_ICP`. `pipeline_config.py` resolves:
+
+- source table + output table names ← `config/entity-types/<entity>.yaml: tables`
+- Clay template names ← `config/entity-types/<entity>.yaml: templates`
+- job titles / segments / Location lists ← `config/icps/<icp>/people_search.yaml`
+
+Run files are namespaced per `<entity>_<icp>` slug, so an Exhibitors run and a
+Sponsors run never share state/targets/logs. See `docs/RUNBOOK.md` for the full
+end-to-end sequence and how to run for Sponsors.
 
 All generated `*.json` (manifests, state, targets, batch/shard lists) and
 `*_logs/` are git-ignored — they carry live workspace/workbook ids. Regenerate
-manifests from the live workspace with the `build_*.py` scripts.
+manifests from the live workspace with the `build_*.py` scripts. The Find-People
+config (`config/icps/<icp>/people_search.yaml`) has **no** live ids and **is**
+committed.
 
 ## Environment notes
 

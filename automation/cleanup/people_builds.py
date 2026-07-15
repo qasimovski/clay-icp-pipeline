@@ -17,41 +17,47 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 AUTO_DIR = os.path.dirname(SCRIPT_DIR)
+sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
 import common         # noqa: E402
 import build_lib as B  # noqa: E402
+import pipeline_config as PC  # noqa: E402
 
-TABLE = "Exhibitors_normalized"
-PEOPLE_TABLE = "Sellers - People"
+# Entity/ICP-driven; set by configure() (defaults applied on import). TABLE is the
+# source table the Find-People search runs over; PEOPLE_TABLE is the per-event
+# output; SELLER_COUNTRIES is the Location list; BUILDS are the sequential searches.
+TABLE = None
+PEOPLE_TABLE = None
+SELLER_COUNTRIES = None
 # Vendored copy of the Chrome extension's filter-fill logic (location_filler/
 # extension/content.js). Kept in-repo so this pipeline is self-contained;
 # override with CLAY_PEOPLE_FILL_JS to point at a different source.
 CONTENT_JS = os.environ.get(
     "CLAY_PEOPLE_FILL_JS", os.path.join(SCRIPT_DIR, "people_fill_lib.js"))
 
-# ---- build specs (from Builds_Types.txt / content.js) ---------------------
-BUILDS = [
-    {"name": "1st", "jobTitleMode": "exact", "jobTitles": [
-        "CEO", "Chief Executive Officer", "MD", "Managing Director",
-        "Managing Partner", "President", "Vice President",
-        "Regional Vice President", "Founder", "GM", "CCO", "CMO",
-        "Chief Strategy Officer", "Regional Director", "Country Manager", "BDM"]},
-    {"name": "2nd", "jobTitleMode": "contains", "jobTitles": [
-        "Executive Director", "General Manager", "COO",
-        "Chief Operating Officer", "Chief Business Officer", "CTO",
-        "Chief Technology Officer", "Owner"]},
-    {"name": "3rd", "jobTitleMode": "contains", "jobTitles": [
-        "Business Development", "Channel", "Commercial", "Distribution",
-        "Events", "Exhibitions", "Go-to-market", "Growth",
-        "Healthcare Solutions", "Marketing", "Partner", "Partnerships",
-        "Product", "Sales", "Strategy", "Trade Show", "Middle East",
-        "EMEA", "MENA", "MEA", "APAC", "Americas"],
-     "experience": "lab, laboratory, life science, pharma, scientific, "
-                    "analytical, biotech, diagnostics, R&D, research"},
-]
+# ---- build specs — loaded from config/icps/<icp>/people_search.yaml ---------
+# Each build: {name, jobTitleMode ('exact'|'contains'), jobTitles[], experience?}.
+BUILDS = []
+
+
+def configure(entity=None, icp=None):
+    """Point the seller build at a given entity type + ICP (config-driven)."""
+    global TABLE, PEOPLE_TABLE, SELLER_COUNTRIES, BUILDS
+    cfg = PC.load(entity, icp)
+    TABLE = cfg.main_table
+    PEOPLE_TABLE = cfg.seller_people_table
+    SELLER_COUNTRIES = cfg.seller_countries
+    BUILDS = [{"name": b["name"], "jobTitleMode": b["job_title_mode"],
+               "jobTitles": b["job_titles"],
+               **({"experience": b["experience"]} if b.get("experience") else {})}
+              for b in cfg.seller_builds]
+    return cfg
+
+
+configure()
 
 
 def build_bundle():
@@ -180,7 +186,7 @@ def fill_filters(page, spec, say):
     if spec.get("experience"):
         ex = page.evaluate("(k) => window.__ext.fillExperience(k)", spec["experience"])
         say(f"  experience: cleared={ex.get('cleared')}")
-    loc = page.evaluate("() => window.__ext.fillCountries(window.__ext.LOCATION_VALUES, false)")
+    loc = page.evaluate("(c) => window.__ext.fillCountries(c, false)", SELLER_COUNTRIES)
     say(f"  location: +{len(loc.get('added',[]))} notFound={loc.get('notFound')}")
     # limit per company = 50 (set + verify in JS, scrolls into view first).
     # Retry a few times — the Limit section occasionally isn't ready on first try.
@@ -269,7 +275,7 @@ def _rename_new_people_table(page, wid, say):
     info = page.evaluate("""(known)=>{for(const el of document.querySelectorAll('button,[role="tab"]')){
         const r=el.getBoundingClientRect(); if(r.width===0||r.y<914||r.y>944||r.x<135||r.x>1150)continue;
         const t=(el.textContent||'').trim();
-        if(t && t!=='Overview' && t!=='Add' && !known.includes(t) && t.length<60)
+        if(t && t!=='Overview' && t!=='Add' && !known.includes(t) && !t.endsWith(' - People') && t.length<60)
           return {x:Math.round(r.x+18),y:Math.round(r.y+r.height/2),t:t};}return null;}""", list(known))
     if not info:
         raise clay_ui.ClayUIError("new people table tab not found for rename")
@@ -353,7 +359,9 @@ def _prepare_people_table(page, wid, say):
     if PEOPLE_TABLE in tabs:
         return True
     known = {TABLE, "Sponsors_normalized", "Overview", "Add", ""}
-    stray = [t for t in tabs if t not in known and t != PEOPLE_TABLE]
+    # never salvage a finished people table (e.g. 'Sellers - People' /
+    # 'Buyers - People') — only auto-named interrupted artifacts.
+    stray = [t for t in tabs if t not in known and not t.endswith(" - People")]
     if stray:
         say(f"  salvaging unrenamed people table {stray[0]!r} -> {PEOPLE_TABLE!r}")
         _rename_new_people_table(page, wid, say)

@@ -1,9 +1,18 @@
-"""Fleet driver for the 3 "Find people at these companies" builds -> per-event
-"Sellers - People" table. Scope = people_targets.json (68 in-scope; ACHEMA /
-ELRIG / Lab Indonesia / Asia Labex excluded). Resumable via people_state_all.json.
+"""Fleet driver for the "Find people at these companies" seller builds -> per-event
+seller people table.
 
-  python people_rollout.py --only "Middle East Coatings Show"
+Entity/ICP-agnostic (--entity/--icp): the source table + output people-table name
+come from config/entity-types/<entity>.yaml, the build specs (job titles, seller
+Location list) from config/icps/<icp>/people_search.yaml. Run files are namespaced
+per "<entity>_<icp>" slug so entities never share state/targets/logs:
+
+  people_targets_<slug>.json   scope: workbook ids that have this entity's source table
+  people_state_<slug>.json     resumable per-event progress
+  people_logs/run_<slug>.log   progress log
+
+  python people_rollout.py --only "Middle East Coatings Show"   # default exhibitors/labs
   python people_rollout.py --limit 5
+  python people_rollout.py --entity sponsors --limit 5          # same flow for Sponsors
 """
 
 import argparse
@@ -18,10 +27,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 
 import common               # noqa: E402
 import people_builds as P   # noqa: E402
+import pipeline_config as PC  # noqa: E402
 
 MANIFEST = os.path.join(SCRIPT_DIR, "cols_manifest.json")
-TARGETS = os.path.join(SCRIPT_DIR, "people_targets.json")
-STATE = os.path.join(SCRIPT_DIR, "people_state_all.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "people_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -37,14 +45,27 @@ def load(p, d):
 
 def main():
     ap = argparse.ArgumentParser()
+    PC.add_cli_args(ap)   # --entity / --icp
     ap.add_argument("--only")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--headed", action="store_true")
     args = ap.parse_args()
 
+    cfg = P.configure(args.entity, args.icp)   # point the build at this entity/ICP
+    slug = cfg.slug()
+    targets_path = os.path.join(SCRIPT_DIR, f"people_targets_{slug}.json")
+    STATE = os.path.join(SCRIPT_DIR, f"people_state_{slug}.json")
+    log_path = os.path.join(LOG_DIR, f"run_{slug}.log")
+    print(f"entity={cfg.entity} icp={cfg.icp} | source={cfg.main_table} "
+          f"-> {cfg.seller_people_table}", flush=True)
+
     wbs = {e["workbook_id"]: e["workbook_name"]
            for e in json.load(open(MANIFEST, encoding="utf-8"))["workbooks"]}
-    target_ids = load(TARGETS, [])
+    target_ids = load(targets_path, [])
+    if not target_ids:
+        raise SystemExit(
+            f"no targets at {targets_path} — create it: a JSON list of workbook ids "
+            f"that have a {cfg.main_table!r} table (see build_cols_manifest.py).")
     targets = [(wid, wbs.get(wid, wid)) for wid in target_ids]
     if args.only:
         targets = [(w, n) for (w, n) in targets if args.only in (w, n)]
@@ -58,7 +79,6 @@ def main():
 
     done = sum(1 for v in state.values() if v.get("status") == "ok")
     print(f"processing {len(pending)} of {len(targets)} (state has {done} done)", flush=True)
-    log_path = os.path.join(LOG_DIR, "run.log")
 
     cf = 0
     with common.clay_page(headless=not args.headed) as page, \

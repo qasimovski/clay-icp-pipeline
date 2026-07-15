@@ -11,15 +11,21 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 AUTO_DIR = os.path.dirname(SCRIPT_DIR)
+sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
 import common         # noqa: E402
 import build_lib as B  # noqa: E402
+import pipeline_config as PC  # noqa: E402
 
-TABLE = "Exhibitors_normalized"
-TEMPLATE = "Exhibitors - Lookup & Send Table Data - v1"
+# Entity/ICP-driven (defaults exhibitors/labs; override via CLAY_PIPELINE_ENTITY).
+# The lookup template's field-mapping is entity-specific (raw columns differ) —
+# verify the Sponsors template before running it for Sponsors.
+_CFG = PC.load()
+TABLE = _CFG.main_table
+TEMPLATE = _CFG.templates.get("lookup", "Exhibitors - Lookup & Send Table Data - v1")
 EC = "Enrich Company - Terrapinn - Competitors"
 SIG = "Send table data"   # present => this template already applied
 
