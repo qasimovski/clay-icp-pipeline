@@ -805,19 +805,24 @@ class WorkbookBuilder:
         if not colcfg.header_exists(page, "JT Fit"):
             raise colcfg.VerificationError("JT Fit column not created")
         self.say("JT Fit text column ready")
+        # try/finally: this flag selects a different formula template at
+        # :315, so leaving it set after a raise silently mis-builds every
+        # later formula column on this builder.
         self._contacts_ct = True
-        self.formula(
-            "Composite Tier",
-            'Using the columns "Fit", "JT Fit" and "Country Fit", concatenate '
-            'their values in that exact order into a three letter code. '
-            'Return the number 1 if the code is one of: AAA, ABA, BAA, AAB. '
-            'Return the number 2 if the code is one of: BAB, BBA, CAB, AAC, '
-            'ABB, BBB, ACA, ACB, BAC. Return the number 3 for any other '
-            'complete three letter code. If any of the three column values '
-            'is empty return an empty string.',
-            lambda f, pv: (all(x in f.upper() for x in ("AAA", "ABA", "BAA", "AAB",
-                                                        "CAB", "BAC")), "formula"))
-        self._contacts_ct = False
+        try:
+            self.formula(
+                "Composite Tier",
+                'Using the columns "Fit", "JT Fit" and "Country Fit", concatenate '
+                'their values in that exact order into a three letter code. '
+                'Return the number 1 if the code is one of: AAA, ABA, BAA, AAB. '
+                'Return the number 2 if the code is one of: BAB, BBA, CAB, AAC, '
+                'ABB, BBB, ACA, ACB, BAC. Return the number 3 for any other '
+                'complete three letter code. If any of the three column values '
+                'is empty return an empty string.',
+                lambda f, pv: (all(x in f.upper() for x in ("AAA", "ABA", "BAA", "AAB",
+                                                            "CAB", "BAC")), "formula"))
+        finally:
+            self._contacts_ct = False
 
     # ---------------------------------------------------------- find people
     def _fp_search(self, table, name, desc, min_filters):

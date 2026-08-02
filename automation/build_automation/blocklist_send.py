@@ -27,8 +27,17 @@ def _rows_and_sources(page):
     """Read the currently-focused table's row count and merge-source count
     from the toolbar. A fresh table with no incoming sends has no "Rows
     from:" badge at all, which reads as 0 sources."""
-    rows_text = page.get_by_text(re.compile(r"^[\d,]+/[\d,]+ rows$")).first.inner_text()
-    rows = int(rows_text.split("/")[1].split(" ")[0].replace(",", ""))
+    badge = page.get_by_text(re.compile(r"^[\d,]+/[\d,]+ rows$")).first
+    badge.wait_for(state="visible", timeout=30000)
+    rows_text = badge.inner_text()
+    # This count decides whether a table has room for another send, so a
+    # surprise in the badge format must fail loudly rather than via a bare
+    # ValueError from int().
+    m = re.search(r"/\s*([\d,]+)\s*rows", rows_text)
+    if not m:
+        raise colcfg.VerificationError(
+            f"could not parse the row badge {rows_text!r}")
+    rows = int(m.group(1).replace(",", ""))
 
     sources = 0
     try:
@@ -68,9 +77,22 @@ def ensure_destination(page, log=None):
     # Table 1's direct URL is known-good and reliably hydrates; land there
     # first, then use ordinary tab clicks for any further tables — the same
     # pattern already proven inside every event build.
-    page.goto(TABLE1_URL, wait_until="domcontentloaded")
-    page.get_by_text(re.compile(r"^[\d,]+/[\d,]+ rows$")).first.wait_for(
-        state="visible", timeout=30000)
+    # Retried like every other navigation in the codebase (clay_ui retries 6x):
+    # a single flake here used to fail the whole blocklist step for the event.
+    last = None
+    for attempt in range(4):
+        try:
+            page.goto(TABLE1_URL, wait_until="domcontentloaded", timeout=45000)
+            page.get_by_text(re.compile(r"^[\d,]+/[\d,]+ rows$")).first.wait_for(
+                state="visible", timeout=30000)
+            break
+        except Exception as e:
+            last = e
+            say(f"[blocklist_send] nav retry {attempt}: {str(e)[:100]}")
+            page.wait_for_timeout(2000)
+    else:
+        raise colcfg.VerificationError(
+            f"could not open the blocklist table after 4 attempts: {last}")
     page.wait_for_timeout(1000)
 
     for idx in range(1, MAX_TABLE_INDEX + 1):

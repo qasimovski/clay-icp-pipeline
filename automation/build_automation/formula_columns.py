@@ -7,6 +7,8 @@ TipTap editor) or newlines.
 """
 import browser_session
 
+VerificationError = browser_session.VerificationError
+
 
 def _panel_editors(page):
     """Visible contenteditables inside the right-hand panel, top-to-bottom."""
@@ -67,15 +69,21 @@ def preview_cells(page, n=8, header="Preview"):
 def build_formula_column(page, description, screenshot_prefix, gen_timeout=150000):
     """Open add-column -> Formula, describe, Generate, and return
     (formula_text, preview) WITHOUT saving. Caller verifies then saves."""
-    assert "/" not in description and "\n" not in description, \
-        "description must avoid '/' and newlines (token picker / paragraph breaks)"
+    # These are real verification gates, so raise rather than assert: assert
+    # statements vanish under `python -O`, which would silently disable every
+    # check that stops a mis-built column.
+    if "/" in description or "\n" in description:
+        raise VerificationError(
+            "description must avoid '/' and newlines "
+            "(token picker / paragraph breaks)")
     page.get_by_role("button", name="Add column").first.click(timeout=40000)
     page.wait_for_timeout(1200)
     page.get_by_role("menuitem", name="Formula", exact=True).first.click(timeout=25000)
     page.wait_for_timeout(2000)
 
     eds = _panel_editors(page)
-    assert eds, "no description editor found in formula panel"
+    if not (eds):
+        raise VerificationError("no description editor found in formula panel")
     desc = page.locator('[contenteditable="true"]').nth(eds[0]["i"])
     desc.click(timeout=5000)
     page.keyboard.type(description, delay=4)
@@ -174,7 +182,8 @@ def rename_column(page, current, new, screenshot_prefix=None):
     """Rename a column via its header menu. Grid must show the header
     (call scroll_grid_right first for right-end columns)."""
     pos = header_click_pos(page, current)
-    assert pos, f"header {current!r} not clickable in viewport"
+    if not (pos):
+        raise VerificationError(f"header {current!r} not clickable in viewport")
     page.mouse.click(pos["x"] + 10, pos["y"])
     page.wait_for_timeout(1200)
     # With many columns the header menu grows a long column-list section and
@@ -207,7 +216,8 @@ def rename_column(page, current, new, screenshot_prefix=None):
         if _header_pos(page, new):
             return
         page.wait_for_timeout(2000)
-    assert _header_pos(page, new), f"rename to {new!r} did not take"
+    if not (_header_pos(page, new)):
+        raise VerificationError(f"rename to {new!r} did not take")
 
 
 def last_header(page, exclude=("Add column", "+ Add column")):
@@ -281,7 +291,8 @@ def build_formula_handwritten(page, template, screenshot_prefix):
             page.mouse.click(pos["x"], pos["y"])
         page.wait_for_timeout(1500)
         eds = _panel_editors(page)
-    assert len(eds) >= 2, "manual formula editor not found"
+    if not (len(eds) >= 2):
+        raise VerificationError("manual formula editor not found")
     ed = page.locator('[contenteditable="true"]').nth(eds[-1]["i"])
     ed.click(timeout=8000)
     page.keyboard.press("Control+a")

@@ -21,6 +21,15 @@ import clay_sync        # noqa: E402  (SESSION_PATH, UA)
 
 from playwright.sync_api import sync_playwright  # noqa: E402
 
+
+class VerificationError(Exception):
+    """A verification gate failed - stop this event, never click past it.
+
+    Defined here rather than in column_config so formula_columns can raise it
+    too: column_config imports formula_columns, so the reverse import would
+    be circular.
+    """
+
 SHOTS_DIR = os.path.join(SCRIPT_DIR, "shots")
 os.makedirs(SHOTS_DIR, exist_ok=True)
 

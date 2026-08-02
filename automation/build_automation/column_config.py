@@ -27,8 +27,10 @@ import formula_columns
 import clay_ui
 
 
-class VerificationError(Exception):
-    """A verification gate failed — stop this event, never click past it."""
+# Defined in browser_session so formula_columns can raise it too (importing
+# column_config from there would be circular). Re-exported here because every
+# caller reaches it as colcfg.VerificationError.
+VerificationError = browser_session.VerificationError
 
 
 # ---------------------------------------------------------------- navigation
@@ -363,6 +365,10 @@ def add_run_condition(page, pre_text, token, post_text=""):
     if not lab.count():
         raise VerificationError("run condition label not visible")
     lb = lab.first.bounding_box()
+    if not lb:
+        # bounding_box() is None for a not-yet-laid-out element; without this
+        # the lb["y"] below raises TypeError instead of a clear gate failure.
+        raise VerificationError("run condition label has no layout box yet")
     cb = None
     for el in page.locator('[role="checkbox"]').all():
         try:
