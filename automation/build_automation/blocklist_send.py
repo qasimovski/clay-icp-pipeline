@@ -65,14 +65,56 @@ MAX_TABLE_INDEX = 10  # Table 1..10 already exist (created manually); if all
                        # than risk more fragile create/rename automation.
 
 
+# Per-process memo of the table the last scan settled on, plus how many sends
+# we have routed to it since. The scan is expensive (a nav plus, per table, a
+# popover open/close) and re-ran for EVERY event in a 77-workbook fleet, even
+# though its answer only changes once a table gains MAX_SOURCES sources. We
+# re-scan when the memoized table could plausibly be full, so the cap is still
+# enforced by a live reading and never by arithmetic alone.
+_destination_memo = None       # (path_list, sources_at_scan)
+_sends_since_scan = 0
+
+
+def note_send_routed():
+    """Record that one send was configured to the memoized destination.
+
+    build_workbook calls this after a successful send so the memo knows when
+    the cached table may have filled up."""
+    global _sends_since_scan
+    _sends_since_scan += 1
+
+
+def reset_destination_memo():
+    """Forget the cached destination (new process/fleet run, or after a
+    manual change in Clay)."""
+    global _destination_memo, _sends_since_scan
+    _destination_memo = None
+    _sends_since_scan = 0
+
+
 def ensure_destination(page, log=None):
     """Return the destination path list (e.g. [..., "Table 2"]) of the first
     blocklist table (Table 1..MAX_TABLE_INDEX) with room for one more source
     and under the row cap. Raises RuntimeError if all existing tables are
     full — that means a human needs to add the next one."""
+    global _destination_memo, _sends_since_scan
+
     def say(msg):
         if log:
             log.write(msg + "\n")
+
+    if _destination_memo is not None:
+        path, sources_at_scan = _destination_memo
+        # Only trust the memo while the table demonstrably still has room even
+        # if every send since the scan added a source.
+        if sources_at_scan + _sends_since_scan < MAX_SOURCES:
+            say(f"[blocklist_send] reusing {path[-1]} "
+                f"(scanned at {sources_at_scan} sources, "
+                f"+{_sends_since_scan} since)")
+            return path
+        say(f"[blocklist_send] re-scanning: {path[-1]} may be full "
+            f"({sources_at_scan}+{_sends_since_scan} >= {MAX_SOURCES})")
+        reset_destination_memo()
 
     # Table 1's direct URL is known-good and reliably hydrates; land there
     # first, then use ordinary tab clicks for any further tables — the same
@@ -108,7 +150,10 @@ def ensure_destination(page, log=None):
         rows, sources = _rows_and_sources(page)
         say(f"[blocklist_send] {name}: rows={rows} sources={sources}")
         if sources < MAX_SOURCES and rows < (MAX_ROWS - ROW_SAFETY_MARGIN):
-            return BLOCKLIST_WORKBOOK_PATH + [name]
+            path = BLOCKLIST_WORKBOOK_PATH + [name]
+            _destination_memo = (path, sources)
+            _sends_since_scan = 0
+            return path
 
     raise RuntimeError(
         f"All blocklist tables (Table 1..{MAX_TABLE_INDEX}) are full — "

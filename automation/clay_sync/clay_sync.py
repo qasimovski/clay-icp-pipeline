@@ -167,13 +167,20 @@ def sync_normalized(args):
                     browser.close()
                     print("\nClay session expired or invalid — run: python clay_login.py")
                     sys.exit(1)
+                # One folder hydration + one listing scroll, then navigate by
+                # id. workbook_exists() + open_workbook() each re-scrolled the
+                # virtualized ~90-row listing and each needed its own
+                # open_target_location, so this folder cost 3 hydrations and 2
+                # full scroll passes to reach a workbook whose id the first
+                # listing already returned.
                 clay_ui.open_target_location(page)
-                if not clay_ui.workbook_exists(page, folder):
+                wid = next((i for i, n in clay_ui.list_workbooks(page).items()
+                            if n == folder), None)
+                if wid is None:
                     print(f"  SKIP {folder}: workbook does not exist")
                     missing_wb.append(folder)
                     continue
-                clay_ui.open_target_location(page)
-                clay_ui.open_workbook(page, folder)
+                clay_ui.open_workbook_by_id(page, wid)
                 if table in clay_ui.existing_tables(page, [table]):
                     print(f"  SKIP {folder}: table {table!r} already present")
                     skipped_exists.append(folder)
@@ -332,14 +339,16 @@ def main():
                 # into it) and reconcile live against Clay, so a partial prior
                 # run converges instead of skipping incomplete workbooks or
                 # creating duplicates.
+                # One hydration + one listing scroll; the listing already
+                # yields the id, so navigate by id instead of scrolling the
+                # virtualized listing a second time to click the cell.
                 clay_ui.open_target_location(page)
-                if clay_ui.workbook_exists(page, folder):
+                wid = next((i for i, n in clay_ui.list_workbooks(page).items()
+                            if n == folder), None)
+                if wid is not None:
                     # Workbook already there — add only whichever tables are
                     # missing (self-heals partial/interrupted earlier runs).
-                    # The existence check scrolled the (virtualized) listing,
-                    # so re-open the folder before clicking the workbook cell.
-                    clay_ui.open_target_location(page)
-                    clay_ui.open_workbook(page, folder)
+                    clay_ui.open_workbook_by_id(page, wid)
                     have = clay_ui.existing_tables(page, [t for t, _ in tables])
                     missing = [(t, p) for t, p in tables if t not in have]
                     for _, p in missing:

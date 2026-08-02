@@ -638,6 +638,9 @@ class WorkbookBuilder:
             self.say(f"WARN blocklist mapping kept locked extras: {extras}")
         colcfg.save_via_menu(page, r"Save and run .* rows in this view")
         self.rename_new("Send to Blocklist", "Exhibitors_normalized", ("Send table data",))
+        # Tell the destination memo this table gained a source, so it knows
+        # when to re-scan instead of trusting a stale reading.
+        blocklist_send.note_send_routed()
         self.screenshot("14_blocklist")
         self.say("Blocklist send created AND run")
 
