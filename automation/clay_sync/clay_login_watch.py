@@ -55,6 +55,18 @@ def page_state(page):
 
 def attempt(p, launch_kwargs, label, deadline_s):
     browser = p.chromium.launch(headless=False, **launch_kwargs)
+    try:
+        return _watch_for_login(browser, label, deadline_s)
+    finally:
+        # finally, not a trailing call: an exception in the poll loop used to
+        # leave the Chrome window running.
+        try:
+            browser.close()
+        except Exception:
+            pass
+
+
+def _watch_for_login(browser, label, deadline_s):
     ctx = browser.new_context()
     page = ctx.new_page()
     for i in range(3):
@@ -96,7 +108,6 @@ def attempt(p, launch_kwargs, label, deadline_s):
         print("TIMEOUT - no signed-in tab seen. If you logged in inside a "
               "DIFFERENT Chrome window (not the one this opened), that session "
               "cannot be captured - redo it in this script's window.", flush=True)
-    browser.close()
     return saved
 
 

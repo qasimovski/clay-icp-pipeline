@@ -36,7 +36,12 @@ class ClayUIError(Exception):
 # --------------------------------------------------------------------------
 
 def is_logged_in(page: Page) -> bool:
-    """Navigate to Clay and report whether we have an authenticated session."""
+    """Navigate to Clay and report whether we have an authenticated session.
+
+    A URL check alone is not enough: when Clay bot-blocks an automated
+    browser it serves the logged-out marketing page ON app.clay.com, whose
+    URL contains no "login" (see browser_session.py). So we also require a
+    signed-in affordance to be present."""
     try:
         page.goto(CLAY_URL, wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("networkidle", timeout=15000)
@@ -45,7 +50,18 @@ def is_logged_in(page: Page) -> bool:
     url = page.url.lower()
     if any(x in url for x in ("login", "signin", "sign-in")):
         return False
-    return True
+    # Require positive evidence of a signed-in app view. Any one of these is
+    # enough (the landing view differs by workspace state); none of them exist
+    # on the logged-out marketing page Clay serves to a blocked browser.
+    for probe in (lambda: page.get_by_test_id("create-new"),
+                  lambda: page.locator('a[href*="/workbooks/"]'),
+                  lambda: page.locator('a[href*="/workspaces/"]')):
+        try:
+            probe().first.wait_for(timeout=10000)
+            return True
+        except Exception:
+            continue
+    return False
 
 
 def _open_cell(page: Page, name: str) -> None:
@@ -197,14 +213,21 @@ def open_workbook(page: Page, name: str) -> None:
 def existing_tables(page: Page, candidates: list) -> set:
     """Which of `candidates` (table names) already exist in the open workbook.
     Each table tab renders as a button with the table's exact name; with only
-    the four standard names in play, presence-checking each is unambiguous."""
+    the four standard names in play, presence-checking each is unambiguous.
+
+    Raises rather than reporting absence if a check fails: callers branch on
+    this to decide whether to import a CSV, so a swallowed timeout read as
+    "table absent" and imported a duplicate table."""
     found = set()
     for name in candidates:
         try:
             if page.get_by_role("button", name=name, exact=True).count() > 0:
                 found.add(name)
-        except Exception:
-            pass
+        except Exception as e:
+            raise ClayUIError(
+                f"could not determine whether table {name!r} exists "
+                f"({type(e).__name__}: {str(e)[:120]}); refusing to report it "
+                f"absent, which would import a duplicate table")
     return found
 
 

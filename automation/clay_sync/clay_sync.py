@@ -160,6 +160,11 @@ def sync_normalized(args):
             page = ctx.new_page()
             try:
                 if not clay_ui.is_logged_in(page):
+                    # Close the browser here: SystemExit skips the
+                    # browser.close() after this loop (it is not an Exception,
+                    # so the except below never sees it).
+                    page.close()
+                    browser.close()
                     print("\nClay session expired or invalid — run: python clay_login.py")
                     sys.exit(1)
                 clay_ui.open_target_location(page)
