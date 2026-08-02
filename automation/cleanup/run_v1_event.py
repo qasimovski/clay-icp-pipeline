@@ -15,8 +15,10 @@ sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 import clay_ui        # noqa: E402
 import common         # noqa: E402
 import build_lib as B  # noqa: E402
+import pipeline_config as PC  # noqa: E402
 
-TABLE = "Exhibitors_normalized"
+# Entity-driven (default exhibitors; override via CLAY_PIPELINE_ENTITY).
+TABLE = PC.load().main_table
 V1_SIGNATURE = "Official Domain"   # present only if v1 applied
 
 
@@ -44,7 +46,7 @@ def run_v1(page, entry, dry_run, say):
     for mi in page.get_by_role("menuitem").all():
         try:
             t = mi.inner_text().strip()
-            if mi.is_visible() and re.match(r"Run [\d.,Kk]+ rows", t):
+            if mi.is_visible() and re.match(r"Run [\d.,Kk]+ rows?", t):
                 ran = t; mi.click(timeout=8000); break
         except Exception:
             pass

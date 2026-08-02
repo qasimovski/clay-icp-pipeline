@@ -270,8 +270,10 @@ def _rename_new_people_table(page, wid, say):
     clay_ui.open_workbook_by_id(page, wid)
     page.wait_for_timeout(3000)
     page.keyboard.press("Escape"); page.wait_for_timeout(500)
-    # the new table is the bottom tab that is not a known table
-    known = {TABLE, "Sponsors_normalized", PEOPLE_TABLE}
+    # the new table is the bottom tab that is not a known table. Protect BOTH
+    # normalized sources (in Sponsors mode TABLE is Sponsors_normalized, so
+    # Exhibitors_normalized must be listed explicitly or it could be grabbed).
+    known = {TABLE, "Sponsors_normalized", "Exhibitors_normalized", PEOPLE_TABLE}
     info = page.evaluate("""(known)=>{for(const el of document.querySelectorAll('button,[role="tab"]')){
         const r=el.getBoundingClientRect(); if(r.width===0||r.y<914||r.y>944||r.x<135||r.x>1150)continue;
         const t=(el.textContent||'').trim();
@@ -358,7 +360,7 @@ def _prepare_people_table(page, wid, say):
     tabs = _bottom_tabs(page)
     if PEOPLE_TABLE in tabs:
         return True
-    known = {TABLE, "Sponsors_normalized", "Overview", "Add", ""}
+    known = {TABLE, "Sponsors_normalized", "Exhibitors_normalized", "Overview", "Add", ""}
     # never salvage a finished people table (e.g. 'Sellers - People' /
     # 'Buyers - People') — only auto-named interrupted artifacts.
     stray = [t for t in tabs if t not in known and not t.endswith(" - People")]

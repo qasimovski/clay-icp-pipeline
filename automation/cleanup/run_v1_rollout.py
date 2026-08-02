@@ -17,15 +17,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 
 import common          # noqa: E402
 import run_v1_event as R  # noqa: E402
+import pipeline_config as _PC  # noqa: E402
 
-MANIFEST_PATH = os.path.join(SCRIPT_DIR, "cols_manifest.json")
-APPLIED_STATE = os.path.join(SCRIPT_DIR, "v1_state_all.json")   # applied set
+_SLUG = _PC.load().slug()  # entity slug namespaces manifest + state (shared workbooks)
+MANIFEST_PATH = os.path.join(SCRIPT_DIR, f"cols_manifest_{_SLUG}.json")
+APPLIED_STATE = os.path.join(SCRIPT_DIR, f"v1_state_{_SLUG}_all.json")   # applied set
 LOG_DIR = os.path.join(SCRIPT_DIR, "v1run_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
 def state_path(tag):
-    return os.path.join(SCRIPT_DIR, f"v1run_state_{tag}.json")
+    return os.path.join(SCRIPT_DIR, f"v1run_state_{_SLUG}_{tag}.json")
 
 
 def load(p):
@@ -47,6 +49,8 @@ def main():
     ap.add_argument("--only")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--shard", type=int, default=None)
+    ap.add_argument("--shards", type=int, default=1)
     args = ap.parse_args()
 
     manifest = json.load(open(MANIFEST_PATH, encoding="utf-8"))
@@ -55,8 +59,11 @@ def main():
     wbs = [e for e in manifest["workbooks"] if e["workbook_id"] in applied_ids]
     if args.only:
         wbs = [e for e in wbs if args.only in (e["workbook_id"], e["workbook_name"])]
+    if args.shard is not None:
+        wbs = [e for i, e in enumerate(wbs) if i % args.shards == args.shard]
 
-    tag = "dry" if args.dry_run else "all"
+    tag = ("dry" if args.dry_run else
+           (f"w{args.shard}" if args.shard is not None else "all"))
     sp = state_path(tag)
     st = {} if args.dry_run else load(sp)
     pending = [e for e in wbs if st.get(e["workbook_id"], {}).get("status") not in ("ok", "skip")]

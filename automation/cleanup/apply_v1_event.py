@@ -28,7 +28,22 @@ import pipeline_config as PC  # noqa: E402
 _CFG = PC.load()
 TABLE = _CFG.main_table
 TEMPLATE = _CFG.templates.get("all_columns", "Exhibitors - All Columns - v1")
-FILL = [("Country", "Country"), ("Description", "Description")]
+# Template config-field label -> raw column to map it to. Each entity's saved
+# template labels its two fillable fields with that entity's own source-column
+# names, so label == target here: Exhibitors' template asks "Country"/"Description"
+# (its columns), Sponsors' asks "Location"/"Company Description" (its columns) —
+# both taken from config/entity-types/<entity>.yaml: field_sources. Company Name /
+# Website are pre-filled by auto-map and skipped.
+_FS = _CFG.entity_cfg.get("field_sources", {})
+_COUNTRY_FIELD = _FS.get("country_source_field", "Country")
+_DESC_FIELD = _FS.get("description_source_field", "Description")
+# Prefer an explicit template_v1_fill from the entity config (list of
+# [field_label, column]); else fall back to the field_sources-derived pair.
+_EXPLICIT_FILL = _CFG.entity_cfg.get("template_v1_fill")
+if _EXPLICIT_FILL:
+    FILL = [(f[0], f[1]) for f in _EXPLICIT_FILL]
+else:
+    FILL = [(_COUNTRY_FIELD, _COUNTRY_FIELD), (_DESC_FIELD, _DESC_FIELD)]
 # a column v1 adds that the reverted base lacks — its presence => already applied
 V1_SIGNATURE = "Official Domain"
 
@@ -46,10 +61,23 @@ _FIELD_BOX = """(label)=>{
 }"""
 
 
-def _open_v1(page):
+def _open_enrichment_dialog(page):
+    """Open the 'Add enrichment' dialog. The Tools panel is open by default now,
+    so click its 'View all enrichments' button directly; only fall back to
+    Ctrl+E (which used to be required) if the button isn't immediately present."""
+    va = page.get_by_text("View all enrichments", exact=False)
+    try:
+        va.first.click(timeout=8000)
+        return
+    except Exception:
+        pass
     page.keyboard.press("Control+e")
     page.wait_for_timeout(2000)
-    page.get_by_text("View all enrichments", exact=False).first.click(timeout=25000)
+    va.first.click(timeout=15000)
+
+
+def _open_v1(page):
+    _open_enrichment_dialog(page)
     page.wait_for_timeout(2500)
     page.get_by_role("tab", name="Templates").first.click(timeout=25000)
     page.wait_for_timeout(2000)
@@ -113,7 +141,14 @@ def apply_v1(page, entry, dry_run, say):
 
     plan = []
     for label, target in FILL:
-        info = page.evaluate(_FIELD_BOX, label)
+        # Poll for the field: on a slow link the config panel can take several
+        # seconds to render its rows, so retry before declaring it missing.
+        info = None
+        for _ in range(12):
+            info = page.evaluate(_FIELD_BOX, label)
+            if info:
+                break
+            page.wait_for_timeout(1000)
         if not info:
             say(f"ABORT {name}: field {label!r} not found")
             page.keyboard.press("Escape")

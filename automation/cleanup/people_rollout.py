@@ -29,7 +29,6 @@ import common               # noqa: E402
 import people_builds as P   # noqa: E402
 import pipeline_config as PC  # noqa: E402
 
-MANIFEST = os.path.join(SCRIPT_DIR, "cols_manifest.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "people_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -49,18 +48,23 @@ def main():
     ap.add_argument("--only")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--shard", type=int, default=None)
+    ap.add_argument("--shards", type=int, default=1)
     args = ap.parse_args()
 
     cfg = P.configure(args.entity, args.icp)   # point the build at this entity/ICP
     slug = cfg.slug()
+    manifest_path = os.path.join(SCRIPT_DIR, f"cols_manifest_{slug}.json")
     targets_path = os.path.join(SCRIPT_DIR, f"people_targets_{slug}.json")
-    STATE = os.path.join(SCRIPT_DIR, f"people_state_{slug}.json")
-    log_path = os.path.join(LOG_DIR, f"run_{slug}.log")
+    # Per-shard state so concurrent workers (disjoint events) never race on one file.
+    _sfx = f"_w{args.shard}" if args.shard is not None else ""
+    STATE = os.path.join(SCRIPT_DIR, f"people_state_{slug}{_sfx}.json")
+    log_path = os.path.join(LOG_DIR, f"run_{slug}{_sfx}.log")
     print(f"entity={cfg.entity} icp={cfg.icp} | source={cfg.main_table} "
           f"-> {cfg.seller_people_table}", flush=True)
 
     wbs = {e["workbook_id"]: e["workbook_name"]
-           for e in json.load(open(MANIFEST, encoding="utf-8"))["workbooks"]}
+           for e in json.load(open(manifest_path, encoding="utf-8"))["workbooks"]}
     target_ids = load(targets_path, [])
     if not target_ids:
         raise SystemExit(
@@ -71,13 +75,22 @@ def main():
         targets = [(w, n) for (w, n) in targets if args.only in (w, n)]
         if not targets:
             raise SystemExit(f"--only {args.only!r} matched nothing")
+    if args.shard is not None:
+        targets = [t for i, t in enumerate(targets) if i % args.shards == args.shard]
 
     state = load(STATE, {})
-    pending = [(w, n) for (w, n) in targets if state.get(w, {}).get("status") != "ok"]
+    # An event is "done" if it is ok in this shard's state OR in the base
+    # (non-sharded) state — so events completed via a plain/--only run (e.g. the
+    # WCF test) are never re-processed by a shard and appended twice.
+    base_state = load(os.path.join(SCRIPT_DIR, f"people_state_{slug}.json"), {}) \
+        if args.shard is not None else {}
+    def _done(w):
+        return state.get(w, {}).get("status") == "ok" or base_state.get(w, {}).get("status") == "ok"
+    pending = [(w, n) for (w, n) in targets if not _done(w)]
     if args.limit:
         pending = pending[: args.limit]
 
-    done = sum(1 for v in state.values() if v.get("status") == "ok")
+    done = len(targets) - len(pending)
     print(f"processing {len(pending)} of {len(targets)} (state has {done} done)", flush=True)
 
     cf = 0

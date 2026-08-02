@@ -18,14 +18,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 
 import common          # noqa: E402
 import apply_v1_event as A  # noqa: E402
+import pipeline_config as _PC  # noqa: E402
 
-MANIFEST_PATH = os.path.join(SCRIPT_DIR, "cols_manifest.json")
+_SLUG = _PC.load().slug()  # entity slug namespaces manifest + state (shared workbooks)
+MANIFEST_PATH = os.path.join(SCRIPT_DIR, f"cols_manifest_{_SLUG}.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "v1_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
 def state_path(tag):
-    return os.path.join(SCRIPT_DIR, f"v1_state_{tag}.json")
+    return os.path.join(SCRIPT_DIR, f"v1_state_{_SLUG}_{tag}.json")
 
 
 def load_state(p):

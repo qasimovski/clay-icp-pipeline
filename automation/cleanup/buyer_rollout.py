@@ -28,7 +28,6 @@ import common               # noqa: E402
 import buyer_builds as BU   # noqa: E402
 import pipeline_config as PC  # noqa: E402
 
-MANIFEST = os.path.join(SCRIPT_DIR, "cols_manifest.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "buyer_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -58,13 +57,14 @@ def main():
 
     cfg = BU.configure(args.entity, args.icp)   # point the build at this entity/ICP
     slug = cfg.slug()
+    manifest_path = os.path.join(SCRIPT_DIR, f"cols_manifest_{slug}.json")
     targets_path = os.path.join(SCRIPT_DIR, f"buyer_targets_{slug}.json")
     STATE = os.path.join(SCRIPT_DIR, f"buyer_state_{slug}.json")
     print(f"entity={cfg.entity} icp={cfg.icp} | source={cfg.main_table} "
           f"-> {cfg.buyer_people_table}", flush=True)
 
     names = {}
-    for e in json.load(open(MANIFEST, encoding="utf-8"))["workbooks"]:
+    for e in json.load(open(manifest_path, encoding="utf-8"))["workbooks"]:
         names[e["workbook_id"]] = e["workbook_name"]
     target_ids = load(targets_path, [])
     if not target_ids:

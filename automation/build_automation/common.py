@@ -84,6 +84,9 @@ def clay_page(headless=True):
                   "--disable-dev-shm-usage", "--disable-gpu",
                   "--disable-extensions", "--disable-background-networking",
                   "--disable-features=site-per-process,TranslateUI",
+                  # Disable QUIC/HTTP3: app.clay.com intermittently throws
+                  # ERR_QUIC_PROTOCOL_ERROR on this network; forcing HTTP/2 avoids it.
+                  "--disable-quic",
                   "--renderer-process-limit=2"])
         ctx = browser.new_context(storage_state=clay_sync.SESSION_PATH,
                                   user_agent=clay_sync.UA,

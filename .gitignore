@@ -31,3 +31,26 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Pasted inputs and vendor docs kept at the repo root. "People - Filters*.txt"
+# holds live Clay table/view/filter ids (t_/gv_/f_), which SENSITIVE_DATA.md
+# keeps out of the repo; the screenshots are run artifacts.
+/People - Filters*.txt
+/Query Skill.md
+/*.png
+# Pre-merge snapshots written by the people-builds rollout
+*.premerge
+# Import-run state/logs from the EVCharge pass (live workbook ids)
+automation/clay_sync/*_state.json
+automation/clay_sync/*_state_*.json
+automation/clay_sync/evcharge_logs/
+
+# Live Clay query files — carry table/view/filter IDs (workspace identifiers)
+# AND the full targeted title/country lists, i.e. the same proprietary ICP
+# targeting logic that *_contact_titles.csv is excluded for. See
+# docs/SENSITIVE_DATA.md. The shape and the correctness rules are documented in
+# docs/PEOPLE_STEP.md; the values stay local.
+People - Filters*.txt
+
+# Blocklist ledger — real company/people exports fed to load_csv.js
+blocklist_ledger/*.csv

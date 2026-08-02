@@ -1,7 +1,9 @@
 """Build the column-trim manifest: for each in-scope Competitive Events
-Exhibitors_normalized table, list the columns to the RIGHT of 'Normalized
-Country' (these get deleted; everything up to and including Normalized Country
-is kept).
+<entity> main table, list the columns to the RIGHT of the entity's cut column
+(these get deleted; everything up to and including the cut column is kept).
+
+Entity-aware via CLAY_PIPELINE_ENTITY (default exhibitors): Exhibitors cuts at
+'Website'; Sponsors cuts at 'Year' (see config/entity-types/<entity>.yaml).
 
 Inventory-driven and read-only. Column order comes from `clay tables columns
 list` which matches the UI's left-to-right display order (verified via recon).
@@ -12,7 +14,7 @@ Outputs (next to this script):
   cols_snapshot.json          pre-run full column list per in-scope table
 
 Scope: workbooks inside Competitive Events (competitive_events_workbooks.json)
-that have an Exhibitors_normalized table, excluding PROTECTED. Run in WSL/Linux.
+that have the entity's main table, excluding PROTECTED. Run in WSL/Linux.
 """
 
 import glob
@@ -22,22 +24,33 @@ import subprocess
 import sys
 import time
 
+import pipeline_config as _PC
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FOLDER_PATH = os.path.join(SCRIPT_DIR, "competitive_events_workbooks.json")
-MANIFEST_PATH = os.path.join(SCRIPT_DIR, "cols_manifest.json")
-SNAPSHOT_PATH = os.path.join(SCRIPT_DIR, "cols_snapshot.json")
 
-TABLE = "Exhibitors_normalized"
-CUT_COLUMN = "Website"   # keep this and everything left; delete right (revert pass)
+# Entity-driven (config/entity-types/<entity>.yaml, via CLAY_PIPELINE_ENTITY).
+_CFG = _PC.load()
+_SLUG = _CFG.slug()
+TABLE = _CFG.main_table
+CUT_COLUMN = _CFG.entity_cfg.get("trim_cut_column", "Website")  # keep this + left; delete right
+# Per-entity manifest/snapshot: Sponsors & Exhibitors live in the SAME workbooks,
+# so one fixed cols_manifest.json would collide (and a Sponsors build would clobber
+# the Exhibitors one). The slug (e.g. sponsors_labs) keeps them separate.
+MANIFEST_PATH = os.path.join(SCRIPT_DIR, f"cols_manifest_{_SLUG}.json")
+SNAPSHOT_PATH = os.path.join(SCRIPT_DIR, f"cols_snapshot_{_SLUG}.json")
 CLEAN_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# This task's protected set = the 7 from the table cleanup + Analytica.
-PROTECTED = {
+# Workbooks excluded from the trim. Falls back to the Exhibitors historical set
+# (table-cleanup 7 + Analytica) when the entity config doesn't set
+# trim_protected_workbooks; Sponsors sets its own (block-list tables only).
+_DEFAULT_PROTECTED = {
     "Labs - Block List - Companies", "Labs - Block List - People",
     "ACHEMA", "ACHEMA Middle East", "ADLM USA",
     "American Chemical Society Fall (ACS)",
     "American Chemical Society Spring (ACS)", "Analytica",
 }
+PROTECTED = set(_CFG.entity_cfg.get("trim_protected_workbooks") or _DEFAULT_PROTECTED)
 
 
 def clay_bin():

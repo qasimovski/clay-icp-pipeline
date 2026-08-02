@@ -6,3 +6,11 @@ workspace_url: "https://app.clay.com/workspaces/REPLACE_ME/home/REPLACE_ME"
 workspace_name: "REPLACE_ME"          # e.g. "Labs [2026 - Qasim - Fable]"
 events_folder: "Competitive Events"    # folder holding one workbook per event
 blocklist_table: "REPLACE_ME - Blocklist - Companies"   # one level up from events_folder
+
+# EVCharge import (automation/clay_sync/import_evcharge.py). Find these by
+# opening the folder in Clay and reading the ids out of the URL. Environment
+# overrides: CLAY_WORKSPACE_ID / CLAY_EVCHARGE_FOLDER_ID /
+# CLAY_EVCHARGE_SUBFOLDER_ID.
+workspace_id: "REPLACE_ME"
+evcharge_folder_id: "REPLACE_ME"       # the EVCharge folder
+evcharge_subfolder_id: "REPLACE_ME"    # "Competitive Events" inside it

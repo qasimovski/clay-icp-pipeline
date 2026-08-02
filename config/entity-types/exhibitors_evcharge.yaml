@@ -1,0 +1,49 @@
+# Entity-type config: Exhibitors (EVCharge ICP)
+#
+# Same entity as config/entity-types/exhibitors.yaml, but for the EVCharge
+# rollout, which differs in two ways that matter to the per-event passes:
+#
+#  1. The source table is lowercase `exhibitors_normalized` (Clay named it after
+#     the CSV stem produced by scrapers_evcharge/normalize_exhibitors.py), not
+#     `Exhibitors_normalized`.
+#  2. The two Labs templates (all-columns + lookup/send) are consolidated into
+#     ONE saved template: "Domain, Enrich Company, Lookup, Add rows" — Verified
+#     Domain (Claygent, gated on Website empty) -> Official Domain -> Enrich
+#     Company (+ its formula columns) -> Google Sheets Lookup row -> Add row.
+#     So `lookup` is deliberately the same template name, not a second pass.
+#
+# Workbooks live in "10. EVCharge [2026 - Qasim]" / Competitive Events.
+
+entity_type: Exhibitors
+
+source_csv: exhibitors_normalized.csv
+
+tables:
+  main: exhibitors_normalized
+
+templates:
+  all_columns: "Domain, Enrich Company, Lookup, Add rows"
+  lookup: "Domain, Enrich Company, Lookup, Add rows"
+
+raw_columns:
+  - Event
+  - Company Name
+  - Year
+  - Description
+  - Country
+  - Website
+
+field_sources:
+  country_source_field: Country
+  description_source_field: Description
+  website_source_field: Website
+
+# trim_cols pass: the through-import base is the 6 raw columns above, in CSV
+# order, so the cut is Website (the last one).
+trim_cut_column: Website
+
+notes: >
+  Pilot: applied + run on the "EV Auto Show" workbook first (52 rows, 24 with a
+  Website and 28 without, so both the Website and the Claygent Verified-Domain
+  branches get exercised) for review before any fleet rollout. ACT Expo was
+  applied and run by hand.

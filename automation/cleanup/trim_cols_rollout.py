@@ -24,8 +24,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 
 import common          # noqa: E402
 import trim_cols_event as T  # noqa: E402
+import pipeline_config as _PC  # noqa: E402
 
-MANIFEST_PATH = os.path.join(SCRIPT_DIR, "cols_manifest.json")
+_SLUG = _PC.load().slug()  # entity slug (e.g. sponsors_labs) namespaces manifest+state
+MANIFEST_PATH = os.path.join(SCRIPT_DIR, f"cols_manifest_{_SLUG}.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "cols_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -37,7 +39,7 @@ def load_manifest():
 
 
 def state_path(tag):
-    return os.path.join(SCRIPT_DIR, f"cols_state_{tag}.json")
+    return os.path.join(SCRIPT_DIR, f"cols_state_{_SLUG}_{tag}.json")
 
 
 def state_tag(args):

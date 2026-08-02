@@ -60,10 +60,16 @@ def _open_cell(page: Page, name: str) -> None:
     page.wait_for_load_state("networkidle", timeout=20000)
 
 
-def open_target_location(page: Page) -> None:
-    """Navigate Home -> Labs [2026 - Qasim] -> Competitive Events and assert
-    we're in a folder view. Raise (never fall back elsewhere) if it can't be
-    reached. Idempotent — call before working on each event.
+def open_target_location(page: Page, subfolder: str = TARGET_SUBFOLDER) -> None:
+    """Navigate Home -> Labs [2026 - Qasim] -> `subfolder` (default
+    "Competitive Events") and assert we're in a folder view. Raise (never
+    fall back elsewhere) if it can't be reached. Idempotent — call before
+    working on each event.
+
+    `subfolder` stays within the same "Labs [2026 - Qasim]" workspace folder
+    — this does not open scope to a different top-level folder, only to a
+    different named subfolder inside it (e.g. "Other Sources"), and only
+    when a caller explicitly asks for it.
 
     Clay's home/folder views load unevenly under load, so retry the whole
     hop a few times (reloading each attempt) before giving up."""
@@ -78,7 +84,7 @@ def open_target_location(page: Page) -> None:
             except PWTimeout:
                 pass
             _open_cell(page, TARGET_FOLDER)
-            _open_cell(page, TARGET_SUBFOLDER)
+            _open_cell(page, subfolder)
             # Confirm we landed somewhere we can create workbooks.
             page.get_by_test_id("create-new").wait_for(timeout=15000)
             return
@@ -86,7 +92,7 @@ def open_target_location(page: Page) -> None:
             last_err = e
             humanize.dwell(1.5, 3.0)  # let Clay settle, then retry from the top
     raise ClayUIError(
-        f"Could not navigate to {TARGET_FOLDER!r} / {TARGET_SUBFOLDER!r} after "
+        f"Could not navigate to {TARGET_FOLDER!r} / {subfolder!r} after "
         f"3 attempts: {last_err}")
 
 
@@ -349,24 +355,29 @@ def open_workbook_by_id(page, workbook_id: str) -> None:
         f"{CLAY_URL}/workspaces/{WORKSPACE_ID}/workbooks/{workbook_id}",
         f"{CLAY_URL}/workbooks/{workbook_id}",
     ]
+    # Navigation timeouts are generous by default and scalable for slow links:
+    # set CLAY_NAV_TIMEOUT (ms) or CLAY_SLOW=1 (=90s) when the connection is poor.
+    nav_to = int(os.environ.get("CLAY_NAV_TIMEOUT",
+                                "90000" if os.environ.get("CLAY_SLOW") else "45000"))
+    attempts = int(os.environ.get("CLAY_NAV_ATTEMPTS", "6"))
     last_err = None
-    for attempt in range(4):
+    for attempt in range(attempts):
         url = urls[attempt % len(urls)]
         try:
             try:
-                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                page.goto(url, wait_until="domcontentloaded", timeout=nav_to)
             except PWTimeout:
                 pass
             # The add-table bottom-bar button only exists inside an open
             # workbook, so its presence confirms we landed on the workbook view.
-            _add_table_button(page).wait_for(state="visible", timeout=25000)
+            _add_table_button(page).wait_for(state="visible", timeout=nav_to)
             humanize.dwell(0.6, 1.2)  # let the table tabs render
             return
         except Exception as e:
             last_err = e
             humanize.dwell(1.5, 3.0)
     raise ClayUIError(
-        f"Could not open workbook id {workbook_id!r} after 4 attempts: {last_err}")
+        f"Could not open workbook id {workbook_id!r} after {attempts} attempts: {last_err}")
 
 
 # The table tabs live in the workbook's bottom bar; each is a button whose
@@ -512,14 +523,17 @@ def visible_menuitems(page) -> list:
 # column deletion (Exhibitors_normalized trim: drop everything right of a marker)
 # --------------------------------------------------------------------------
 
-# Columns at/left of the cut in Exhibitors_normalized — delete_column hard-refuses
-# these so a manifest/worker bug can never trim into the kept range. Cut is now
-# 'Website' (the raw-import tail): the Normalize a Domain / Normalize Company Name
-# / Normalized Country helper columns are INTENTIONALLY deletable in this pass.
+# Columns at/left of the cut column — delete_column hard-refuses these so a
+# manifest/worker bug can never trim into the kept range. Covers both entities'
+# raw bases: Exhibitors (cut at 'Website') and Sponsors (cut at 'Year', whose raw
+# set adds Address / Location / Company Description). Helper columns like Normalize
+# a Domain / Normalized Country remain INTENTIONALLY deletable.
 KEEP_NEVER_DELETE_COLS = {
     "Created At", "Updated At", "Event", "Company Name", "Profile URL", "Booth",
     "Year", "Description", "Address Line 1", "City", "Postal Code", "Country",
     "Phone", "Email", "Website",
+    # Sponsors_normalized raw columns (defensive; they sit left of the Year cut):
+    "Address", "Location", "Company Description",
 }
 
 # Signature items unique to a column HEADER menu (not the grid cell menu): if any

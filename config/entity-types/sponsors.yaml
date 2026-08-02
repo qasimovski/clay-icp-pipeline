@@ -24,11 +24,15 @@ tables:
   buyer_people: "Sponsors - Buyers - People"
 
 # Saved Clay template names applied by the per-event passes (apply_v1 / apply_lookup).
-# These Sponsors templates must exist in Clay (built from this entity's raw_columns —
-# the schema differs from Exhibitors, so it is NOT the same template renamed).
+# all_columns: the user created "Sponsors - All Columns - v1" (2026-07-18, a copy of
+# the Exhibitors one renamed for clarity) after reviewing the World Chemical Forum
+# pilot. lookup: no Sponsors-specific lookup template exists, so it reuses the
+# Exhibitors one. Fields are remapped to the Sponsors columns at apply time via
+# field_sources below (Country->Location, Description->Company Description; Company
+# Name / Website auto-map).
 templates:
   all_columns: "Sponsors - All Columns - v1"
-  lookup: "Sponsors - Lookup & Send Table Data - v1"
+  lookup: "Sponsors - Lookup & Send Data"
 
 # Sponsors' raw CSV shape is flatter than Exhibitors' — no separate
 # City/Postal Code/Phone/Email, a single Address and a single Location field
@@ -47,6 +51,19 @@ field_sources:
   country_source_field: Location
   description_source_field: Company Description
   website_source_field: Website
+
+# trim_cols pass: keep columns up to and including this one, delete everything to
+# its right. Sponsors' raw base is Event, Company Name, Address, Website, Location,
+# Company Description, Year — so the cut is Year (unlike Exhibitors' Website).
+trim_cut_column: Year
+
+# trim_cols scope: workbooks to exclude from the Sponsors column-trim. The block-
+# list tables live outside Competitive Events (folder scope already excludes them),
+# and — unlike the Exhibitors run — no event workbooks are protected, so every
+# event's Sponsors_normalized is in scope (incl. the ACS Spring/Fall sponsor events).
+trim_protected_workbooks:
+  - Labs - Block List - Companies
+  - Labs - Block List - People
 
 # Canonical/mature field set (matches Exhibitors) — see docs/KNOWN_ISSUES.md
 # #3. Some live Sponsors replica tables only pass through Name/Website/

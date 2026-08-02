@@ -20,14 +20,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 
 import common               # noqa: E402
 import apply_lookup_event as A  # noqa: E402
+import pipeline_config as _PC  # noqa: E402
 
-MANIFEST_PATH = os.path.join(SCRIPT_DIR, "cols_manifest.json")
+_SLUG = _PC.load().slug()  # entity slug namespaces manifest + state (shared workbooks)
+MANIFEST_PATH = os.path.join(SCRIPT_DIR, f"cols_manifest_{_SLUG}.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "lookup_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
 def state_path(tag):
-    return os.path.join(SCRIPT_DIR, f"lookup_state_{tag}.json")
+    return os.path.join(SCRIPT_DIR, f"lookup_state_{_SLUG}_{tag}.json")
 
 
 def load_state(p):
@@ -49,6 +51,8 @@ def main():
     ap.add_argument("--only")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--shard", type=int, default=None)
+    ap.add_argument("--shards", type=int, default=1)
     args = ap.parse_args()
 
     manifest = json.load(open(MANIFEST_PATH, encoding="utf-8"))
@@ -57,9 +61,13 @@ def main():
         wbs = [e for e in wbs if args.only in (e["workbook_id"], e["workbook_name"])]
         if not wbs:
             raise SystemExit(f"--only {args.only!r} matched nothing")
-    # dry-run and --only still consult the shared 'all' state so completed
-    # workbooks stay skipped across batches
-    sp = state_path("all")
+    if args.shard is not None:
+        wbs = [e for i, e in enumerate(wbs) if i % args.shards == args.shard]
+    # Per-shard state files avoid a read-modify-write race between concurrent
+    # shards; a non-sharded run uses the shared 'all' state. Either way the real
+    # idempotency guard is the event-level 'Send table data' column check, so a
+    # missed state entry only causes a harmless re-skip.
+    sp = state_path("all" if args.shard is None else f"w{args.shard}")
     state = load_state(sp)
     pending = [e for e in wbs if state.get(e["workbook_id"], {}).get("status") != "ok"]
     if args.limit:

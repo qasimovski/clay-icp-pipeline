@@ -95,24 +95,45 @@ def discover(only_folder=None):
     return events
 
 
-def sync_normalized(args):
-    """Add `<folder>/Exhibitors_normalized.csv` as a new table to the already-
-    existing workbook named after that folder. Clay names the table after the
-    CSV stem ("Exhibitors_normalized"), so it sits alongside the old-schema
-    "Exhibitors" table without touching it — this module has no delete op, so a
-    true replace is deliberately out of scope. Idempotent: skips if the table
-    is already present. Requires --folder and --apply."""
-    if not args.folder:
-        print("--normalized requires --folder NAME"); sys.exit(1)
-    csv_path = os.path.join(SCRAPERS_ROOT, args.folder, "Exhibitors_normalized.csv")
-    if not os.path.exists(csv_path):
-        print(f"No Exhibitors_normalized.csv in folder {args.folder!r} "
-              f"({csv_path})"); sys.exit(1)
-    table = os.path.splitext(os.path.basename(csv_path))[0]  # "Exhibitors_normalized"
+def _normalized_targets(csv_name, only_folder=None):
+    """[(folder, csv_path), ...] for every scraper folder that has `csv_name`
+    (e.g. "Speakers_normalized.csv"), or just [(only_folder, path)] if
+    `only_folder` is given (exits if that folder doesn't have the file)."""
+    if only_folder:
+        path = os.path.join(SCRAPERS_ROOT, only_folder, csv_name)
+        if not os.path.exists(path):
+            print(f"No {csv_name} in folder {only_folder!r} ({path})")
+            sys.exit(1)
+        return [(only_folder, path)]
+    targets = []
+    for dirpath, dirnames, filenames in os.walk(SCRAPERS_ROOT):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        if os.path.abspath(dirpath) == SCRAPERS_ROOT:
+            continue
+        if csv_name in filenames:
+            targets.append((os.path.basename(dirpath), os.path.join(dirpath, csv_name)))
+    return sorted(targets)
 
-    print(f"\nTarget: {clay_ui.TARGET_FOLDER} / {clay_ui.TARGET_SUBFOLDER} / "
-          f"{args.folder}")
-    print(f"Add table {table!r} from {csv_path}")
+
+def sync_normalized(args):
+    """Add `<folder>/<csv-name>` (default Exhibitors_normalized.csv) as a new
+    table to the already-existing workbook named after that folder. Clay
+    names the table after the CSV stem (e.g. "Speakers_normalized"), so it
+    sits alongside any old-schema table without touching it — this module has
+    no delete op, so a true replace is deliberately out of scope. Idempotent:
+    skips a folder whose table is already present. If --folder is omitted,
+    processes every scraper folder that has the named CSV. Requires --apply."""
+    csv_name = args.csv_name
+    table = os.path.splitext(csv_name)[0]
+    targets = _normalized_targets(csv_name, args.folder)
+    if not targets:
+        print(f"No {csv_name} found anywhere under {SCRAPERS_ROOT}.")
+        sys.exit(1)
+
+    print(f"\nTarget: {clay_ui.TARGET_FOLDER} / {clay_ui.TARGET_SUBFOLDER}")
+    print(f"Add table {table!r} from {csv_name} to {len(targets)} workbook(s):")
+    for folder, _ in targets:
+        print(f"  {folder}")
     if not args.apply:
         print("\nDRY RUN — nothing was changed. Re-run with --apply.")
         return
@@ -120,6 +141,7 @@ def sync_normalized(args):
         print(f"\nNo Clay session found at {SESSION_PATH}.\nRun: python clay_login.py")
         sys.exit(1)
 
+    added, skipped_exists, missing_wb, failed = [], [], [], []
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=not args.show, slow_mo=500 if args.show else 0,
@@ -128,24 +150,62 @@ def sync_normalized(args):
                                   viewport={"width": 1600, "height": 900})
         ctx.add_init_script(
             "Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
-        page = ctx.new_page()
-        try:
-            if not clay_ui.is_logged_in(page):
-                print("\nClay session expired or invalid — run: python clay_login.py")
-                sys.exit(1)
-            clay_ui.open_target_location(page)
-            if not clay_ui.workbook_exists(page, args.folder):
-                print(f"\nWorkbook {args.folder!r} does not exist — nothing to add to.")
-                sys.exit(1)
-            clay_ui.open_target_location(page)
-            clay_ui.open_workbook(page, args.folder)
-            if table in clay_ui.existing_tables(page, [table]):
-                print(f"\nTable {table!r} already present — nothing to do.")
-                return
-            clay_ui.add_csv_table(page, csv_path)
-            print(f"\nAdded table {table!r} to workbook {args.folder!r}.")
-        finally:
-            browser.close()
+
+        first = True
+        for folder, csv_path in targets:
+            if not first:
+                humanize.pace()  # human gap before the next workbook
+            first = False
+            # Fresh page per folder: a stuck/slow import shouldn't cascade to
+            # every subsequent folder (same reasoning as the create loop below).
+            # The is_logged_in check happens on this SAME page (not a separate
+            # probe page that gets closed) - closing a page right before
+            # opening a new one reliably wedged the next page's navigation
+            # (reproduced consistently while debugging this).
+            page = ctx.new_page()
+            try:
+                if not clay_ui.is_logged_in(page):
+                    print("\nClay session expired or invalid — run: python clay_login.py")
+                    sys.exit(1)
+                clay_ui.open_target_location(page)
+                if not clay_ui.workbook_exists(page, folder):
+                    print(f"  SKIP {folder}: workbook does not exist")
+                    missing_wb.append(folder)
+                    continue
+                clay_ui.open_target_location(page)
+                clay_ui.open_workbook(page, folder)
+                if table in clay_ui.existing_tables(page, [table]):
+                    print(f"  SKIP {folder}: table {table!r} already present")
+                    skipped_exists.append(folder)
+                    continue
+                clay_ui.add_csv_table(page, csv_path)
+                print(f"  ADDED {folder}: table {table!r}")
+                added.append(folder)
+            except Exception as e:
+                print(f"  FAILED {folder}: {e}")
+                failed.append((folder, str(e)))
+            finally:
+                try:
+                    page.close()
+                except Exception:
+                    pass
+        browser.close()
+
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print(f"  Added            : {len(added)}")
+    for f in added:
+        print(f"      + {f}")
+    print(f"  Already present  : {len(skipped_exists)}")
+    print(f"  No workbook found: {len(missing_wb)}")
+    for f in missing_wb:
+        print(f"      ? {f}")
+    print(f"  Failed           : {len(failed)}")
+    for f, err in failed:
+        print(f"      ! {f}: {err}")
+    if failed:
+        sys.exit(1)
 
 
 def main():
@@ -160,9 +220,13 @@ def main():
     parser.add_argument("--show", action="store_true",
                         help="run with a visible, slowed-down browser (for debugging selectors)")
     parser.add_argument("--normalized", action="store_true",
-                        help="add <folder>/Exhibitors_normalized.csv as a new table to an "
-                             "existing workbook (requires --folder --apply). Non-destructive: "
-                             "leaves the old Exhibitors table in place.")
+                        help="add <folder>/<csv-name> (default Exhibitors_normalized.csv) as a "
+                             "new table to an existing workbook (requires --apply). Omit --folder "
+                             "to process every scraper folder that has the file. Non-destructive: "
+                             "leaves any old-schema table in place.")
+    parser.add_argument("--csv-name", default="Exhibitors_normalized.csv",
+                        help="normalized CSV filename to add as a table with --normalized "
+                             "(e.g. Speakers_normalized.csv); default Exhibitors_normalized.csv")
     args = parser.parse_args()
 
     if args.normalized:

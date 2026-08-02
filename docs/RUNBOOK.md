@@ -98,6 +98,9 @@ python people_rollout.py --limit 5
 
 # f. Buyers - People: Side→Buyer, per-Classification segment searches → one table
 python buyer_rollout.py --limit 5
+
+# g. apply the Google Sheet lookup+send template to the seller/buyer people tables
+python apply_gsheet_rollout.py --limit 5
 ```
 
 Steps **e** and **f** are the config-driven Find-People passes:
@@ -114,6 +117,31 @@ Both passes are **resumable and salvage-safe**: a run cut off mid-event resumes
 from `segments_done`; an unrenamed people table from a killed run is salvaged
 rather than duplicated; `Sellers - People` and `Buyers - People` are never
 clobbered by each other.
+
+Step **g** (`apply_gsheet_rollout.py` / `apply_gsheet_event.py`) applies a
+single, entity-agnostic Clay template — **"Google Sheet - Lookup & Send
+Data"** — to whichever of the two people tables (`seller_people`/
+`buyer_people`) exist for the workbook. It's entity-agnostic because it
+targets the People tables' own columns directly (its two Configure fields,
+"Full Name" and "LinkedIn Profile", auto-map by exact column-name match —
+every entity's People table has the same shape, since both come out of the
+same Find-People builds), unlike steps b/c which need per-entity template
+content and field mapping. Idempotent via the "Lookup in Audiences" column
+the template adds (NOT "Send table data", despite the template's name
+following the same convention as step c). Scope = the union of steps e and
+f's target files (a workbook only needs step g once it has one of those two
+tables); state `gsheet_state_<slug>.json`. This template is built once, in
+Clay, and reused for every entity/ICP — no per-entity variant to create,
+unlike the templates steps b/c apply.
+
+**Verify Clay UI automation results with the CLI, not the page's own status
+text**: a "Save and run N rows in this view" / "N% of table completed"
+message on the page is not proof the action landed — it can be a stale
+leftover from an unrelated column's auto-run. `apply_gsheet_event.py` learned
+this the hard way (a run reported success while the template was never
+actually added) and now polls for the real signature column before ever
+returning "ok"; the same principle applies to any future UI-automation pass —
+confirm with `clay tables columns list <tableId>` (WSL CLI) when in doubt.
 
 ### Parallelism (buyer pass)
 
@@ -152,12 +180,17 @@ CLAY_PIPELINE_ENTITY=sponsors python apply_lookup_rollout.py --limit 5
 CLAY_PIPELINE_ENTITY=sponsors python apply_filters_rollout.py --limit 5
 python people_rollout.py --entity sponsors --limit 5                    # flag for e–f
 python buyer_rollout.py  --entity sponsors --limit 5
+python apply_gsheet_rollout.py --entity sponsors --limit 5              # flag for g
 ```
 
 Nothing collides with the live Exhibitors run: Sponsors uses distinct table
 names (`Sponsors - Sellers - People`, …), distinct templates, and distinct
 `*_sponsors_labs.*` run files. The ICP config (`labs`) — taxonomy, tiers,
-job-title/segment lists — is shared across entities and unchanged.
+job-title/segment lists — is shared across entities and unchanged. Step g's
+template ("Google Sheet - Lookup & Send Data") is the one exception to
+"distinct templates per entity" — it's the same saved template reused as-is
+for every entity, since it targets the people tables' own (entity-independent)
+columns rather than the entity's raw columns.
 
 For a new **ICP**, copy `config/icps/_template/` → `config/icps/<icp>/`, fill in
 `icp.yaml` + `people_search.yaml`, and pass `--icp <icp>`.
