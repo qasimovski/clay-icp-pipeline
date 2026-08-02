@@ -128,6 +128,11 @@ def main():
             say(f"\n--- [{i+1}/{len(pending)}] {entry['workbook_name']} ---")
             rec = state.setdefault(wid, {}) if not args.dry_run else {}
             wb_failed = False
+            # The workbook is already open after the first table's apply, so
+            # the second table is a tab click rather than a second full
+            # workbook load. Reset on any exception/retry: after a DNS blip
+            # or an Escape we can no longer assume where the page is.
+            wb_open = False
             for table in tables:
                 if table_done(rec, table):
                     continue  # already reached a final status for this table
@@ -139,11 +144,15 @@ def main():
                 last_exc = None
                 for dns_try in range(3):
                     try:
-                        r = apply_gsheet_lookup.apply_gsheet(page, entry, table, args.dry_run, say)
+                        r = apply_gsheet_lookup.apply_gsheet(
+                            page, entry, table, args.dry_run, say,
+                            already_open=wb_open)
+                        wb_open = True
                         last_exc = None
                         break
                     except Exception as e:
                         last_exc = e
+                        wb_open = False
                         if "ERR_NAME_NOT_RESOLVED" in str(e) and dns_try < 2:
                             say(f"   DNS blip on {table}, pausing 30s (try {dns_try+1}/3)")
                             try:

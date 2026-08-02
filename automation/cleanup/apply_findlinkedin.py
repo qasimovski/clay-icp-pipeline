@@ -262,15 +262,17 @@ def apply_findlinkedin(page, entry, table_name, dry_run, say):
                 "status": "aborted", "reason": "no_run_option"}
     lbl = ti.inner_text().strip().replace("\n", " ")
     ti.click(timeout=8000)
-    page.wait_for_timeout(16000)
-    st = page.evaluate("()=>{const t=document.body.innerText;"
-                        "return (t.match(/\\d+% of table completed/)||['?'])[0];}")
+    # Wait on the post-condition (marker column appears), not a flat 16s: the
+    # poll below already waits, lengthened here to cover the old total.
+    page.wait_for_timeout(1500)
     confirmed = False
-    for _ in range(8):
+    for _ in range(14):
         if clay_ui._find_header_rect(page, MARKER):
             confirmed = True
             break
         page.wait_for_timeout(2500)
+    st = page.evaluate("()=>{const t=document.body.innerText;"
+                        "return (t.match(/\\d+% of table completed/)||['?'])[0];}")
     if not confirmed:
         say(f"UNCONFIRMED {name}/{table_name}: clicked {lbl!r} but {MARKER!r} column "
             f"never appeared | {st}")

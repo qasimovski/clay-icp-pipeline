@@ -165,9 +165,14 @@ def _wait_for_full_completion(page, say, table_name, max_wait_s=1800, poll_s=12)
     return False, last
 
 
-def apply_gsheet(page, entry, table_name, dry_run, say):
+def apply_gsheet(page, entry, table_name, dry_run, say, already_open=False):
+    """Apply the template to one table. `already_open=True` skips the
+    workbook navigation when the caller has just opened this same workbook
+    for another of its tables — a two-table workbook otherwise paid two full
+    workbook loads to reach two tabs of the same grid."""
     wid = entry["workbook_id"]; name = entry["workbook_name"]
-    clay_ui.open_workbook_by_id(page, wid)
+    if not already_open:
+        clay_ui.open_workbook_by_id(page, wid)
 
     if not colcfg.table_exists(page, table_name):
         say(f"SKIP {name}/{table_name}: table does not exist")
@@ -229,20 +234,24 @@ def apply_gsheet(page, entry, table_name, dry_run, say):
                 "status": "aborted", "reason": "no_run_option"}
     lbl = ti.inner_text().strip().replace("\n", " ")
     ti.click(timeout=8000)
-    page.wait_for_timeout(16000)
-    st = page.evaluate("()=>{const t=document.body.innerText;"
-                        "return (t.match(/\\d+% of table completed/)||['?'])[0];}")
+    # Wait on the actual post-condition (the marker column appearing) rather
+    # than sleeping a flat 16s first: the poll below already waits, so the
+    # sleep only delayed the common case where the column lands in seconds.
+    # The poll is lengthened to cover at least the old total.
+    page.wait_for_timeout(1500)
     # The "N% of table completed" text can be a stale leftover from an
     # unrelated column's auto-run and isn't proof OUR save landed (seen once:
     # Analytica India / Sellers - People reported "applied" + 100% but the
     # column was never actually added) - verify the signature column is
     # really there before calling this "ok".
     confirmed = False
-    for _ in range(8):
+    for _ in range(14):
         if clay_ui._find_header_rect(page, MARKER):
             confirmed = True
             break
         page.wait_for_timeout(2500)
+    st = page.evaluate("()=>{const t=document.body.innerText;"
+                        "return (t.match(/\\d+% of table completed/)||['?'])[0];}")
     if not confirmed:
         say(f"UNCONFIRMED {name}/{table_name}: clicked {lbl!r} but {MARKER!r} column "
             f"never appeared | {st}")

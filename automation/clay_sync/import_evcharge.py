@@ -290,12 +290,22 @@ def main():
             sys.exit(1)
         probe.close()
 
+        known = {}   # last folder listing; see the presence check below
         for folder, csv_path in todo:
             # Fresh page per folder so one stuck import can't cascade.
             page = ctx.new_page()
             try:
                 open_subfolder(page)
-                live = list_workbooks(page)
+                # The full listing was re-scraped for every folder, so the run
+                # cost O(N^2) scroll passes as the folder grew (the comment
+                # below records it timing out past ~50 workbooks). Reuse the
+                # previous scan instead — but ONLY to confirm a workbook is
+                # PRESENT. An apparent absence is always re-verified with a
+                # fresh scan before creating anything, so a stale cache can
+                # never produce a duplicate workbook.
+                if folder not in set(known.values()):
+                    known = list_workbooks(page)
+                live = known
                 if folder in set(live.values()):
                     # Workbook exists (e.g. the exhibitors run made it): add this
                     # CSV as another table rather than creating a duplicate.
