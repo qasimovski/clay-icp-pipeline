@@ -60,7 +60,11 @@ def pending_events(audit):
 
 
 def row_total(ev):
-    """Total rows across the event's pending tables (for smallest-first order)."""
+    """Total rows across the event's pending tables (for smallest-first order).
+
+    Returns None if any table's count could not be read. "Unknown" must never
+    collapse to 0: a CLI hiccup reading as an empty table silently dropped the
+    workbook from every future batch (audit C4)."""
     tot = 0
     for t in ev["todo"]:
         tid = ev["tables"][t]["table_id"]
@@ -70,9 +74,11 @@ def row_total(ev):
                 ["wsl", "-d", "Ubuntu", "--", "python3", path, tid],
                 capture_output=True, text=True, timeout=120,
                 env={**os.environ, "MSYS_NO_PATHCONV": "1"})
-            tot += int((out.stdout or "0").strip().split()[0])
+            if out.returncode != 0:
+                return None
+            tot += int((out.stdout or "").strip().split()[0])
         except Exception:
-            tot += 9999
+            return None
     return tot
 
 
@@ -125,17 +131,25 @@ def main():
         for e in events:
             e["rows"] = row_total(e)
         # An empty table has nothing to enrich, and "Run 0 rows" is not a thing.
+        # Only a COUNT WE ACTUALLY READ (0) may drop an event; an unreadable
+        # count (None) is kept and sorted last, so a transient CLI failure
+        # delays a workbook instead of retiring it permanently.
         skipped_empty = [e["workbook_name"] for e in events if e["rows"] == 0]
         if skipped_empty:
             print(f"skipping {len(skipped_empty)} empty table(s): "
                   f"{skipped_empty}", flush=True)
-        events = [e for e in events if e["rows"] > 0]
-        events.sort(key=lambda e: (e["rows"], e["workbook_name"]))
+        unknown = [e["workbook_name"] for e in events if e["rows"] is None]
+        if unknown:
+            print(f"row count unavailable for {len(unknown)} event(s), keeping "
+                  f"them (ordered last): {unknown}", flush=True)
+        events = [e for e in events if e["rows"] is None or e["rows"] > 0]
+        events.sort(key=lambda e: (e["rows"] is None, e["rows"] or 0,
+                                   e["workbook_name"]))
 
     if args.list:
         for e in events:
             print(f"  {e['workbook_name']:48} tables={e['todo']} "
-                  f"rows={e.get('rows', '?')}")
+                  f"rows={e.get('rows') if e.get('rows') is not None else '?'}")
         print(f"{len(events)} events pending")
         return
 
@@ -176,7 +190,7 @@ def main():
         for i, ev in enumerate(batch):
             name = ev["workbook_name"]
             entry = {"workbook_id": ev["workbook_id"], "workbook_name": name}
-            say(f"\n--- [{i+1}/{len(batch)}] {name} (rows={ev.get('rows','?')}) ---")
+            say(f"\n--- [{i+1}/{len(batch)}] {name} (rows={ev.get('rows') if ev.get('rows') is not None else '?'}) ---")
             rec = state.setdefault(name, {})
             for table in people_email.TABLES:
                 if table not in ev["tables"]:
