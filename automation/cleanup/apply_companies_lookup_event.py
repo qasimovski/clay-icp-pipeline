@@ -1,4 +1,8 @@
-"""Apply "Google Sheets - Companies Lookup and Add Row" to the Companies table
+"""UNUSED - no rollout driver and no importer; reachable only via __main__.
+
+Kept for reference alongside apply_lookup.py (a different Clay template).
+
+Apply "Google Sheets - Companies Lookup and Add Row" to the Companies table
 of one Product & Services workbook.
 
 Recon (Material Sciences, 2026-07-31) — the Configure panel has just two fields:

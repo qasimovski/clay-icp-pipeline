@@ -1,4 +1,8 @@
-"""Fleet driver to apply the "Exhibitors - All Columns" template (Save and don't
+"""SUPERSEDED - use apply_all_columns_rollout.py + run_all_columns_rollout.py.
+
+Kept for reference. Reads the legacy unsuffixed cols_manifest.json.
+
+Fleet driver to apply the "Exhibitors - All Columns" template (Save and don't
 run) across the 71 in-scope workbooks (reuses cols_manifest.json). Resumable
 single-threaded passes; partial does not abort (only exceptions/aborted count).
 

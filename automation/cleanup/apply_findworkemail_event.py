@@ -1,4 +1,11 @@
-"""Apply the "Find Work Email and Validate Email" template to a single named
+"""SUPERSEDED - use add_workemail_waterfall.py instead.
+
+add_workemail_waterfall.py:4-8 replaced this template-based approach on
+2026-07-27 ("the saved template proved unreliable to apply"). Kept for
+reference; the real apply path requires CLAY_ALLOW_SUPERSEDED=1 because it
+spends ~14.5 credits/row.
+
+Apply the "Find Work Email and Validate Email" template to a single named
 table (Speakers_normalized) in one workbook.
 
 Mirrors apply_findlinkedin.py's structure (--recon / --dry-run / a real
@@ -774,6 +781,15 @@ if __name__ == "__main__":
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--screenshot")
     a = ap.parse_args()
+    # SUPERSEDED by add_workemail_waterfall.py (2026-07-27). The recon and
+    # dry-run paths cost nothing, so they stay open; the real apply spends
+    # ~14.5 credits/row and needs a deliberate opt-in.
+    if not (a.recon or a.dry_run) and not os.environ.get("CLAY_ALLOW_SUPERSEDED"):
+        raise SystemExit(
+            "apply_findworkemail_event is SUPERSEDED by "
+            "add_workemail_waterfall.py and spends ~14.5 credits/row.\n"
+            "Use --recon/--dry-run freely, or set CLAY_ALLOW_SUPERSEDED=1 to "
+            "run it for real.")
     entry = {"workbook_id": a.workbook_id, "workbook_name": a.workbook_name}
     with browser_session.clay_page(headless=not a.headed) as page:
         def say(m):

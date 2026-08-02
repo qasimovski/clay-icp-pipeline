@@ -1,4 +1,10 @@
-"""Apply the "Exhibitors - All Columns" template to one workbook's
+"""SUPERSEDED - use apply_all_columns.py + run_all_columns.py instead.
+
+This is the "Save and don't run" variant of the same template apply, kept
+for reference. It is also the last reader of the legacy unsuffixed
+cols_manifest.json (every other pass reads cols_manifest_<slug>.json).
+
+Apply the "Exhibitors - All Columns" template to one workbook's
 Exhibitors_normalized table, mapping only the EMPTY fields per the spec, and
 Save WITHOUT running.
 
