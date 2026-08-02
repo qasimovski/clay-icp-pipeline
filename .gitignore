@@ -6,7 +6,10 @@ config/local.yaml
 
 # Automation run artifacts (logs, state, screenshots, sessions, queue)
 automation/**/shots/
-automation/**/rollout_shots/
+# Any <pass>_shots/ dir, not just rollout_shots/: these hold screenshots of live
+# Clay panels (account names, workbook contents). people_shots/ was slipping
+# through because the bare shots/ pattern does not match a prefixed name.
+automation/**/*_shots/
 automation/**/rollout_logs/
 automation/**/rollout_state*.json
 automation/**/queue/

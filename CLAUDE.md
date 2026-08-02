@@ -13,11 +13,20 @@ fixed; everything that varies is config in two layers:
 | Entity type (data source) | `config/entity-types/<entity>.yaml` | source/output table names, Clay template names, `raw_columns`, trim cut column |
 | ICP (vertical) | `config/icps/<icp>/icp.yaml` + `people_search.yaml` | classifier taxonomy, fit/country tiers, Find-People job titles/segments/locations |
 
-Defaults everywhere: `--entity exhibitors --icp labs`. `automation/cleanup/pipeline_config.py`
-is the single resolver both the passes and the spec renderer read.
+Defaults everywhere: `exhibitors` + `labs`. `automation/cleanup/pipeline_config.py` is the
+single resolver both the passes and the spec renderer read. **Two ways in, not one:** passes
+that call `pcfg.add_cli_args(ap)` expose `--entity` / `--icp` (the people, gsheet and
+merge-shards rollouts); the earlier passes (`trim_columns`, `apply_all_columns`,
+`apply_lookup`, `apply_view_filters`) only read `CLAY_PIPELINE_ENTITY` /
+`CLAY_PIPELINE_ICP` from the environment. Passing `--entity` to one of those is an argparse
+error, not a silent no-op — but exporting the env var and forgetting it *is* silent, and it
+picks the source table for every later pass in that shell.
 
 Read `docs/GTM_METHODOLOGY.md` (why) → `docs/PIPELINE_ARCHITECTURE.md` (the 14-step column
-pipeline) → `docs/RUNBOOK.md` (the operational sequence, a–g) before changing pipeline behavior.
+pipeline) → `docs/RUNBOOK.md` (the operational sequence, a–h) before changing pipeline
+behavior. `docs/PEOPLE_PASSES.md` holds the Find-People query-correctness rules (whole persona
+in one experience predicate, `contains` not `in` for titles, always cap per company) — read it
+before touching `people_search.yaml` or the seller/buyer search builders.
 
 ## Commands
 
@@ -34,10 +43,25 @@ python automation/clay_sync/clay_login.py       # one-time, headed → gitignore
 
 Per-event passes live in `automation/cleanup/` and run in the RUNBOOK order (a–h, where h is the
 email waterfall + Validate Email pass on the people tables). Each is a
-pair: `<verb>.py` (one workbook) + `<verb>_rollout.py` (fleet, `--only` / `--limit`, most
-support `--dry-run` and `--shards N --shard i`). Scope comes from a generated targets/manifest
-JSON (`build_workbook_manifest.py`, `build_cleanup_manifest.py`); state and logs are namespaced
-per `<entity>_<icp>` slug so two entities never share them.
+pair: `<verb>.py` (one workbook) + `<verb>_rollout.py` (fleet). Scope comes from a generated
+targets/manifest JSON (`build_workbook_manifest.py`, `build_cleanup_manifest.py`); state and
+logs are namespaced per `<entity>_<icp>` slug so two entities never share them.
+
+The flag vocabulary is near-uniform across the fleet drivers, and the escalation order matters
+because selector drift against the live Clay DOM is the failure mode the tests cannot catch:
+
+```bash
+python <pass>_rollout.py --list                     # scope only, no browser
+python <pass>_rollout.py --dry-run                  # what it would touch
+python <pass>_rollout.py --only "<event>" --headed --recon   # watch one workbook, probe the
+                                                    # panel/selectors, change nothing
+python <pass>_rollout.py --only "<event>" --headed  # one for real, watched
+python <pass>_rollout.py --shards 4 --shard 0       # fleet, one worker per terminal
+```
+
+`--recon` (and `--screenshot` / `--inspect` where present) is the read-only probe; `--skip-run`
+configures without triggering; `--limit N` caps a batch. Prefer `--recon` over reading the DOM
+by hand — several passes vendor their recon output shape into the repair scripts.
 
 ## Three generations of automation — know which you're touching
 
@@ -55,6 +79,13 @@ Cross-event dedupe is **not** a Clay table: it's the Supabase `blocklist_ledger/
 row by one HTTP column that does lookup-and-insert atomically and returns `Is New`. Views filter
 on `Is New` *before* any paid column runs. A legacy Clay "Block List" table (fed by Send Table
 Data) only recorded repeats without gating them — older workbooks may still carry it.
+
+The ledger's SQL applies in filename order (`01_schema` → `02_functions` → `03_verify` →
+`04_backfill`); identity keys are normalized *in the database* (`normalize_domain`,
+`normalize_linkedin`) with a CHECK constraint making an unnormalized key unstorable, so never
+normalize on the Clay side too. **Backfill before wiring the column, not after** — the ledger
+inserts on first sighting, so a Clay run against an unbackfilled ledger marks already-worked
+records `Is New` and re-spends the full downstream funnel on them.
 
 ## Hard rules
 
@@ -74,6 +105,9 @@ byte-identical — rollouts have in-flight resume state and a silent restart re-
 
 **State files fail loud.** `state_io.load_json` refuses to treat a corrupt state file as empty;
 `save_json` is atomic (temp + `os.replace`). Don't add `except Exception: return {}` around them.
+The suite in `tests/` exists to guard exactly these money-and-state decisions — `tests/README.md`
+maps each file to the failure it prevents. Adding a pass that can double-charge or strand a
+workbook means adding a row to that table, not just a test file.
 
 **Don't trust the Clay page's own status text.** "Save and run N rows" / "N% of table completed"
 can be a stale leftover from an unrelated column. Poll for the pass's marker column, and confirm
