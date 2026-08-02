@@ -60,7 +60,11 @@ def main():
     args = ap.parse_args()
 
     wbs = json.load(open(SCOPE_PATH, encoding="utf-8"))
+    # Sorted by name, not dict insertion order: --shard partitions and
+    # --after cursors are computed from this list, so regenerating the
+    # scope JSON must not re-partition the fleet under running workers.
     scope = [{"workbook_id": wid, "workbook_name": name} for wid, name in wbs.items()]
+    scope.sort(key=lambda e: e["workbook_name"])
     if args.only:
         scope = [e for e in scope if args.only in (e["workbook_id"], e["workbook_name"])]
         if not scope:

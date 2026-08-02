@@ -7,10 +7,11 @@ BOTH email steps —
      auto-run OFF, output fields Status / Mx Record / Mx Provider — CONFIGURED
      BUT NOT RUN, mirroring what was done on BioTrinity.
 
-Scope order follows speakers_normalized_workbooks.json; --after skips everything
-up to and including a named workbook (default BioTrinity, which is already done).
-Anything the user already built by hand is detected by its signature column and
-skipped, never rebuilt.
+Scope is sorted by workbook name (stable across regenerations of
+speakers_normalized_workbooks.json, which --shard and --after depend on);
+--after skips everything up to and including a named workbook. Anything the
+user already built by hand is detected by its marker column and skipped,
+never rebuilt.
 
 Both steps verify what PERSISTED by reopening the column, and step 1 refuses to
 run unless its gate is really there — see add_workemail_waterfall.py for
@@ -68,7 +69,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only", help="workbook id or exact name")
     ap.add_argument("--limit", type=int, help="max workbooks this run")
-    ap.add_argument("--after", default="BioTrinity",
+    ap.add_argument("--after", default=None,
                     help="skip scope up to and including this workbook name")
     ap.add_argument("--shards", type=int, default=1)
     ap.add_argument("--shard", type=int, default=0)
@@ -78,7 +79,11 @@ def main():
     args = ap.parse_args()
 
     wbs = json.load(open(SCOPE_PATH, encoding="utf-8"))
+    # Sorted by name, not dict insertion order: --shard partitions and
+    # --after cursors are computed from this list, so regenerating the
+    # scope JSON must not re-partition the fleet under running workers.
     scope = [{"workbook_id": wid, "workbook_name": n} for wid, n in wbs.items()]
+    scope.sort(key=lambda e: e["workbook_name"])
 
     if args.after:
         names = [e["workbook_name"] for e in scope]
