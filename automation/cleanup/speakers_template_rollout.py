@@ -32,18 +32,25 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                               # noqa: E402
-import apply_email_template_event as T      # noqa: E402
-import configure_validate_email_event as V  # noqa: E402
+import browser_session                               # noqa: E402
+import apply_email_template      # noqa: E402
+import configure_validate_email  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, "check_table_columns.py")
 
 
 def already_built(entry, audit_rec, say):
-    """True if Clay already has a WORK EMAIL column on this table.
+    """True/False if Clay does/doesn't already have a WORK EMAIL column on
+    this table; None if the check itself failed.
 
     Asks the CLI right now rather than trusting state or the batch-start audit:
     a killed worker can leave columns created but unrecorded.
+
+    None is NOT True. Both mean "don't build now", but only True means "this
+    table is done": returning True on a transient WSL error made the caller
+    write status ok/already_built for a table that was never built (audit
+    C10), and nothing ever revisited it.
     """
     tid = (audit_rec or {}).get("table_id")
     if not tid:
@@ -56,11 +63,11 @@ def already_built(entry, audit_rec, say):
             env={**os.environ, "MSYS_NO_PATHCONV": "1"})
         names = (out.stdout or "").strip().splitlines()
     except Exception as e:
-        say(f"  !! column pre-check failed ({str(e)[:80]}) — skipping for safety")
-        return True          # fail closed: never risk a duplicate build
-    if not names:
-        say("  !! column pre-check returned nothing — skipping for safety")
-        return True
+        say(f"  !! column pre-check failed ({str(e)[:80]}) — deferring event")
+        return None          # unknown: don't build, don't record as done
+    if out.returncode != 0 or not names:
+        say("  !! column pre-check returned nothing — deferring event")
+        return None
     return "WORK EMAIL" in names
 
 
@@ -68,11 +75,16 @@ FILL_SCRIPT = os.path.join(SCRIPT_DIR, "check_column_fill.py")
 
 
 def already_run(audit_rec, say):
-    """True if WORK EMAIL already holds values, i.e. the waterfall has run.
+    """True/False if the WORK EMAIL waterfall has/hasn't already run (i.e. the
+    column holds values); None if the check itself failed.
 
     Guards the RUN, not just the build. A late-finishing worker overwrote a
     shared state file with a stale snapshot, which made the rollout re-trigger
     SLAS Europe's waterfall and pay for it twice.
+
+    None means "unknown": the caller must defer the event rather than
+    configure it with run_after=False, which would record the table as done
+    with the waterfall never run (audit C10).
     """
     tid = (audit_rec or {}).get("table_id")
     if not tid:
@@ -83,12 +95,15 @@ def already_run(audit_rec, say):
             ["wsl", "-d", "Ubuntu", "--", "python3", wsl_path, tid, "WORK EMAIL"],
             capture_output=True, text=True, timeout=180,
             env={**os.environ, "MSYS_NO_PATHCONV": "1"})
-        filled, total = (out.stdout or "0 0").split()[:2]
+        if out.returncode != 0:
+            say("  !! fill pre-check failed (CLI error) — deferring event")
+            return None
+        filled, total = (out.stdout or "").split()[:2]
         say(f"  WORK EMAIL fill: {filled}/{total}")
         return int(filled) > 0
     except Exception as e:
-        say(f"  !! fill pre-check failed ({str(e)[:70]}) — not re-running")
-        return True          # fail closed: never risk paying twice
+        say(f"  !! fill pre-check failed ({str(e)[:70]}) — deferring event")
+        return None          # unknown: neither run nor record as done
 
 
 AUDIT_PATH = os.path.join(SCRIPT_DIR, "speakers_email_audit.json")
@@ -99,16 +114,11 @@ DONE = ("ok", "dryrun")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def step_done(rec, step):
@@ -159,7 +169,7 @@ def main():
           flush=True)
 
     needs_check = []
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -176,24 +186,35 @@ def main():
                 # Ask Clay directly first. State alone is not enough: a worker
                 # killed mid-event can leave the columns created but unrecorded,
                 # which is how two tables got the template applied twice.
-                if not args.dry_run and already_built(entry, audit.get(name), say):
+                built = None if args.dry_run else already_built(
+                    entry, audit.get(name), say)
+                if built is None and not args.dry_run:
+                    # Check failed — we don't know. Defer: building risks a
+                    # duplicate, and recording done would strand the table.
+                    say(f"DEFER {name}: cannot confirm build state — retry "
+                        f"next run (state left untouched)")
+                    needs_check.append((name, "template", "unknown",
+                                        "column pre-check failed"))
+                    continue
+                if built:
                     say(f"SKIP {name}: WORK EMAIL already exists in Clay "
                         f"(built by an earlier, possibly killed, run)")
                     r = {"status": "ok", "note": "already_built"}
                     rec["template"] = r
                     save(state_path, state)
                 else:
-                  try:
-                    r = T.apply_template(page, entry, args.dry_run, say)
-                  except Exception as e:
-                    say(f"!! template EXCEPTION on {name}: {str(e)[:180]}")
-                    logf.write(traceback.format_exc()); logf.flush()
-                    r = {"status": "error", "error": str(e)[:300]}
                     try:
-                        page.keyboard.press("Escape")
-                    except Exception:
-                        pass
-                  rec["template"] = r
+                        r = apply_email_template.apply_template(
+                            page, entry, args.dry_run, say)
+                    except Exception as e:
+                        say(f"!! template EXCEPTION on {name}: {str(e)[:180]}")
+                        logf.write(traceback.format_exc()); logf.flush()
+                        r = {"status": "error", "error": str(e)[:300]}
+                        try:
+                            page.keyboard.press("Escape")
+                        except Exception:
+                            pass
+                    rec["template"] = r
                 if not args.dry_run:
                     save(state_path, state)
                 if r.get("status") not in DONE:
@@ -206,10 +227,18 @@ def main():
                 continue
 
             if not step_done(rec, "validate"):
-                do_run = not args.skip_run and not already_run(
-                    audit.get(name), say)
+                ran_before = already_run(audit.get(name), say)
+                if ran_before is None:
+                    # Unknown fill state: configuring with run_after=False here
+                    # would record the table done with the waterfall never run.
+                    say(f"DEFER {name}: cannot confirm WORK EMAIL fill — retry "
+                        f"next run (state left untouched)")
+                    needs_check.append((name, "validate", "unknown",
+                                        "fill pre-check failed"))
+                    continue
+                do_run = not args.skip_run and not ran_before
                 try:
-                    r = V.configure(page, entry, say, run_after=do_run)
+                    r = configure_validate_email.configure(page, entry, say, run_after=do_run)
                 except Exception as e:
                     say(f"!! validate EXCEPTION on {name}: {str(e)[:180]}")
                     logf.write(traceback.format_exc()); logf.flush()

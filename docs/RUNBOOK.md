@@ -36,7 +36,7 @@ python automation/clay_sync/clay_login.py   # headed once → saves .clay_sessio
 - Real data (scraped `*_normalized.csv`, ICP lookup CSVs) is **gitignored** — see
   `docs/SENSITIVE_DATA.md`. Point the build at yours with
   `CLAY_PIPELINE_SCRAPERS_ROOT` / `CLAY_PIPELINE_ICP_LOOKUPS_DIR` (defaults in
-  `automation/build_automation/build_event.py`).
+  `automation/build_automation/build_workbook.py`).
 - The `clay` CLI (read-only verification, dedupe checks) runs **only under WSL
   Ubuntu** here — invoke the cached linux binary with a clean PATH; see
   `docs/KNOWN_ISSUES.md` and the pattern in `verify_cleanup.py`.
@@ -73,34 +73,37 @@ treat it as the how-it-was-done reference (see `automation/README.md`).
 
 ## 3. Per-event passes (`automation/cleanup/`), in order
 
-Each pass is `*_event.py` (one workbook) + `*_rollout.py` (fleet: `--only`,
+Each pass is `<verb>.py` (one workbook) + `<verb>_rollout.py` (fleet: `--only`,
 `--limit`, most support `--dry-run` / sharding). Each writes its own resumable
 state + `*_logs/`. Scope comes from a targets file = JSON list of workbook ids
-that have this entity's source table (build with `build_cols_manifest.py`).
+that have this entity's source table (build with `build_workbook_manifest.py`).
 
 ```bash
 cd automation/cleanup
 
 # a. trim back to the through-import base (deletes columns right of trim_cut_column)
-python trim_cols_rollout.py --limit 5
+python trim_columns_rollout.py --limit 5
 
 # b. apply + run the all-columns template
-python apply_v1_rollout.py --limit 5
+python apply_all_columns_rollout.py --limit 5
 
 # c. apply + run the lookup & send-table-data template
 python apply_lookup_rollout.py --limit 5
 
 # d. set the two view filters: Side = Seller AND "Send table data has results"
-python apply_filters_rollout.py --limit 5
+python apply_view_filters_rollout.py --limit 5
 
 # e. Sellers - People: the 3 "Find people" seller builds → one per-event table
-python people_rollout.py --limit 5
+python seller_people_rollout.py --limit 5
 
 # f. Buyers - People: Side→Buyer, per-Classification segment searches → one table
-python buyer_rollout.py --limit 5
+python buyer_people_rollout.py --limit 5
 
 # g. apply the Google Sheet lookup+send template to the seller/buyer people tables
-python apply_gsheet_rollout.py --limit 5
+python apply_gsheet_lookup_rollout.py --limit 5
+
+# h. email pass: work-email waterfall + Validate Email on the people tables
+python ps_people_email_rollout.py --audit      # plan only; --limit N to run a batch
 ```
 
 Steps **e** and **f** are the config-driven Find-People passes:
@@ -108,7 +111,7 @@ Steps **e** and **f** are the config-driven Find-People passes:
   (`seller_people` / `buyer_people`).
 - job titles, segments, seniority, Location list ←
   `config/icps/<icp>/people_search.yaml` (`seller.builds`, `buyer.segments`,
-  `*.location_countries`; seniority is the 11 levels in `people_fill_lib.js`).
+  `*.location_countries`; seniority is the 11 levels in `people_search_fill.js`).
 - run files namespaced per `<entity>_<icp>` slug:
   `{people,buyer}_targets_<slug>.json`, `{people,buyer}_state_<slug>.json`,
   `{people,buyer}_logs/run_<slug>*.log`.
@@ -118,7 +121,7 @@ from `segments_done`; an unrenamed people table from a killed run is salvaged
 rather than duplicated; `Sellers - People` and `Buyers - People` are never
 clobbered by each other.
 
-Step **g** (`apply_gsheet_rollout.py` / `apply_gsheet_event.py`) applies a
+Step **g** (`apply_gsheet_lookup_rollout.py` / `apply_gsheet_lookup.py`) applies a
 single, entity-agnostic Clay template — **"Google Sheet - Lookup & Send
 Data"** — to whichever of the two people tables (`seller_people`/
 `buyer_people`) exist for the workbook. It's entity-agnostic because it
@@ -134,10 +137,66 @@ tables); state `gsheet_state_<slug>.json`. This template is built once, in
 Clay, and reused for every entity/ICP — no per-entity variant to create,
 unlike the templates steps b/c apply.
 
+### Step h — the email pass (work-email waterfall + Validate Email)
+
+Turns a People table into an emailable one. Two template variants exist; they
+differ only in their Configure panel, so pick by which template the workspace
+has saved:
+
+| People table | Template | Pass |
+|---|---|---|
+| `Sellers - People` / `Buyers - People` | "Waterfall and Validate Email" | `people_email.py` + `people_email_rollout.py` |
+| Product & Services `People` | "Enrich and Validate Email" | `apply_people_enrich_email.py` + `ps_people_email_rollout.py` |
+
+**Fields and values** — what to bind in the Configure panel. Clay prefills only
+where an input's name exactly matches a column on the table; everything else is
+mapped by walking the picker tree. For the "Enrich and Validate Email" panel:
+
+| Panel label | Bind to | Arrives |
+|---|---|---|
+| `Full Name` | `Full Name` | prefilled |
+| `Domain` | `Company Table Data` › `Domain` | map |
+| `records` | `People - Supabase` › `Lookup in Audiences` › `records` | map |
+| `Is New` | `People - Supabase` › `Is New` | map |
+| `Name` | `Company Table Data` › `Name` | map |
+| `LinkedIn Profile` | `LinkedIn Profile` | prefilled |
+
+Two traps here. `Domain`/`Name` have no top-level column on these tables — they
+only exist under `Company Table Data`, and Clay's picker search does **not**
+descend into an unexpanded column's schema, so filtering by "Name" reports "No
+properties"; expand the group instead. And `Is New` exists under *both*
+`Company Table Data` (company ledger) and `People - Supabase` (people ledger) —
+bind the person-level one on a People table, or the waterfall ends up gated on
+the wrong population.
+
+**Run conditions** — on the `Validate Email` column the template creates:
+`Email Address` = `WORK EMAIL`, *Only run if* = `!!{{WORK EMAIL}}`,
+Auto-update OFF. **Always retype the condition**; never accept the inherited
+one. The template carries it over as a raw field id from the table it was built
+on (seen as `!!{{f_…}}` on all 11 P&S tables), which resolves to nothing in the
+target table, leaving the gate dead.
+
+**Save, then run after** — three commits in this order:
+
+1. apply the template with **Save and don't run** (template panel = split button)
+2. bind Validate Email and retype the condition, **plain Save** (Edit-column
+   panel commits on plain Save — the split button is a template-panel thing)
+3. only then trigger: select all rows → **Run N rows**
+
+Step 3 must come last: running at step 1 charges every row while Validate Email
+is still gated on a nonexistent field. Two guards sit in front of it — a
+write-ahead run log (survives a killed worker) and a `WORK EMAIL` fill count
+(does not, since results land *after* the trigger) — checked in that order.
+Default is configure-only; running is opt-in.
+
+Expect roughly a 1-in-10 miss on the final "Run N rows" click. It fails safe
+(configured, unrun, logged retryable, left pending), so re-run the rollout at
+the end to sweep stragglers; finished tables are a no-op.
+
 **Verify Clay UI automation results with the CLI, not the page's own status
 text**: a "Save and run N rows in this view" / "N% of table completed"
 message on the page is not proof the action landed — it can be a stale
-leftover from an unrelated column's auto-run. `apply_gsheet_event.py` learned
+leftover from an unrelated column's auto-run. `apply_gsheet_lookup.py` learned
 this the hard way (a run reported success while the template was never
 actually added) and now polls for the real signature column before ever
 returning "ok"; the same principle applies to any future UI-automation pass —
@@ -145,11 +204,11 @@ confirm with `clay tables columns list <tableId>` (WSL CLI) when in doubt.
 
 ### Parallelism (buyer pass)
 
-`buyer_rollout.py --shards N --shard i` partitions events disjointly and writes
+`buyer_people_rollout.py --shards N --shard i` partitions events disjointly and writes
 per-shard state (`buyer_state_<slug>_w{i}.json`), merged by `merge_shards.py
 --entity <e>`. Use only when RAM allows a second headless browser — on a
 low-RAM machine run a single worker (the builds already use memory-lean
-Chromium flags in `common.py`).
+Chromium flags in `browser_session.py`).
 
 ## 4. Verify
 
@@ -174,13 +233,13 @@ A small number of repeats is expected by design — a company whose
 #    -> people_targets_sponsors_labs.json / buyer_targets_sponsors_labs.json
 # 4. run every pass with --entity sponsors:
 cd automation/cleanup
-CLAY_PIPELINE_ENTITY=sponsors python trim_cols_rollout.py --limit 5     # env for passes a–d
-CLAY_PIPELINE_ENTITY=sponsors python apply_v1_rollout.py --limit 5
+CLAY_PIPELINE_ENTITY=sponsors python trim_columns_rollout.py --limit 5     # env for passes a–d
+CLAY_PIPELINE_ENTITY=sponsors python apply_all_columns_rollout.py --limit 5
 CLAY_PIPELINE_ENTITY=sponsors python apply_lookup_rollout.py --limit 5
-CLAY_PIPELINE_ENTITY=sponsors python apply_filters_rollout.py --limit 5
-python people_rollout.py --entity sponsors --limit 5                    # flag for e–f
-python buyer_rollout.py  --entity sponsors --limit 5
-python apply_gsheet_rollout.py --entity sponsors --limit 5              # flag for g
+CLAY_PIPELINE_ENTITY=sponsors python apply_view_filters_rollout.py --limit 5
+python seller_people_rollout.py --entity sponsors --limit 5                    # flag for e–f
+python buyer_people_rollout.py  --entity sponsors --limit 5
+python apply_gsheet_lookup_rollout.py --entity sponsors --limit 5              # flag for g
 ```
 
 Nothing collides with the live Exhibitors run: Sponsors uses distinct table

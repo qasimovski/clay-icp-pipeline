@@ -7,13 +7,14 @@ BOTH email steps —
      auto-run OFF, output fields Status / Mx Record / Mx Provider — CONFIGURED
      BUT NOT RUN, mirroring what was done on BioTrinity.
 
-Scope order follows speakers_normalized_workbooks.json; --after skips everything
-up to and including a named workbook (default BioTrinity, which is already done).
-Anything the user already built by hand is detected by its signature column and
-skipped, never rebuilt.
+Scope is sorted by workbook name (stable across regenerations of
+speakers_normalized_workbooks.json, which --shard and --after depend on);
+--after skips everything up to and including a named workbook. Anything the
+user already built by hand is detected by its marker column and skipped,
+never rebuilt.
 
 Both steps verify what PERSISTED by reopening the column, and step 1 refuses to
-run unless its gate is really there — see add_workemail_waterfall_event.py for
+run unless its gate is really there — see add_workemail_waterfall.py for
 why (a run condition can look set pre-save and be silently dropped).
 
   python speakers_email_rollout.py --limit 5                    # one worker
@@ -33,9 +34,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                              # noqa: E402
-import add_workemail_waterfall_event as W  # noqa: E402
-import add_validate_email_event as V       # noqa: E402
+import browser_session                              # noqa: E402
+import add_workemail_waterfall as panel  # noqa: E402
+import add_validate_email       # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 SCOPE_PATH = os.path.join(SCRIPT_DIR, "speakers_normalized_workbooks.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "speakers_email_logs")
@@ -51,16 +53,11 @@ SKIP = ("no_table", "no_gate_column")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def step_done(rec, step):
@@ -72,7 +69,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only", help="workbook id or exact name")
     ap.add_argument("--limit", type=int, help="max workbooks this run")
-    ap.add_argument("--after", default="BioTrinity",
+    ap.add_argument("--after", default=None,
                     help="skip scope up to and including this workbook name")
     ap.add_argument("--shards", type=int, default=1)
     ap.add_argument("--shard", type=int, default=0)
@@ -82,7 +79,11 @@ def main():
     args = ap.parse_args()
 
     wbs = json.load(open(SCOPE_PATH, encoding="utf-8"))
+    # Sorted by name, not dict insertion order: --shard partitions and
+    # --after cursors are computed from this list, so regenerating the
+    # scope JSON must not re-partition the fleet under running workers.
     scope = [{"workbook_id": wid, "workbook_name": n} for wid, n in wbs.items()]
+    scope.sort(key=lambda e: e["workbook_name"])
 
     if args.after:
         names = [e["workbook_name"] for e in scope]
@@ -116,7 +117,7 @@ def main():
     print(f"[{tag}] scope={len(scope)} pending={len(pending)}", flush=True)
 
     skipped = []
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -132,7 +133,7 @@ def main():
             # step 1: waterfall (adds, verifies the gate, then runs)
             if not step_done(rec, "waterfall"):
                 try:
-                    r = W.add_waterfall(page, entry, args.dry_run, say,
+                    r = panel.add_waterfall(page, entry, args.dry_run, say,
                                         run_after=not (args.dry_run or args.skip_run))
                 except Exception as e:
                     say(f"!! waterfall EXCEPTION on {name}: {str(e)[:180]}")
@@ -154,9 +155,9 @@ def main():
             # step 2: validate email (configured, NOT run)
             if not step_done(rec, "validate"):
                 try:
-                    r = (V.add_validate(page, entry, True, say)
+                    r = (add_validate_email.add_validate(page, entry, True, say)
                          if args.dry_run else
-                         V.ensure_validate(page, entry, say))
+                         add_validate_email.ensure_validate(page, entry, say))
                 except Exception as e:
                     say(f"!! validate EXCEPTION on {name}: {str(e)[:180]}")
                     logf.write(traceback.format_exc()); logf.flush()

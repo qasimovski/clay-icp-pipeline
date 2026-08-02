@@ -18,11 +18,12 @@ import traceback
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common               # noqa: E402
-import apply_lookup_event as A  # noqa: E402
-import pipeline_config as _PC  # noqa: E402
+import browser_session               # noqa: E402
+import apply_lookup  # noqa: E402
+import pipeline_config as pcfg  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
-_SLUG = _PC.load().slug()  # entity slug namespaces manifest + state (shared workbooks)
+_SLUG = pcfg.load().slug()  # entity slug namespaces manifest + state (shared workbooks)
 MANIFEST_PATH = os.path.join(SCRIPT_DIR, f"cols_manifest_{_SLUG}.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "lookup_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -33,16 +34,11 @@ def state_path(tag):
 
 
 def load_state(p):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return {}
+    return state_io.load_json(p)
 
 
 def save_state(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def main():
@@ -81,7 +77,7 @@ def main():
 
     cf = 0
     results = []
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -90,7 +86,7 @@ def main():
         for i, entry in enumerate(pending):
             say(f"\n--- [{i+1}/{len(pending)}] {entry['workbook_name']} ---")
             try:
-                r = A.apply_lookup(page, entry, args.dry_run, say)
+                r = apply_lookup.apply_lookup(page, entry, args.dry_run, say)
                 results.append(r)
                 if r["status"] in ("ok", "dryrun"):
                     cf = 0

@@ -26,9 +26,9 @@ raw_columns:
 
 # TODO: which raw column feeds each pipeline-generic step.
 field_sources:
-  country_source_field: TODO   # e.g. "Country" or "Location"
-  description_source_field: TODO   # e.g. "Description" or "Company Description"
-  website_source_field: TODO
+  country: TODO   # e.g. "Country" or "Location"
+  description: TODO   # e.g. "Description" or "Company Description"
+  website: TODO
 
 # TODO: usually copy the canonical/mature set from exhibitors.yaml unless
 # this entity type genuinely has no meaningful company-level enrichment
@@ -41,9 +41,9 @@ enrich_company_fields:
 
 # TODO: usually leave both true (the canonical/mature behavior) unless you
 # have a specific reason not to gate for this entity type.
-gating:
+run_conditions:
   official_domain_skip_if_domain_known: true
-  fanout_gated_on_side: true
+  people_fanout_only_if_side: true
 
 # TODO: usually fit_and_country_fit (the 2D matrix) unless the ICP workbook
 # defines a different Seller tiering rule for this entity type specifically

@@ -5,6 +5,17 @@
 workspace_url: "https://app.clay.com/workspaces/REPLACE_ME/home/REPLACE_ME"
 workspace_name: "REPLACE_ME"          # e.g. "Labs [2026 - Qasim - Fable]"
 events_folder: "Competitive Events"    # folder holding one workbook per event
+
+# Blocklist = the Supabase ledger (blocklist_ledger/), reached from Clay by an
+# HTTP API column that returns `Is New`. These name the Clay-side saved
+# template and the connected account it runs under. Both optional; the
+# defaults below are what the Labs workspace uses.
+blocklist_ledger_template: "Companies - Supabase"
+blocklist_api_account: "REPLACE_ME"    # e.g. "Qasim - Labs"
+
+# Legacy: the shared Clay "Block List" table the pipeline used to Send Table
+# Data into, before the Supabase ledger replaced it. Only needed if you still
+# run automation/build_automation (the Interphex-era reference build).
 blocklist_table: "REPLACE_ME - Blocklist - Companies"   # one level up from events_folder
 
 # EVCharge import (automation/clay_sync/import_evcharge.py). Find these by
@@ -14,3 +25,13 @@ blocklist_table: "REPLACE_ME - Blocklist - Companies"   # one level up from even
 workspace_id: "REPLACE_ME"
 evcharge_folder_id: "REPLACE_ME"       # the EVCharge folder
 evcharge_subfolder_id: "REPLACE_ME"    # "Competitive Events" inside it
+
+# Blocklist destination (automation/build_automation/blocklist_send.py). Open
+# the blocklist workbook's Table 1 in Clay and read the three ids out of the
+# URL: /workspaces/<workspace_id>/workbooks/<wb>/tables/<t>/views/<gv>.
+# Environment overrides: CLAY_BLOCKLIST_WORKBOOK_ID / CLAY_BLOCKLIST_TABLE_ID
+# / CLAY_BLOCKLIST_VIEW_ID. The workbook's display name (used to build the
+# send-destination path) overrides via CLAY_BLOCKLIST_WORKBOOK.
+blocklist_workbook_id: "REPLACE_ME"    # wb_...
+blocklist_table_id: "REPLACE_ME"       # t_...
+blocklist_view_id: "REPLACE_ME"        # gv_...

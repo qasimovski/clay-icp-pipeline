@@ -96,12 +96,12 @@ Sources (2 Find People searches): "Executive Leadership, Global" and
 
 First/Last/Full Name, Job Title, Location, Company Domain, LinkedIn Profile,
 Lookup in Audiences, Total Records, Send table data (→ "Table 2").
-**No block-list lookup, no MD checkbox** — blocklist only gates Sell Side.
+**No blocklist lookup, no MD checkbox** — blocklist only gates Sell Side.
 
 ## Blocklist mechanism (replicated for Labs — see `docs/PIPELINE_ARCHITECTURE.md`)
 
 Three separate exclusion layers, all free (no credits):
-1. **A block-list table** — a plain Clay table of LinkedIn profile URLs;
+1. **A blocklist table** — a plain Clay table of LinkedIn profile URLs;
    every Sell-Side table has a "Lookup Single Row in Other Table" column
    against it + a view filter "has no results".
 2. **A large-companies exclusion table** — for excluding giant companies

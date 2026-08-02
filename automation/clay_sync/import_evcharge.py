@@ -32,11 +32,11 @@ import datetime
 import json
 import os
 import sys
+import tempfile
 
 from playwright.sync_api import sync_playwright
 
 import clay_ui
-import humanize
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SESSION_PATH = os.path.join(SCRIPT_DIR, ".clay_session.json")
@@ -115,7 +115,7 @@ _ROWS_JS = """() => {
 }"""
 
 
-def discover():
+def discover_import_folders():
     """[(folder, csv_path), ...] for every scraper folder holding CSV_NAME."""
     out = []
     for name in sorted(os.listdir(SCRAPERS_ROOT)):
@@ -133,8 +133,20 @@ def load_state():
 
 
 def save_state(state):
-    with open(STATE_PATH, "w", encoding="utf-8") as fh:
-        json.dump(state, fh, indent=1, sort_keys=True)
+    # Temp file + os.replace: never leave a truncated state file (which would
+    # read as "nothing imported" and recreate every workbook next run).
+    fd, tmp = tempfile.mkstemp(prefix=os.path.basename(STATE_PATH) + ".",
+                               suffix=".tmp", dir=SCRIPT_DIR)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(state, fh, indent=1, sort_keys=True)
+        os.replace(tmp, STATE_PATH)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def open_subfolder(page):
@@ -153,11 +165,11 @@ def open_subfolder(page):
             if EVCHARGE_SUBFOLDER_ID not in page.url:
                 raise clay_ui.ClayUIError(
                     f"landed outside the target subfolder: {page.url}")
-            humanize.dwell(0.8, 1.5)
+            page.wait_for_timeout(800)
             return
         except Exception as e:
             last_err = e
-            humanize.dwell(1.5, 3.0)
+            page.wait_for_timeout(1500)
     raise clay_ui.ClayUIError(
         f"Could not open the EVCharge/Competitive Events subfolder: {last_err}")
 
@@ -220,7 +232,7 @@ def main():
         print(f"No Clay session at {SESSION_PATH} — run clay_login.py")
         sys.exit(1)
 
-    targets = discover()
+    targets = discover_import_folders()
     if args.only:
         wanted = set(args.only)
         unknown = wanted - {f for f, _ in targets}
@@ -278,16 +290,22 @@ def main():
             sys.exit(1)
         probe.close()
 
-        first = True
+        known = {}   # last folder listing; see the presence check below
         for folder, csv_path in todo:
-            if not first:
-                humanize.pace()
-            first = False
             # Fresh page per folder so one stuck import can't cascade.
             page = ctx.new_page()
             try:
                 open_subfolder(page)
-                live = list_workbooks(page)
+                # The full listing was re-scraped for every folder, so the run
+                # cost O(N^2) scroll passes as the folder grew (the comment
+                # below records it timing out past ~50 workbooks). Reuse the
+                # previous scan instead — but ONLY to confirm a workbook is
+                # PRESENT. An apparent absence is always re-verified with a
+                # fresh scan before creating anything, so a stale cache can
+                # never produce a duplicate workbook.
+                if folder not in set(known.values()):
+                    known = list_workbooks(page)
+                live = known
                 if folder in set(live.values()):
                     # Workbook exists (e.g. the exhibitors run made it): add this
                     # CSV as another table rather than creating a duplicate.

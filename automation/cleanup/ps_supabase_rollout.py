@@ -26,8 +26,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                              # noqa: E402
-import apply_companies_supabase_event as S  # noqa: E402
+import browser_session                              # noqa: E402
+import apply_companies_supabase  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 AUDIT = os.path.join(SCRIPT_DIR, "product_services_companies.json")
 STATE = os.path.join(SCRIPT_DIR, "ps_supabase_state.json")
@@ -35,21 +36,16 @@ LOG_DIR = os.path.join(SCRIPT_DIR, "ps_supabase_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 SKIP = {"Cleanroom Technology", "Chemicals & Reagents", "Digital & AI Services"}
-SIG = ("HTTP API", "Is New")
+MARKER = ("HTTP API", "Is New")
 DONE = ("ok", "already_applied", "dryrun")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def main():
@@ -81,7 +77,7 @@ def main():
     print(f"batch: {[wb for wb, _ in batch]}", flush=True)
     log_path = os.path.join(LOG_DIR, "run.log")
 
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -92,8 +88,8 @@ def main():
             entry = {"workbook_id": rec["workbook_id"], "workbook_name": wb,
                      "table_id": rec.get("table_id")}
             try:
-                r = S.apply_supabase(page, entry, False, say,
-                                     run_after=not args.skip_run, sig=SIG)
+                r = apply_companies_supabase.apply_supabase(page, entry, False, say,
+                                     run_after=not args.skip_run, marker=MARKER)
             except Exception as e:
                 say(f"!! EXCEPTION {wb}: {str(e)[:160]}")
                 logf.write(traceback.format_exc()); logf.flush()

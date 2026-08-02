@@ -1,4 +1,10 @@
-"""Apply the "Exhibitors - All Columns" template to one workbook's
+"""SUPERSEDED - use apply_all_columns.py + run_all_columns.py instead.
+
+This is the "Save and don't run" variant of the same template apply, kept
+for reference. It is also the last reader of the legacy unsuffixed
+cols_manifest.json (every other pass reads cols_manifest_<slug>.json).
+
+Apply the "Exhibitors - All Columns" template to one workbook's
 Exhibitors_normalized table, mapping only the EMPTY fields per the spec, and
 Save WITHOUT running.
 
@@ -25,8 +31,8 @@ sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
-import common         # noqa: E402
-import build_lib as B  # noqa: E402
+import browser_session         # noqa: E402
+import column_config as B  # noqa: E402
 
 TABLE = "Exhibitors_normalized"
 TEMPLATE = "Exhibitors - All Columns"

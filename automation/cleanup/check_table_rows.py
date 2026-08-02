@@ -28,10 +28,16 @@ def main():
             n = d.get("rowCount")
             if n is None and isinstance(d.get("data"), dict):
                 n = d["data"].get("rowCount")
-            print(n if n is not None else 0)
+            if n is None:
+                # A response without a row count is not a zero-row table.
+                print("ERROR", file=sys.stderr)
+                return 1
+            print(n)
             return 0
         time.sleep(2)
-    print(0)
+    # Never print a number here: a CLI failure that looks like "0 rows" makes
+    # the caller file the table as empty and drop it from every future batch.
+    print("ERROR", file=sys.stderr)
     return 1
 
 

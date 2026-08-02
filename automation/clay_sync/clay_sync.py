@@ -36,9 +36,8 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
-import clay_state
+import csv_push_state
 import clay_ui
-import humanize
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # The scrapers root (with the event folders) is the parent of this folder.
@@ -51,7 +50,7 @@ SKIP_DIRS = {".claude", "__pycache__", ".git", "node_modules", ".venv", "venv",
 # Folders that repeatedly fail to import through the UI (import commits but
 # Clay never renders data). Retrying these created duplicate workbooks, so the
 # tool now leaves them alone entirely — add them to Clay manually.
-MANUAL_FOLDERS = {
+NEEDS_HUMAN_FOLDERS = {
     "MEDICA",
     "Medtech Japan",
     "Pittcon",
@@ -75,7 +74,7 @@ UA = (
 )
 
 
-def discover(only_folder=None):
+def discover_csv_folders(only_folder=None):
     """Return {folder_name: [(table_name, csv_path), ...]} for every event
     folder that has at least one standard CSV. Non-standard CSV names are
     ignored. Tables are ordered Exhibitors/Speakers/Sponsors/Attendees."""
@@ -151,11 +150,7 @@ def sync_normalized(args):
         ctx.add_init_script(
             "Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
 
-        first = True
         for folder, csv_path in targets:
-            if not first:
-                humanize.pace()  # human gap before the next workbook
-            first = False
             # Fresh page per folder: a stuck/slow import shouldn't cascade to
             # every subsequent folder (same reasoning as the create loop below).
             # The is_logged_in check happens on this SAME page (not a separate
@@ -165,15 +160,27 @@ def sync_normalized(args):
             page = ctx.new_page()
             try:
                 if not clay_ui.is_logged_in(page):
+                    # Close the browser here: SystemExit skips the
+                    # browser.close() after this loop (it is not an Exception,
+                    # so the except below never sees it).
+                    page.close()
+                    browser.close()
                     print("\nClay session expired or invalid — run: python clay_login.py")
                     sys.exit(1)
+                # One folder hydration + one listing scroll, then navigate by
+                # id. workbook_exists() + open_workbook() each re-scrolled the
+                # virtualized ~90-row listing and each needed its own
+                # open_target_location, so this folder cost 3 hydrations and 2
+                # full scroll passes to reach a workbook whose id the first
+                # listing already returned.
                 clay_ui.open_target_location(page)
-                if not clay_ui.workbook_exists(page, folder):
+                wid = next((i for i, n in clay_ui.list_workbooks(page).items()
+                            if n == folder), None)
+                if wid is None:
                     print(f"  SKIP {folder}: workbook does not exist")
                     missing_wb.append(folder)
                     continue
-                clay_ui.open_target_location(page)
-                clay_ui.open_workbook(page, folder)
+                clay_ui.open_workbook_by_id(page, wid)
                 if table in clay_ui.existing_tables(page, [table]):
                     print(f"  SKIP {folder}: table {table!r} already present")
                     skipped_exists.append(folder)
@@ -233,8 +240,8 @@ def main():
         sync_normalized(args)
         return
 
-    state = clay_state.load_state()
-    events = discover(only_folder=args.folder)
+    state = csv_push_state.load_state()
+    events = discover_csv_folders(only_folder=args.folder)
 
     if not events:
         where = f" in folder {args.folder!r}" if args.folder else ""
@@ -248,15 +255,15 @@ def main():
         tables = events[folder]
         sigs, any_new, any_changed = {}, False, False
         for _, path in tables:
-            changed, sha, mtime = clay_state.needs_sync(path, state)
+            changed, sha, mtime = csv_push_state.needs_sync(path, state)
             sigs[path] = (sha, mtime)
-            if clay_state.rel_key(path) not in state:
+            if csv_push_state.rel_key(path) not in state:
                 any_new = True
             elif changed:
                 any_changed = True
 
-        seen_before = any(clay_state.rel_key(p) in state for _, p in tables)
-        if folder in MANUAL_FOLDERS:
+        seen_before = any(csv_push_state.rel_key(p) in state for _, p in tables)
+        if folder in NEEDS_HUMAN_FOLDERS:
             action = "manual"          # known-broken import — add to Clay by hand
         elif args.force or not seen_before:
             action = "create"          # workbook expected to be missing
@@ -322,11 +329,7 @@ def main():
             sys.exit(1)
         page.close()
 
-        first = True
         for folder, tables, action, sigs in creates:
-            if not first:
-                humanize.pace()  # human gap before the next workbook
-            first = False
             # Give every folder a fresh page. A stuck/slow import (e.g. a very
             # large CSV) can wedge the page; without this, the failure cascades
             # to every subsequent folder in the run.
@@ -336,14 +339,16 @@ def main():
                 # into it) and reconcile live against Clay, so a partial prior
                 # run converges instead of skipping incomplete workbooks or
                 # creating duplicates.
+                # One hydration + one listing scroll; the listing already
+                # yields the id, so navigate by id instead of scrolling the
+                # virtualized listing a second time to click the cell.
                 clay_ui.open_target_location(page)
-                if clay_ui.workbook_exists(page, folder):
+                wid = next((i for i, n in clay_ui.list_workbooks(page).items()
+                            if n == folder), None)
+                if wid is not None:
                     # Workbook already there — add only whichever tables are
                     # missing (self-heals partial/interrupted earlier runs).
-                    # The existence check scrolled the (virtualized) listing,
-                    # so re-open the folder before clicking the workbook cell.
-                    clay_ui.open_target_location(page)
-                    clay_ui.open_workbook(page, folder)
+                    clay_ui.open_workbook_by_id(page, wid)
                     have = clay_ui.existing_tables(page, [t for t, _ in tables])
                     missing = [(t, p) for t, p in tables if t not in have]
                     for _, p in missing:
@@ -361,11 +366,11 @@ def main():
                 now = datetime.datetime.now().isoformat(timespec="seconds")
                 for table, path in tables:
                     sha, mtime = sigs[path]
-                    state[clay_state.rel_key(path)] = {
+                    state[csv_push_state.rel_key(path)] = {
                         "sha256": sha, "mtime": mtime,
                         "workbook": folder, "table": table, "last_synced": now,
                     }
-                clay_state.save_state(state)
+                csv_push_state.save_state(state)
             except Exception as e:
                 failed.append((folder, str(e)))
                 print(f"  FAILED {folder}: {e}")

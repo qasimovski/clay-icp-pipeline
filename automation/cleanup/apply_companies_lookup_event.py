@@ -1,4 +1,8 @@
-"""Apply "Google Sheets - Companies Lookup and Add Row" to the Companies table
+"""UNUSED - no rollout driver and no importer; reachable only via __main__.
+
+Kept for reference alongside apply_lookup.py (a different Clay template).
+
+Apply "Google Sheets - Companies Lookup and Add Row" to the Companies table
 of one Product & Services workbook.
 
 Recon (Material Sciences, 2026-07-31) — the Configure panel has just two fields:
@@ -29,9 +33,9 @@ sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
-import common         # noqa: E402
-import build_lib as B  # noqa: E402
-import add_workemail_waterfall_event as W  # noqa: E402  (save/menu helpers)
+import browser_session         # noqa: E402
+import column_config as B  # noqa: E402
+import add_workemail_waterfall as W  # noqa: E402  (save/menu helpers)
 import subprocess  # noqa: E402
 
 AUDIT = os.path.join(SCRIPT_DIR, "product_services_companies.json")
@@ -288,7 +292,7 @@ if __name__ == "__main__":
     rec = audit[a.workbook_name]
     entry = {"workbook_id": rec["workbook_id"], "workbook_name": a.workbook_name,
              "table_id": rec.get("table_id")}
-    with common.clay_page(headless=not a.headed) as page:
+    with browser_session.clay_page(headless=not a.headed) as page:
         def say(m):
             print(m, flush=True)
         print("\nRESULT:", apply_lookup(page, entry, a.dry_run, say,

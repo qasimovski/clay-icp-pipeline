@@ -17,6 +17,7 @@ because the config files are hand-edited YAML, not JSON.
 """
 import argparse
 import os
+import re
 import sys
 
 try:
@@ -27,9 +28,16 @@ except ImportError:
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+PLACEHOLDER_RE = re.compile(r"\{\{[A-Z][A-Z0-9_]*\}\}")
+UNFILLED = "REPLACE_ME"
+
+
 def load_yaml(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        raise SystemExit(f"config file not found: {path}")
 
 
 def load_local_config():
@@ -41,6 +49,16 @@ def load_local_config():
           f"Copy local.yaml.example to local.yaml and fill in your workspace details.",
           file=sys.stderr)
     return load_yaml(example)
+
+
+def require(cfg, key, source, hint=""):
+    """Fetch a required config key, naming the file when it is missing.
+
+    Bare cfg["key"] raised a KeyError naming only the key, which is how
+    `--entity exhibitors_evcharge` died with `KeyError: 'gating'`."""
+    if key not in cfg:
+        raise SystemExit(f"{source}: missing required key {key!r}{hint}")
+    return cfg[key]
 
 
 def format_taxonomy_block(taxonomy):
@@ -118,17 +136,31 @@ def format_seller_contact_titles_block():
 
 
 def render(entity_key, icp_key):
-    entity_cfg = load_yaml(os.path.join(REPO_ROOT, "config", "entity-types", f"{entity_key}.yaml"))
-    icp_cfg = load_yaml(os.path.join(REPO_ROOT, "config", "icps", icp_key, "icp.yaml"))
+    entity_path = os.path.join(REPO_ROOT, "config", "entity-types",
+                               f"{entity_key}.yaml")
+    icp_path = os.path.join(REPO_ROOT, "config", "icps", icp_key, "icp.yaml")
+    entity_cfg = load_yaml(entity_path)
+    icp_cfg = load_yaml(icp_path)
     local_cfg = load_local_config()
 
     with open(os.path.join(REPO_ROOT, "template", "BUILD_PROMPT.template.md"),
               "r", encoding="utf-8") as f:
         text = f.read()
 
-    tables = entity_cfg["tables"]
-    field_sources = entity_cfg["field_sources"]
-    gating = entity_cfg["gating"]
+    entity_src = os.path.relpath(entity_path, REPO_ROOT)
+    # This template renders the full two-audience pipeline, so it needs the
+    # keys a split-audience entity defines. A consolidated single-template
+    # entity (e.g. exhibitors_evcharge) legitimately omits them — say so
+    # instead of dying on a bare KeyError deep in the replacements dict.
+    hint = (f" (this entity config does not describe the full "
+            f"Seller/Buyer pipeline this template renders)")
+    tables = require(entity_cfg, "tables", entity_src)
+    field_sources = require(entity_cfg, "field_sources", entity_src)
+    run_conditions = require(entity_cfg, "run_conditions", entity_src, hint)
+    for key in ("seller", "buyer", "seller_contacts", "buyer_contacts"):
+        require(tables, key, f"{entity_src}: tables", hint)
+    require(entity_cfg, "enrich_company_fields", entity_src, hint)
+    require(entity_cfg, "composite_tier", entity_src, hint)
 
     replacements = {
         "{{ICP_NAME}}": icp_cfg["icp_name"],
@@ -142,11 +174,17 @@ def render(entity_key, icp_key):
         "{{WORKSPACE_URL}}": local_cfg["workspace_url"],
         "{{WORKSPACE_NAME}}": local_cfg["workspace_name"],
         "{{EVENTS_FOLDER}}": local_cfg["events_folder"],
-        "{{BLOCKLIST_TABLE}}": local_cfg["blocklist_table"],
+        # The blocklist is the Supabase ledger reached over HTTP, not a Clay
+        # table (see blocklist_ledger/). These name the Clay-side saved
+        # template and connected account that call it.
+        "{{BLOCKLIST_LEDGER_TEMPLATE}}": local_cfg.get(
+            "blocklist_ledger_template", "Companies - Supabase"),
+        "{{BLOCKLIST_API_ACCOUNT}}": local_cfg.get(
+            "blocklist_api_account", "(your Clay HTTP API connected account)"),
         "{{RAW_COLUMNS}}": ", ".join(entity_cfg["raw_columns"]),
-        "{{WEBSITE_SOURCE_FIELD}}": field_sources["website_source_field"],
-        "{{COUNTRY_SOURCE_FIELD}}": field_sources["country_source_field"],
-        "{{DESCRIPTION_SOURCE_FIELD}}": field_sources["description_source_field"],
+        "{{WEBSITE_SOURCE_FIELD}}": field_sources["website"],
+        "{{COUNTRY_SOURCE_FIELD}}": field_sources["country"],
+        "{{DESCRIPTION_SOURCE_FIELD}}": field_sources["description"],
         "{{ENRICH_COMPANY_FIELDS}}": ", ".join(entity_cfg["enrich_company_fields"]),
         "{{COUNTRY_NORMALIZATION_BLOCK}}": format_country_normalization(icp_cfg["country_normalization"]),
         "{{CLASSIFIER_NAME}}": icp_cfg["classifier"]["name"],
@@ -160,28 +198,42 @@ def render(entity_key, icp_key):
         "{{KNOWN_ISSUES_BLOCK}}": format_known_issues(icp_cfg),
         "{{OFFICIAL_DOMAIN_GATING_TEXT}}": (
             "only runs when the domain is still unknown after normalization —"
-            if gating.get("official_domain_skip_if_domain_known") else
+            if run_conditions.get("official_domain_skip_if_domain_known") else
             "runs unconditionally —"
         ),
         "{{FANOUT_GATING_TEXT}}": (
             "Gate each action on `{{Side}}` matching its destination (do not send Buyer rows to the Seller table or vice versa)."
-            if gating.get("fanout_gated_on_side") else
-            "(no gating configured for this entity type — see docs/KNOWN_ISSUES.md)"
+            if run_conditions.get("people_fanout_only_if_side") else
+            "(no run conditions configured for this entity type — see docs/KNOWN_ISSUES.md)"
         ),
     }
 
     for placeholder, value in replacements.items():
         text = text.replace(placeholder, str(value))
 
-    # Note: literal {{ColumnName}} references (e.g. {{Description}}, {{Side}})
-    # are intentional Clay field-interpolation syntax meant to stay verbatim
-    # in the rendered prompt/formula text for Clay to interpret — only our
-    # own ALL_CAPS placeholder tokens indicate a template bug if left unfilled.
-    unresolved = [p for p in replacements if p in text]
+    # Literal {{ColumnName}} references (e.g. {{Description}}, {{Side}}) are
+    # intentional Clay field-interpolation syntax and must stay verbatim for
+    # Clay to interpret; only our own ALL_CAPS tokens signal a template bug.
+    # Scanning the TEXT for that shape (rather than re-checking the keys we
+    # just substituted, which can only report a value that reintroduced its
+    # own token) is what actually catches a new {{PLACEHOLDER}} added to the
+    # template but never wired into `replacements`.
+    unresolved = sorted(set(PLACEHOLDER_RE.findall(text)))
     if unresolved:
-        print("warning: these template placeholders were not substituted:", file=sys.stderr)
-        for p in unresolved:
-            print(f"  {p}", file=sys.stderr)
+        raise SystemExit(
+            "template placeholders were never substituted: "
+            + ", ".join(unresolved)
+            + "\nAdd them to `replacements` in render() (or fix the typo).")
+
+    # A rendered spec full of REPLACE_ME is worse than no spec: it looks
+    # authoritative and points at a workspace that does not exist.
+    unfilled = sorted(k for k, v in replacements.items()
+                      if UNFILLED in str(v))
+    if unfilled:
+        raise SystemExit(
+            f"config/local.yaml still has {UNFILLED} for: "
+            + ", ".join(unfilled)
+            + "\nFill those in before rendering a build spec.")
 
     return text
 
@@ -200,7 +252,16 @@ def main():
             f.write(rendered)
         print(f"wrote {args.out}", file=sys.stderr)
     else:
-        print(rendered)
+        # The spec contains → ∈ × –, and Windows consoles default to cp1252,
+        # so a plain print() raised UnicodeEncodeError on the no---out form
+        # the RUNBOOK documents. Write UTF-8 bytes straight to the buffer.
+        buffer = getattr(sys.stdout, "buffer", None)
+        if buffer is not None:
+            buffer.write(rendered.encode("utf-8"))
+            buffer.write(b"\n")
+            buffer.flush()
+        else:
+            print(rendered)
 
 
 if __name__ == "__main__":

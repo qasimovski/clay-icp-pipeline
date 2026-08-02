@@ -8,7 +8,7 @@ Digi-tech Pharma & AI are pre-seeded as done in the state file (user applied
 this template to them manually before this rollout existed).
 
 Waits for each table's run to reach 100% completion (see
-apply_findlinkedin_event.py's _wait_for_full_completion) before considering
+apply_findlinkedin.py's _wait_for_full_completion) before considering
 it done. Idempotent per workbook via the "Enrich person" signature column.
 
   python apply_findlinkedin_rollout.py --only "HIMSS"
@@ -26,8 +26,9 @@ import traceback
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                        # noqa: E402
-import apply_findlinkedin_event as A  # noqa: E402
+import browser_session                        # noqa: E402
+import apply_findlinkedin  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 SCOPE_PATH = os.path.join(SCRIPT_DIR, "speakers_normalized_workbooks.json")
 STATE_PATH = os.path.join(SCRIPT_DIR, "findlinkedin_state.json")
@@ -39,16 +40,11 @@ _FINAL_STATUSES = ("ok", "dryrun", "no_table")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def workbook_done(state, wid):
@@ -64,7 +60,11 @@ def main():
     args = ap.parse_args()
 
     wbs = json.load(open(SCOPE_PATH, encoding="utf-8"))
+    # Sorted by name, not dict insertion order: --shard partitions and
+    # --after cursors are computed from this list, so regenerating the
+    # scope JSON must not re-partition the fleet under running workers.
     scope = [{"workbook_id": wid, "workbook_name": name} for wid, name in wbs.items()]
+    scope.sort(key=lambda e: e["workbook_name"])
     if args.only:
         scope = [e for e in scope if args.only in (e["workbook_id"], e["workbook_name"])]
         if not scope:
@@ -82,7 +82,7 @@ def main():
           flush=True)
 
     cf = 0
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -95,7 +95,7 @@ def main():
             last_exc = None
             for dns_try in range(3):
                 try:
-                    r = A.apply_findlinkedin(page, entry, TABLE, args.dry_run, say)
+                    r = apply_findlinkedin.apply_findlinkedin(page, entry, TABLE, args.dry_run, say)
                     last_exc = None
                     break
                 except Exception as e:

@@ -1,0 +1,14 @@
+# Normalize line endings in the repo; check out native on each platform.
+# Three files were committed CRLF while the other 56 were LF, which made
+# whole-file diffs out of one-line edits.
+* text=auto
+
+*.py text
+*.md text
+*.yaml text
+*.yml text
+*.js text
+*.sql text
+*.json text
+
+*.png binary

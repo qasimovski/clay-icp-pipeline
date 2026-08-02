@@ -4,7 +4,7 @@ subfolder to Competitive Events) and write other_sources_workbooks.json
 
 Read-only discovery step for applying the "Google Sheet - Lookup & Send
 Data" template to this folder's Sellers - People / Buyers - People tables
-(see apply_gsheet_event.py) — run once, then re-run only if the folder's
+(see apply_gsheet_lookup.py) — run once, then re-run only if the folder's
 contents change.
 """
 
@@ -17,14 +17,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "clay_sync"))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
 import clay_ui        # noqa: E402
-import common         # noqa: E402
+import browser_session         # noqa: E402
 
 SUBFOLDER = "Other Sources"
 OUT = os.path.join(SCRIPT_DIR, "other_sources_workbooks.json")
 
 
 def main():
-    with common.clay_page(headless=True) as page:
+    with browser_session.clay_page(headless=True) as page:
         clay_ui.open_target_location(page, subfolder=SUBFOLDER)
         id_to_name = clay_ui.list_workbooks(page)
     json.dump(id_to_name, open(OUT, "w", encoding="utf-8"),

@@ -1,7 +1,7 @@
 """Fleet driver for the people-tables "Waterfall and Validate Email" pass.
 
 Loops over events whose Sellers/Buyers - People tables still lack WORK EMAIL and
-runs the guarded per-event flow from people_email_event.py:
+runs the guarded per-event flow from people_email.py:
   apply (no run) -> fix Validate Email (input + !!{{WORK EMAIL}} + Auto-run OFF)
   -> run only if WORK EMAIL is still empty.
 
@@ -25,8 +25,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                          # noqa: E402
-import people_email_event as E         # noqa: E402
+import browser_session                          # noqa: E402
+import people_email         # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 AUDIT = os.path.join(SCRIPT_DIR, "people_email_audit.json")
 STATE = os.path.join(SCRIPT_DIR, "people_email_state.json")
@@ -38,16 +39,11 @@ SKIP_PATH = os.path.join(SCRIPT_DIR, "people_email_skip.json")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def pending_events(audit):
@@ -64,7 +60,11 @@ def pending_events(audit):
 
 
 def row_total(ev):
-    """Total rows across the event's pending tables (for smallest-first order)."""
+    """Total rows across the event's pending tables (for smallest-first order).
+
+    Returns None if any table's count could not be read. "Unknown" must never
+    collapse to 0: a CLI hiccup reading as an empty table silently dropped the
+    workbook from every future batch (audit C4)."""
     tot = 0
     for t in ev["todo"]:
         tid = ev["tables"][t]["table_id"]
@@ -74,9 +74,11 @@ def row_total(ev):
                 ["wsl", "-d", "Ubuntu", "--", "python3", path, tid],
                 capture_output=True, text=True, timeout=120,
                 env={**os.environ, "MSYS_NO_PATHCONV": "1"})
-            tot += int((out.stdout or "0").strip().split()[0])
+            if out.returncode != 0:
+                return None
+            tot += int((out.stdout or "").strip().split()[0])
         except Exception:
-            tot += 9999
+            return None
     return tot
 
 
@@ -97,15 +99,15 @@ def main():
     args = ap.parse_args()
 
     if args.tables:
-        bad = [t for t in args.tables if t not in E.ALLOWED_PREFIXES]
+        bad = [t for t in args.tables if t not in people_email.ALLOWED_PREFIXES]
         if bad:
             raise SystemExit(f"refusing to touch tables outside the allowed "
                              f"list: {bad}")
-        E.TABLES = tuple(args.tables)
+        people_email.TABLES = tuple(args.tables)
     audit_path = args.audit or AUDIT
     if not os.path.isabs(audit_path):
         audit_path = os.path.join(SCRIPT_DIR, audit_path)
-    print(f"audit={os.path.basename(audit_path)} tables={E.TABLES}", flush=True)
+    print(f"audit={os.path.basename(audit_path)} tables={people_email.TABLES}", flush=True)
     audit = load(audit_path, None)
     if audit is None:
         raise SystemExit("run audit_people_email.py (in WSL) first")
@@ -129,17 +131,25 @@ def main():
         for e in events:
             e["rows"] = row_total(e)
         # An empty table has nothing to enrich, and "Run 0 rows" is not a thing.
+        # Only a COUNT WE ACTUALLY READ (0) may drop an event; an unreadable
+        # count (None) is kept and sorted last, so a transient CLI failure
+        # delays a workbook instead of retiring it permanently.
         skipped_empty = [e["workbook_name"] for e in events if e["rows"] == 0]
         if skipped_empty:
             print(f"skipping {len(skipped_empty)} empty table(s): "
                   f"{skipped_empty}", flush=True)
-        events = [e for e in events if e["rows"] > 0]
-        events.sort(key=lambda e: (e["rows"], e["workbook_name"]))
+        unknown = [e["workbook_name"] for e in events if e["rows"] is None]
+        if unknown:
+            print(f"row count unavailable for {len(unknown)} event(s), keeping "
+                  f"them (ordered last): {unknown}", flush=True)
+        events = [e for e in events if e["rows"] is None or e["rows"] > 0]
+        events.sort(key=lambda e: (e["rows"] is None, e["rows"] or 0,
+                                   e["workbook_name"]))
 
     if args.list:
         for e in events:
             print(f"  {e['workbook_name']:48} tables={e['todo']} "
-                  f"rows={e.get('rows', '?')}")
+                  f"rows={e.get('rows') if e.get('rows') is not None else '?'}")
         print(f"{len(events)} events pending")
         return
 
@@ -151,14 +161,27 @@ def main():
 
     batch = events[: args.limit]
     state_path = STATE
+    log_path = os.path.join(LOG_DIR, "run.log")
     if args.shards > 1:
         state_path = STATE.replace(".json", f"_w{args.shard}.json")
+        log_path = os.path.join(LOG_DIR, f"run_w{args.shard}.log")
+        # The write-ahead run log is the double-charge guard, and it is only
+        # safe under parallel workers when each worker has its OWN file
+        # (people_email.py documents the read-modify-write loss). It used to
+        # rely on the operator remembering to export CLAY_RUNS_FILE — now the
+        # shard sets it automatically unless one was given explicitly.
+        # Merge shard run logs back with merge_shards.py before a non-sharded
+        # run, so already_triggered() sees every past trigger.
+        if not os.environ.get("CLAY_RUNS_FILE"):
+            people_email.RUNS = people_email.RUNS.replace(
+                ".json", f"_w{args.shard}.json")
+            print(f"run log (per-shard): "
+                  f"{os.path.basename(people_email.RUNS)}", flush=True)
     state = load(state_path, {})
-    log_path = os.path.join(LOG_DIR, "run.log")
     print(f"batch of {len(batch)}: "
           f"{[e['workbook_name'] for e in batch]}", flush=True)
 
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -167,13 +190,13 @@ def main():
         for i, ev in enumerate(batch):
             name = ev["workbook_name"]
             entry = {"workbook_id": ev["workbook_id"], "workbook_name": name}
-            say(f"\n--- [{i+1}/{len(batch)}] {name} (rows={ev.get('rows','?')}) ---")
+            say(f"\n--- [{i+1}/{len(batch)}] {name} (rows={ev.get('rows') if ev.get('rows') is not None else '?'}) ---")
             rec = state.setdefault(name, {})
-            for table in E.TABLES:
+            for table in people_email.TABLES:
                 if table not in ev["tables"]:
                     continue
                 try:
-                    r = E.do_table(page, entry, table,
+                    r = people_email.do_table(page, entry, table,
                                    ev["tables"][table]["table_id"], say,
                                    skip_run=args.skip_run)
                 except Exception as exc:

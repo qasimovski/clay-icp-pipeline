@@ -2,7 +2,15 @@
 -- Central Blocklist ledger for Clay
 -- 04_backfill.sql  --  load your existing ~400k records at ZERO Clay Actions
 --
--- Run FOURTH, after the verify suite passes.
+-- *** SUPERSEDED — DO NOT RUN AGAINST THE CURRENT SCHEMA ***
+-- This script predates the normalized-key schema: its Step 4 inserts omit the
+-- NOT NULL domain_key/linkedin_key columns and target constraints named
+-- company_ledger_uniq/people_ledger_uniq, which are now
+-- company_ledger_key_uniq/people_ledger_key_uniq (01_schema.sql). It will fail.
+-- Use load_csv.js instead — it normalizes with the same DB functions the RPCs
+-- use. Kept for history only.
+--
+-- (Original header: run FOURTH, after the verify suite passes.)
 --
 -- WHY THIS MATTERS: pushing the existing backlog through Clay's HTTP column costs
 -- ~1 Action per row. Loading it directly into Postgres costs zero. Do the

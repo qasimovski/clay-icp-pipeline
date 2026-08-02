@@ -2,7 +2,7 @@
 
 Navigates Home -> Labs [2026 - Qasim] -> Competitive Events, lists the workbook
 ids actually in that subfolder, and writes competitive_events_workbooks.json.
-cleanup_rollout.py intersects the manifest with this set so a workbook is only
+delete_byproduct_tables_rollout.py intersects the manifest with this set so a workbook is only
 ever cleaned if it is genuinely inside Competitive Events — nothing outside that
 folder is touched, even if it happens to contain a normalized table.
 
@@ -22,14 +22,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "clay_sync"))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
 import clay_ui        # noqa: E402
-import common         # noqa: E402
+import browser_session         # noqa: E402
 
 OUT = os.path.join(SCRIPT_DIR, "competitive_events_workbooks.json")
 MANIFEST = os.path.join(SCRIPT_DIR, "cleanup_manifest.json")
 
 
 def main():
-    with common.clay_page(headless=True) as page:
+    with browser_session.clay_page(headless=True) as page:
         clay_ui.open_target_location(page)
         id_to_name = clay_ui.list_workbooks(page)
     json.dump(id_to_name, open(OUT, "w", encoding="utf-8"),

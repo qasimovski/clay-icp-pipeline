@@ -18,7 +18,7 @@ automation/clay_sync/*.state.json
 # Cleanup / rollout passes — every generated .json (manifests, inventories,
 # per-run state, targets, batch/shard lists) carries live workspace + workbook
 # ids, and every *_logs/ dir is a run artifact. Regenerate manifests with the
-# build_*.py scripts. Committed code (*.py + people_fill_lib.js) is portable.
+# build_*.py scripts. Committed code (*.py + people_search_fill.js) is portable.
 automation/cleanup/*.json
 automation/cleanup/*_logs/
 
@@ -36,7 +36,7 @@ Thumbs.db
 # "People - Filters*.txt" are written for one batch of workbooks (not part of the
 # uniform process) and hold live Clay table/view/filter ids, which
 # SENSITIVE_DATA.md keeps out of the repo; the screenshots are run artifacts.
-# Pass such a file to people_search_event.py with --queries.
+# Pass such a file to people_search.py with --queries.
 /People - Filters*.txt
 /Query Skill.md
 /*.png

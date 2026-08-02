@@ -13,23 +13,30 @@ filling in config, not re-deriving the pipeline.
 raw CSV (per event, per entity type)
    │
    ▼
-normalize domain / company name / country  ──┐
-   ▼                                          │  identical mechanics
-Enrich Company (Clay native action)           │  across entity types
-   ▼                                          │  and ICPs
+normalize domain / company name  ─────────────┐
+   ▼                                          │
+blocklist ledger check → Is New ──▶ filter    │  identical mechanics
+   ▼   (Supabase; gates everything below)     │  across entity types
+normalize country                             │  and ICPs
+   ▼                                          │
+Enrich Company (Clay native action)           │
+   ▼                                          │
 ICP classifier (Claygent: Side + Classification) ◄── ICP-specific taxonomy
    ▼                                          │
 Fit / Country Fit / Composite Tier  ──────────┘  ICP-specific tier lists
    ▼
 split → Sellers / Buyers tables → Contacts tables (Find People)
-   ▼
-Blocklist send (cross-event dedupe registry)
 ```
+
+Cross-event dedupe is the **Supabase blocklist ledger** (`blocklist_ledger/`),
+queried per row over HTTP and filtered on before any paid column runs — it
+replaced an earlier shared Clay "Block List" table that recorded repeats but
+did not gate them.
 
 - `docs/GTM_METHODOLOGY.md` — the engine: why this exists, the
   BuySide/SellSide scoring shape, the credit-minimization funnel. Read
   this first.
-- `docs/PIPELINE_ARCHITECTURE.md` — the concrete 15-step column pipeline
+- `docs/PIPELINE_ARCHITECTURE.md` — the concrete 14-step column pipeline
   built inside every event workbook, with pointers to which config file
   governs each ICP- or entity-specific step.
 - `template/BUILD_PROMPT.template.md` + `template/render_build_prompt.py`

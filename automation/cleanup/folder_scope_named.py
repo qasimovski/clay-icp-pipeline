@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "clay_sync"))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
 import clay_ui        # noqa: E402
-import common         # noqa: E402
+import browser_session         # noqa: E402
 
 
 def main():
@@ -27,7 +27,7 @@ def main():
                    + "_workbooks.json"
     out = os.path.join(SCRIPT_DIR, out_name)
 
-    with common.clay_page(headless=True) as page:
+    with browser_session.clay_page(headless=True) as page:
         clay_ui.open_target_location(page, subfolder=folder)
         id_to_name = clay_ui.list_workbooks(page)
 

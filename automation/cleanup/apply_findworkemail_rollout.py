@@ -1,4 +1,13 @@
-"""Fleet driver: apply the "Email Waterfall and Validate Email" template to
+"""SUPERSEDED — use add_workemail_waterfall.py instead.
+
+add_workemail_waterfall.py:4-8 replaced this template-based approach on
+2026-07-27 ("the saved template proved unreliable to apply"). This module and
+its event script are kept for reference only. Because they still spend ~14.5
+credits/row, running them requires an explicit opt-in:
+
+    CLAY_ALLOW_SUPERSEDED=1 python apply_findworkemail_rollout.py ...
+
+Fleet driver: apply the "Email Waterfall and Validate Email" template to
 every Competitive Events workbook's "Speakers_normalized" table.
 
 Same scope and shape as apply_findlinkedin_rollout.py (43 workbooks from
@@ -29,7 +38,7 @@ import traceback
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                        # noqa: E402
+import browser_session                        # noqa: E402
 import apply_findworkemail_event as A  # noqa: E402
 
 SCOPE_PATH = os.path.join(SCRIPT_DIR, "speakers_normalized_workbooks.json")
@@ -73,7 +82,11 @@ def main():
     args = ap.parse_args()
 
     wbs = json.load(open(SCOPE_PATH, encoding="utf-8"))
+    # Sorted by name, not dict insertion order: --shard partitions and
+    # --after cursors are computed from this list, so regenerating the
+    # scope JSON must not re-partition the fleet under running workers.
     scope = [{"workbook_id": wid, "workbook_name": name} for wid, name in wbs.items()]
+    scope.sort(key=lambda e: e["workbook_name"])
     if args.only:
         scope = [e for e in scope if args.only in (e["workbook_id"], e["workbook_name"])]
         if not scope:
@@ -96,7 +109,7 @@ def main():
           flush=True)
 
     cf = 0
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -150,5 +163,17 @@ def main():
         say("\nSUMMARY: see workemail_state.json for per-workbook results")
 
 
+def _refuse_unless_opted_in():
+    """This pass is superseded and costs ~14.5 credits/row; 30,000+ for a
+    fleet run. Nothing should reach it by habit or by an old shell-history
+    line, so require a deliberate environment opt-in."""
+    if not os.environ.get("CLAY_ALLOW_SUPERSEDED"):
+        raise SystemExit(
+            "apply_findworkemail_* is SUPERSEDED by add_workemail_waterfall.py "
+            "(see that module's header) and spends ~14.5 credits/row.\n"
+            "If you really mean to run it, set CLAY_ALLOW_SUPERSEDED=1.")
+
+
 if __name__ == "__main__":
+    _refuse_unless_opted_in()
     main()

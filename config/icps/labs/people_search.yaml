@@ -1,11 +1,11 @@
 # Find-People search config for the Labs ICP.
-# Consumed by automation/cleanup/people_builds.py (Sellers - People) and
-# buyer_builds.py (Buyers - People). Entity-agnostic: the SAME lists apply
+# Consumed by automation/cleanup/seller_people_searches.py (Sellers - People) and
+# buyer_people_searches.py (Buyers - People). Entity-agnostic: the SAME lists apply
 # whether the source is Exhibitors_normalized or Sponsors_normalized — only
 # the table names (config/entity-types/<entity>.yaml: tables) change per entity.
 #
 # seniority: the 11 Find-People seniority levels (shared seller+buyer).
-# seller.builds: the 3 sequential 'Find people' seller searches (exact/contains).
+# seller.searches: the 3 sequential 'Find people' seller searches (exact/contains).
 # buyer.segments: per-Classification job-title lists; each runs an exact then a
 #   contains Find-People search (Clay's Job Title field is single-mode).
 # *.location_countries: the Find-People Location filter (Germany intentionally excluded).
@@ -31,7 +31,7 @@ seller:
   - Netherlands
   - Japan
   - China
-  builds:
+  searches:
   - name: 1st
     job_title_mode: exact
     job_titles:

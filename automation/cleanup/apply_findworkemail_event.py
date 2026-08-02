@@ -1,7 +1,14 @@
-"""Apply the "Find Work Email and Validate Email" template to a single named
+"""SUPERSEDED - use add_workemail_waterfall.py instead.
+
+add_workemail_waterfall.py:4-8 replaced this template-based approach on
+2026-07-27 ("the saved template proved unreliable to apply"). Kept for
+reference; the real apply path requires CLAY_ALLOW_SUPERSEDED=1 because it
+spends ~14.5 credits/row.
+
+Apply the "Find Work Email and Validate Email" template to a single named
 table (Speakers_normalized) in one workbook.
 
-Mirrors apply_findlinkedin_event.py's structure (--recon / --dry-run / a real
+Mirrors apply_findlinkedin.py's structure (--recon / --dry-run / a real
 apply that waits for 100% completion), but this template's Configure panel is
 materially harder than the previous two, so the field mapping is bespoke.
 
@@ -35,8 +42,8 @@ sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
-import common         # noqa: E402
-import build_lib as B  # noqa: E402
+import browser_session         # noqa: E402
+import column_config as B  # noqa: E402
 
 # The saved template's name in Clay, tried in order — the user renamed it
 # "Find Work Email and Validate Email" -> "Email Waterfall and Validate Email"
@@ -56,7 +63,7 @@ TEMPLATE_USED = None
 SIG_CANDIDATES = ["Work Email", "Find Work Email", "Validate Email",
                   "Email Validation", "Validate email", "Work email"]
 
-# Config-panel field-box locator (same as apply_v1_event.py / findlinkedin):
+# Config-panel field-box locator (same as apply_all_columns.py / findlinkedin):
 # find the label's y, then the "Start typing" placeholder box just below it.
 # Note the panel renders some labels with non-breaking spaces ("Enrich\xa0person");
 # JS \s matches   so the norm() below handles that.
@@ -774,8 +781,17 @@ if __name__ == "__main__":
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--screenshot")
     a = ap.parse_args()
+    # SUPERSEDED by add_workemail_waterfall.py (2026-07-27). The recon and
+    # dry-run paths cost nothing, so they stay open; the real apply spends
+    # ~14.5 credits/row and needs a deliberate opt-in.
+    if not (a.recon or a.dry_run) and not os.environ.get("CLAY_ALLOW_SUPERSEDED"):
+        raise SystemExit(
+            "apply_findworkemail_event is SUPERSEDED by "
+            "add_workemail_waterfall.py and spends ~14.5 credits/row.\n"
+            "Use --recon/--dry-run freely, or set CLAY_ALLOW_SUPERSEDED=1 to "
+            "run it for real.")
     entry = {"workbook_id": a.workbook_id, "workbook_name": a.workbook_name}
-    with common.clay_page(headless=not a.headed) as page:
+    with browser_session.clay_page(headless=not a.headed) as page:
         def say(m):
             print(m, flush=True)
         if a.recon:
