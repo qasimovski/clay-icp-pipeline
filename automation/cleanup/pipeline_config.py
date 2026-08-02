@@ -19,7 +19,7 @@ Usage:
     cfg.buyer_segments        # [{segment, exact, contains}, ...]
     cfg.buyer_countries       # 50-country location list for buyer searches
 
-Seniority is defined once in people_fill_lib.js (SENIORITY_VALUES); it is the
+Seniority is defined once in people_search_fill.js (SENIORITY_VALUES); it is the
 same 11 levels for every entity/ICP here and is not re-declared per config.
 """
 import os

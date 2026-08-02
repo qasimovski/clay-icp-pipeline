@@ -13,7 +13,7 @@ Anything the user already built by hand is detected by its signature column and
 skipped, never rebuilt.
 
 Both steps verify what PERSISTED by reopening the column, and step 1 refuses to
-run unless its gate is really there — see add_workemail_waterfall_event.py for
+run unless its gate is really there — see add_workemail_waterfall.py for
 why (a run condition can look set pre-save and be silently dropped).
 
   python speakers_email_rollout.py --limit 5                    # one worker
@@ -33,9 +33,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                              # noqa: E402
-import add_workemail_waterfall_event as W  # noqa: E402
-import add_validate_email_event as V       # noqa: E402
+import browser_session                              # noqa: E402
+import add_workemail_waterfall as panel  # noqa: E402
+import add_validate_email       # noqa: E402
 
 SCOPE_PATH = os.path.join(SCRIPT_DIR, "speakers_normalized_workbooks.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "speakers_email_logs")
@@ -116,7 +116,7 @@ def main():
     print(f"[{tag}] scope={len(scope)} pending={len(pending)}", flush=True)
 
     skipped = []
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -132,7 +132,7 @@ def main():
             # step 1: waterfall (adds, verifies the gate, then runs)
             if not step_done(rec, "waterfall"):
                 try:
-                    r = W.add_waterfall(page, entry, args.dry_run, say,
+                    r = panel.add_waterfall(page, entry, args.dry_run, say,
                                         run_after=not (args.dry_run or args.skip_run))
                 except Exception as e:
                     say(f"!! waterfall EXCEPTION on {name}: {str(e)[:180]}")
@@ -154,9 +154,9 @@ def main():
             # step 2: validate email (configured, NOT run)
             if not step_done(rec, "validate"):
                 try:
-                    r = (V.add_validate(page, entry, True, say)
+                    r = (add_validate_email.add_validate(page, entry, True, say)
                          if args.dry_run else
-                         V.ensure_validate(page, entry, say))
+                         add_validate_email.ensure_validate(page, entry, say))
                 except Exception as e:
                     say(f"!! validate EXCEPTION on {name}: {str(e)[:180]}")
                     logf.write(traceback.format_exc()); logf.flush()

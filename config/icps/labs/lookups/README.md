@@ -14,6 +14,6 @@ To populate them:
    - `BuySide ICP – TIERED` → `buyer_contact_titles.csv`
    - The Fit column derived from the taxonomy in `config/icps/labs/icp.yaml` → `fit_lookup.csv`
 2. Save each as CSV in this folder with the exact filename above (no `.example`).
-3. `automation/build_automation/build_event.py` reads these from
+3. `automation/build_automation/build_workbook.py` reads these from
    `CLAY_PIPELINE_ICP_LOOKUPS_DIR` (defaults to this folder) — see
    `automation/README.md`.

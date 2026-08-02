@@ -1,4 +1,4 @@
-"""Fleet rollout: run build_event over every scrapers folder that has an
+"""Fleet rollout: run build_workbook over every scrapers folder that has an
 Exhibitors_normalized.csv (excluding Interphex, already built).
 
   python rollout.py                 # run everything not yet done
@@ -18,12 +18,12 @@ import sys
 import time
 import traceback
 
-import common
-import build_event
+import browser_session
+import build_workbook
 
-SCRAPERS_ROOT = build_event.SCRAPERS_ROOT
-STATE_PATH = os.path.join(common.SCRIPT_DIR, "rollout_state.json")
-LOG_DIR = os.path.join(common.SCRIPT_DIR, "rollout_logs")
+SCRAPERS_ROOT = build_workbook.SCRAPERS_ROOT
+STATE_PATH = os.path.join(browser_session.SCRIPT_DIR, "rollout_state.json")
+LOG_DIR = os.path.join(browser_session.SCRIPT_DIR, "rollout_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 MANUAL = {"MEDICA", "Medtech Japan", "Pittcon", "SLAS Europe", "SLAS2026",
@@ -37,7 +37,7 @@ def load_state(own_path=STATE_PATH):
     merged = {}
     import glob as _glob
     paths = [STATE_PATH] + sorted(_glob.glob(
-        os.path.join(common.SCRIPT_DIR, "rollout_state_w*.json")))
+        os.path.join(browser_session.SCRIPT_DIR, "rollout_state_w*.json")))
     for p in paths:
         if os.path.exists(p):
             try:
@@ -96,7 +96,7 @@ def main():
     args = ap.parse_args()
 
     own_path = STATE_PATH if args.shard is None else os.path.join(
-        common.SCRIPT_DIR, f"rollout_state_w{args.shard}.json")
+        browser_session.SCRIPT_DIR, f"rollout_state_w{args.shard}.json")
     state = load_state()
     events = [args.only] if args.only else discover()
     if args.shard is not None:
@@ -112,14 +112,14 @@ def main():
     for i, folder in enumerate(pending):
         stamp = datetime.datetime.now().isoformat(timespec="seconds")
         print(f"\n=== [{i+1}/{len(pending)}] {folder}  ({stamp}) ===", flush=True)
-        log_path = os.path.join(LOG_DIR, build_event.slug(folder) + ".log")
+        log_path = os.path.join(LOG_DIR, build_workbook.slug(folder) + ".log")
         if not wait_online():
             print("network down for 1h — aborting", flush=True)
             sys.exit(3)
         try:
             with open(log_path, "a", encoding="utf-8") as log:
                 log.write(f"\n===== run {stamp} =====\n")
-                build_event.run_event(folder, log)
+                build_workbook.run_event(folder, log)
             state[folder] = {"status": "done", "ts": stamp}
             save_state_entry(own_path, folder, state[folder])
             consecutive_failures = 0

@@ -1,6 +1,6 @@
 # Find-People search config for the Labs ICP.
-# Consumed by automation/cleanup/people_builds.py (Sellers - People) and
-# buyer_builds.py (Buyers - People). Entity-agnostic: the SAME lists apply
+# Consumed by automation/cleanup/seller_people_searches.py (Sellers - People) and
+# buyer_people_searches.py (Buyers - People). Entity-agnostic: the SAME lists apply
 # whether the source is Exhibitors_normalized or Sponsors_normalized — only
 # the table names (config/entity-types/<entity>.yaml: tables) change per entity.
 #

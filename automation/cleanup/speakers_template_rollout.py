@@ -32,9 +32,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                               # noqa: E402
-import apply_email_template_event as T      # noqa: E402
-import configure_validate_email_event as V  # noqa: E402
+import browser_session                               # noqa: E402
+import apply_email_template      # noqa: E402
+import configure_validate_email  # noqa: E402
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, "check_table_columns.py")
 
@@ -159,7 +159,7 @@ def main():
           flush=True)
 
     needs_check = []
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -184,7 +184,7 @@ def main():
                     save(state_path, state)
                 else:
                   try:
-                    r = T.apply_template(page, entry, args.dry_run, say)
+                    r = apply_email_template.apply_template(page, entry, args.dry_run, say)
                   except Exception as e:
                     say(f"!! template EXCEPTION on {name}: {str(e)[:180]}")
                     logf.write(traceback.format_exc()); logf.flush()
@@ -209,7 +209,7 @@ def main():
                 do_run = not args.skip_run and not already_run(
                     audit.get(name), say)
                 try:
-                    r = V.configure(page, entry, say, run_after=do_run)
+                    r = configure_validate_email.configure(page, entry, say, run_after=do_run)
                 except Exception as e:
                     say(f"!! validate EXCEPTION on {name}: {str(e)[:180]}")
                     logf.write(traceback.format_exc()); logf.flush()

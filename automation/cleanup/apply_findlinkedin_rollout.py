@@ -8,7 +8,7 @@ Digi-tech Pharma & AI are pre-seeded as done in the state file (user applied
 this template to them manually before this rollout existed).
 
 Waits for each table's run to reach 100% completion (see
-apply_findlinkedin_event.py's _wait_for_full_completion) before considering
+apply_findlinkedin.py's _wait_for_full_completion) before considering
 it done. Idempotent per workbook via the "Enrich person" signature column.
 
   python apply_findlinkedin_rollout.py --only "HIMSS"
@@ -26,8 +26,8 @@ import traceback
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                        # noqa: E402
-import apply_findlinkedin_event as A  # noqa: E402
+import browser_session                        # noqa: E402
+import apply_findlinkedin  # noqa: E402
 
 SCOPE_PATH = os.path.join(SCRIPT_DIR, "speakers_normalized_workbooks.json")
 STATE_PATH = os.path.join(SCRIPT_DIR, "findlinkedin_state.json")
@@ -82,7 +82,7 @@ def main():
           flush=True)
 
     cf = 0
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -95,7 +95,7 @@ def main():
             last_exc = None
             for dns_try in range(3):
                 try:
-                    r = A.apply_findlinkedin(page, entry, TABLE, args.dry_run, say)
+                    r = apply_findlinkedin.apply_findlinkedin(page, entry, TABLE, args.dry_run, say)
                     last_exc = None
                     break
                 except Exception as e:

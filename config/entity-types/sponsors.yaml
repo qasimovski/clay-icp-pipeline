@@ -23,7 +23,7 @@ tables:
   seller_people: "Sponsors - Sellers - People"
   buyer_people: "Sponsors - Buyers - People"
 
-# Saved Clay template names applied by the per-event passes (apply_v1 / apply_lookup).
+# Saved Clay template names applied by the per-event passes (apply_all_columns / apply_lookup).
 # all_columns: the user created "Sponsors - All Columns - v1" (2026-07-18, a copy of
 # the Exhibitors one renamed for clarity) after reviewing the World Chemical Forum
 # pilot. lookup: no Sponsors-specific lookup template exists, so it reuses the
@@ -52,12 +52,12 @@ field_sources:
   description_source_field: Company Description
   website_source_field: Website
 
-# trim_cols pass: keep columns up to and including this one, delete everything to
+# trim_columns pass: keep columns up to and including this one, delete everything to
 # its right. Sponsors' raw base is Event, Company Name, Address, Website, Location,
 # Company Description, Year — so the cut is Year (unlike Exhibitors' Website).
 trim_cut_column: Year
 
-# trim_cols scope: workbooks to exclude from the Sponsors column-trim. The block-
+# trim_columns scope: workbooks to exclude from the Sponsors column-trim. The block-
 # list tables live outside Competitive Events (folder scope already excludes them),
 # and — unlike the Exhibitors run — no event workbooks are protected, so every
 # event's Sponsors_normalized is in scope (incl. the ACS Spring/Fall sponsor events).

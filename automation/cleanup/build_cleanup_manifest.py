@@ -1,7 +1,7 @@
 """Build the Competitive Events cleanup manifest from the live Clay inventory.
 
 Clay has no delete API, so deletion is done by driving the web UI (see
-cleanup_event.py). This script does NOT delete anything — it only reads the
+delete_byproduct_tables.py). This script does NOT delete anything — it only reads the
 workspace table inventory via the `clay` CLI and writes an explicit, auditable
 allowlist of exactly which tables to delete in which workbooks.
 

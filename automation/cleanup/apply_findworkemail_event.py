@@ -1,7 +1,7 @@
 """Apply the "Find Work Email and Validate Email" template to a single named
 table (Speakers_normalized) in one workbook.
 
-Mirrors apply_findlinkedin_event.py's structure (--recon / --dry-run / a real
+Mirrors apply_findlinkedin.py's structure (--recon / --dry-run / a real
 apply that waits for 100% completion), but this template's Configure panel is
 materially harder than the previous two, so the field mapping is bespoke.
 
@@ -35,8 +35,8 @@ sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
-import common         # noqa: E402
-import build_lib as B  # noqa: E402
+import browser_session         # noqa: E402
+import column_config as B  # noqa: E402
 
 # The saved template's name in Clay, tried in order — the user renamed it
 # "Find Work Email and Validate Email" -> "Email Waterfall and Validate Email"
@@ -56,7 +56,7 @@ TEMPLATE_USED = None
 SIG_CANDIDATES = ["Work Email", "Find Work Email", "Validate Email",
                   "Email Validation", "Validate email", "Work email"]
 
-# Config-panel field-box locator (same as apply_v1_event.py / findlinkedin):
+# Config-panel field-box locator (same as apply_all_columns.py / findlinkedin):
 # find the label's y, then the "Start typing" placeholder box just below it.
 # Note the panel renders some labels with non-breaking spaces ("Enrich\xa0person");
 # JS \s matches   so the norm() below handles that.
@@ -775,7 +775,7 @@ if __name__ == "__main__":
     ap.add_argument("--screenshot")
     a = ap.parse_args()
     entry = {"workbook_id": a.workbook_id, "workbook_name": a.workbook_name}
-    with common.clay_page(headless=not a.headed) as page:
+    with browser_session.clay_page(headless=not a.headed) as page:
         def say(m):
             print(m, flush=True)
         if a.recon:

@@ -17,14 +17,14 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
-import pipeline_config as PC  # noqa: E402
+import pipeline_config as pcfg  # noqa: E402
 
 
 def main():
     ap = argparse.ArgumentParser()
-    PC.add_cli_args(ap)
+    pcfg.add_cli_args(ap)
     args = ap.parse_args()
-    slug = PC.load(args.entity, args.icp).slug()
+    slug = pcfg.load(args.entity, args.icp).slug()
     state_path = os.path.join(SCRIPT_DIR, f"buyer_state_{slug}.json")
 
     master = json.load(open(state_path, encoding="utf-8")) if os.path.exists(state_path) else {}

@@ -26,8 +26,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                              # noqa: E402
-import apply_companies_supabase_event as S  # noqa: E402
+import browser_session                              # noqa: E402
+import apply_companies_supabase  # noqa: E402
 
 AUDIT = os.path.join(SCRIPT_DIR, "product_services_companies.json")
 STATE = os.path.join(SCRIPT_DIR, "ps_supabase_state.json")
@@ -81,7 +81,7 @@ def main():
     print(f"batch: {[wb for wb, _ in batch]}", flush=True)
     log_path = os.path.join(LOG_DIR, "run.log")
 
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -92,7 +92,7 @@ def main():
             entry = {"workbook_id": rec["workbook_id"], "workbook_name": wb,
                      "table_id": rec.get("table_id")}
             try:
-                r = S.apply_supabase(page, entry, False, say,
+                r = apply_companies_supabase.apply_supabase(page, entry, False, say,
                                      run_after=not args.skip_run, sig=SIG)
             except Exception as e:
                 say(f"!! EXCEPTION {wb}: {str(e)[:160]}")

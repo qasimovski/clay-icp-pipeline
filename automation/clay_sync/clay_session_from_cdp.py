@@ -1,7 +1,7 @@
 """Copy the live Clay login out of YOUR real Chrome into .clay_session.json.
 
 Clay bot-blocks Playwright-launched browsers on the login page (see
-automation/build_automation/common.py:36-45), so an interactive login inside a
+automation/build_automation/browser_session.py:36-45), so an interactive login inside a
 launched window often can't be completed or captured. Driving a real,
 user-launched Chrome over CDP is treated as a normal user and works.
 

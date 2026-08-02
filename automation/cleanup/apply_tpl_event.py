@@ -25,8 +25,8 @@ sys.path.insert(0, os.path.join(AUTO_DIR, "clay_sync"))
 sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 
 import clay_ui        # noqa: E402
-import common         # noqa: E402
-import build_lib as B  # noqa: E402
+import browser_session         # noqa: E402
+import column_config as B  # noqa: E402
 
 TABLE = "Exhibitors_normalized"
 TEMPLATE = "Exhibitors - All Columns"

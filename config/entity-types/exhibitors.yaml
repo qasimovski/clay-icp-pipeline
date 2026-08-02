@@ -16,12 +16,12 @@ tables:
   buyer: Buyers
   seller_contacts: "Contacts – Sellers"
   buyer_contacts: "Contacts – Buyers"
-  # Per-event Find-People output tables (see automation/cleanup/people_builds.py
-  # and buyer_builds.py). One each per event, appended across all searches.
+  # Per-event Find-People output tables (see automation/cleanup/seller_people_searches.py
+  # and buyer_people_searches.py). One each per event, appended across all searches.
   seller_people: "Sellers - People"
   buyer_people: "Buyers - People"
 
-# Saved Clay template names applied by the per-event passes (apply_v1 / apply_lookup).
+# Saved Clay template names applied by the per-event passes (apply_all_columns / apply_lookup).
 # NOTE: the templates themselves are entity-specific (they encode this entity's raw
 # columns) — create/verify them in Clay per entity; code only targets these names.
 templates:
@@ -51,7 +51,7 @@ field_sources:
   description_source_field: Description
   website_source_field: Website
 
-# trim_cols pass: keep columns up to and including this one, delete everything to
+# trim_columns pass: keep columns up to and including this one, delete everything to
 # its right (reverts a workbook to the through-import base before re-templating).
 trim_cut_column: Website
 

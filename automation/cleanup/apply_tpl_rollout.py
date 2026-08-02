@@ -17,7 +17,7 @@ import traceback
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common          # noqa: E402
+import browser_session          # noqa: E402
 import apply_tpl_event as A  # noqa: E402
 
 MANIFEST_PATH = os.path.join(SCRIPT_DIR, "cols_manifest.json")
@@ -27,7 +27,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 
 def load_manifest():
     if not os.path.exists(MANIFEST_PATH):
-        raise SystemExit("no cols_manifest.json; run build_cols_manifest.py")
+        raise SystemExit("no cols_manifest.json; run build_workbook_manifest.py")
     return json.load(open(MANIFEST_PATH, encoding="utf-8"))
 
 
@@ -82,7 +82,7 @@ def main():
 
     cf = 0
     results = []
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()

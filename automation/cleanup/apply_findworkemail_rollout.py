@@ -29,7 +29,7 @@ import traceback
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                        # noqa: E402
+import browser_session                        # noqa: E402
 import apply_findworkemail_event as A  # noqa: E402
 
 SCOPE_PATH = os.path.join(SCRIPT_DIR, "speakers_normalized_workbooks.json")
@@ -96,7 +96,7 @@ def main():
           flush=True)
 
     cf = 0
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()

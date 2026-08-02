@@ -36,7 +36,7 @@ python automation/clay_sync/clay_login.py   # headed once → saves .clay_sessio
 - Real data (scraped `*_normalized.csv`, ICP lookup CSVs) is **gitignored** — see
   `docs/SENSITIVE_DATA.md`. Point the build at yours with
   `CLAY_PIPELINE_SCRAPERS_ROOT` / `CLAY_PIPELINE_ICP_LOOKUPS_DIR` (defaults in
-  `automation/build_automation/build_event.py`).
+  `automation/build_automation/build_workbook.py`).
 - The `clay` CLI (read-only verification, dedupe checks) runs **only under WSL
   Ubuntu** here — invoke the cached linux binary with a clean PATH; see
   `docs/KNOWN_ISSUES.md` and the pattern in `verify_cleanup.py`.
@@ -73,34 +73,34 @@ treat it as the how-it-was-done reference (see `automation/README.md`).
 
 ## 3. Per-event passes (`automation/cleanup/`), in order
 
-Each pass is `*_event.py` (one workbook) + `*_rollout.py` (fleet: `--only`,
+Each pass is `<verb>.py` (one workbook) + `<verb>_rollout.py` (fleet: `--only`,
 `--limit`, most support `--dry-run` / sharding). Each writes its own resumable
 state + `*_logs/`. Scope comes from a targets file = JSON list of workbook ids
-that have this entity's source table (build with `build_cols_manifest.py`).
+that have this entity's source table (build with `build_workbook_manifest.py`).
 
 ```bash
 cd automation/cleanup
 
 # a. trim back to the through-import base (deletes columns right of trim_cut_column)
-python trim_cols_rollout.py --limit 5
+python trim_columns_rollout.py --limit 5
 
 # b. apply + run the all-columns template
-python apply_v1_rollout.py --limit 5
+python apply_all_columns_rollout.py --limit 5
 
 # c. apply + run the lookup & send-table-data template
 python apply_lookup_rollout.py --limit 5
 
 # d. set the two view filters: Side = Seller AND "Send table data has results"
-python apply_filters_rollout.py --limit 5
+python apply_view_filters_rollout.py --limit 5
 
 # e. Sellers - People: the 3 "Find people" seller builds → one per-event table
-python people_rollout.py --limit 5
+python seller_people_rollout.py --limit 5
 
 # f. Buyers - People: Side→Buyer, per-Classification segment searches → one table
-python buyer_rollout.py --limit 5
+python buyer_people_rollout.py --limit 5
 
 # g. apply the Google Sheet lookup+send template to the seller/buyer people tables
-python apply_gsheet_rollout.py --limit 5
+python apply_gsheet_lookup_rollout.py --limit 5
 ```
 
 Steps **e** and **f** are the config-driven Find-People passes:
@@ -108,7 +108,7 @@ Steps **e** and **f** are the config-driven Find-People passes:
   (`seller_people` / `buyer_people`).
 - job titles, segments, seniority, Location list ←
   `config/icps/<icp>/people_search.yaml` (`seller.builds`, `buyer.segments`,
-  `*.location_countries`; seniority is the 11 levels in `people_fill_lib.js`).
+  `*.location_countries`; seniority is the 11 levels in `people_search_fill.js`).
 - run files namespaced per `<entity>_<icp>` slug:
   `{people,buyer}_targets_<slug>.json`, `{people,buyer}_state_<slug>.json`,
   `{people,buyer}_logs/run_<slug>*.log`.
@@ -118,7 +118,7 @@ from `segments_done`; an unrenamed people table from a killed run is salvaged
 rather than duplicated; `Sellers - People` and `Buyers - People` are never
 clobbered by each other.
 
-Step **g** (`apply_gsheet_rollout.py` / `apply_gsheet_event.py`) applies a
+Step **g** (`apply_gsheet_lookup_rollout.py` / `apply_gsheet_lookup.py`) applies a
 single, entity-agnostic Clay template — **"Google Sheet - Lookup & Send
 Data"** — to whichever of the two people tables (`seller_people`/
 `buyer_people`) exist for the workbook. It's entity-agnostic because it
@@ -137,7 +137,7 @@ unlike the templates steps b/c apply.
 **Verify Clay UI automation results with the CLI, not the page's own status
 text**: a "Save and run N rows in this view" / "N% of table completed"
 message on the page is not proof the action landed — it can be a stale
-leftover from an unrelated column's auto-run. `apply_gsheet_event.py` learned
+leftover from an unrelated column's auto-run. `apply_gsheet_lookup.py` learned
 this the hard way (a run reported success while the template was never
 actually added) and now polls for the real signature column before ever
 returning "ok"; the same principle applies to any future UI-automation pass —
@@ -145,11 +145,11 @@ confirm with `clay tables columns list <tableId>` (WSL CLI) when in doubt.
 
 ### Parallelism (buyer pass)
 
-`buyer_rollout.py --shards N --shard i` partitions events disjointly and writes
+`buyer_people_rollout.py --shards N --shard i` partitions events disjointly and writes
 per-shard state (`buyer_state_<slug>_w{i}.json`), merged by `merge_shards.py
 --entity <e>`. Use only when RAM allows a second headless browser — on a
 low-RAM machine run a single worker (the builds already use memory-lean
-Chromium flags in `common.py`).
+Chromium flags in `browser_session.py`).
 
 ## 4. Verify
 
@@ -174,13 +174,13 @@ A small number of repeats is expected by design — a company whose
 #    -> people_targets_sponsors_labs.json / buyer_targets_sponsors_labs.json
 # 4. run every pass with --entity sponsors:
 cd automation/cleanup
-CLAY_PIPELINE_ENTITY=sponsors python trim_cols_rollout.py --limit 5     # env for passes a–d
-CLAY_PIPELINE_ENTITY=sponsors python apply_v1_rollout.py --limit 5
+CLAY_PIPELINE_ENTITY=sponsors python trim_columns_rollout.py --limit 5     # env for passes a–d
+CLAY_PIPELINE_ENTITY=sponsors python apply_all_columns_rollout.py --limit 5
 CLAY_PIPELINE_ENTITY=sponsors python apply_lookup_rollout.py --limit 5
-CLAY_PIPELINE_ENTITY=sponsors python apply_filters_rollout.py --limit 5
-python people_rollout.py --entity sponsors --limit 5                    # flag for e–f
-python buyer_rollout.py  --entity sponsors --limit 5
-python apply_gsheet_rollout.py --entity sponsors --limit 5              # flag for g
+CLAY_PIPELINE_ENTITY=sponsors python apply_view_filters_rollout.py --limit 5
+python seller_people_rollout.py --entity sponsors --limit 5                    # flag for e–f
+python buyer_people_rollout.py  --entity sponsors --limit 5
+python apply_gsheet_lookup_rollout.py --entity sponsors --limit 5              # flag for g
 ```
 
 Nothing collides with the live Exhibitors run: Sponsors uses distinct table

@@ -5,7 +5,7 @@ executes numbered command files from ./queue:
 
     queue/cmd_000.py, cmd_001.py, ...   (executed in order, once each)
 
-Each command runs with `page`, `common`, `formula_lib` in scope. Stdout and
+Each command runs with `page`, `browser_session`, `formula_columns` in scope. Stdout and
 tracebacks are written to queue/cmd_NNN.ok or .err. Drop a file named STOP in
 the queue to shut the worker down cleanly.
 """
@@ -15,18 +15,18 @@ import os
 import time
 import traceback
 
-import common
-import formula_lib  # noqa: F401  (exposed to commands)
+import browser_session
+import formula_columns  # noqa: F401  (exposed to commands)
 
-QUEUE = os.path.join(common.SCRIPT_DIR, "queue")
+QUEUE = os.path.join(browser_session.SCRIPT_DIR, "queue")
 os.makedirs(QUEUE, exist_ok=True)
 
 
 def main():
-    with common.clay_page() as page:
+    with browser_session.clay_page() as page:
         for attempt in range(10):
             try:
-                common.open_interphex(page, table=common.MAIN_TABLE)
+                browser_session.open_interphex(page, table=browser_session.MAIN_TABLE)
                 break
             except Exception as e:
                 print(f"nav retry {attempt}: {e}", flush=True)
@@ -56,8 +56,8 @@ def main():
                 with contextlib.redirect_stdout(buf):
                     code = open(cmd, encoding="utf-8").read()
                     exec(compile(code, cmd, "exec"),
-                         {"page": page, "common": common,
-                          "formula_lib": formula_lib})
+                         {"page": page, "browser_session": browser_session,
+                          "formula_columns": formula_columns})
                 dest = done_ok
             except Exception:
                 buf.write("\n" + traceback.format_exc())

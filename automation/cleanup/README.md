@@ -19,8 +19,8 @@ names / listing virtualization).
 - `build_cleanup_manifest.py` — read the live inventory via the `clay` CLI; write
   `cleanup_manifest.json` (the delete allowlist) + `inventory_snapshot.json`
   (pre-run state of everything, for the untouched-check). **Run in WSL/Linux.**
-- `cleanup_event.py` — `clean_workbook()`; also a `--only` single-workbook runner.
-- `cleanup_rollout.py` — fleet driver: `--dry-run`, `--shard i --shards N`,
+- `delete_byproduct_tables.py` — `clean_workbook()`; also a `--only` single-workbook runner.
+- `delete_byproduct_tables_rollout.py` — fleet driver: `--dry-run`, `--shard i --shards N`,
   `--only`, `--headed`. Runs the Playwright browser. **Run on Windows** (same env
   as `clay_login.py`).
 - `verify_cleanup.py` — read-only post-run check via the CLI. **Run in WSL/Linux.**
@@ -35,16 +35,16 @@ python ../clay_sync/clay_login.py
 python build_cleanup_manifest.py
 
 # 2) dry run — review exactly what would be deleted (Windows)
-python cleanup_rollout.py --dry-run
+python delete_byproduct_tables_rollout.py --dry-run
 
 # 3) validate the delete interaction on ONE workbook, watched (Windows)
-python cleanup_rollout.py --only "Interphex" --headed
+python delete_byproduct_tables_rollout.py --only "Interphex" --headed
 
 # 4) real run, 4 workers — one per terminal (Windows)
-python cleanup_rollout.py --shards 4 --shard 0
-python cleanup_rollout.py --shards 4 --shard 1
-python cleanup_rollout.py --shards 4 --shard 2
-python cleanup_rollout.py --shards 4 --shard 3
+python delete_byproduct_tables_rollout.py --shards 4 --shard 0
+python delete_byproduct_tables_rollout.py --shards 4 --shard 1
+python delete_byproduct_tables_rollout.py --shards 4 --shard 2
+python delete_byproduct_tables_rollout.py --shards 4 --shard 3
 
 # 5) verify (WSL)
 python verify_cleanup.py --wait 120
@@ -57,21 +57,21 @@ shard to pick up where it stopped.
 
 Beyond the original table cleanup, this folder accumulated a set of
 manifest-driven, resumable passes over each event's `Exhibitors_normalized`.
-All are `*_event.py` (one workbook) + `*_rollout.py` (fleet, `--only` / `--limit`),
-keyed off `cols_manifest.json` (build it with `build_cols_manifest.py`). Every
+All are `<verb>.py` (one workbook) + `<verb>_rollout.py` (fleet, `--only` / `--limit`),
+keyed off `cols_manifest.json` (build it with `build_workbook_manifest.py`). Every
 pass writes its own `*_state_*.json` (skips already-done) and `*_logs/`.
 
-- `trim_cols_*` — delete columns to the right of a cut column.
-- `apply_v1_*` / `run_v1_*` — apply + run the "Exhibitors - All Columns - v1" template.
-- `apply_lookup_*` — apply + run "Exhibitors - Lookup & Send Table Data - v1".
-- `apply_filters_*` — set the two view filters (`Side = Seller` AND
+- `trim_columns*` — delete columns to the right of a cut column.
+- `apply_all_columns*` / `run_all_columns*` — apply + run the "Exhibitors - All Columns - v1" template.
+- `apply_lookup*` — apply + run "Exhibitors - Lookup & Send Table Data - v1".
+- `apply_view_filters_*` — set the two view filters (`Side = Seller` AND
   `Send table data has results`); supports `--ids-file` + `--state-suffix` for
   parallel shards.
-- `people_builds.py` + `people_rollout.py` — the "Find people at these companies"
+- `seller_people_searches.py` + `seller_people_rollout.py` — the "Find people at these companies"
   seller builds into a per-event **seller people** table (build 1 → new table +
   rename; later builds → append). Filter-fill logic is vendored in
-  `people_fill_lib.js` (override with `CLAY_PEOPLE_FILL_JS`).
-- `buyer_builds.py` + `buyer_rollout.py` — the buyer counterpart: flip the Side
+  `people_search_fill.js` (override with `CLAY_PEOPLE_FILL_JS`).
+- `buyer_people_searches.py` + `buyer_people_rollout.py` — the buyer counterpart: flip the Side
   view filter Seller→Buyer, then per ICP `Classification` segment run an
   exact-match then a contains-match Find-People search into one per-event
   **buyer people** table. `--shards N`/`--shard i` for parallel workers +
@@ -80,9 +80,9 @@ pass writes its own `*_state_*.json` (skips already-done) and `*_logs/`.
 
 ### Entity/ICP parameterization
 
-`people_rollout.py` and `buyer_rollout.py` take **`--entity`** (default
+`seller_people_rollout.py` and `buyer_people_rollout.py` take **`--entity`** (default
 `exhibitors`) and **`--icp`** (default `labs`); the earlier passes
-(`trim_cols` / `apply_v1` / `apply_lookup` / `apply_filters`) read the same via
+(`trim_columns` / `apply_all_columns` / `apply_lookup` / `apply_view_filters`) read the same via
 `CLAY_PIPELINE_ENTITY` / `CLAY_PIPELINE_ICP`. `pipeline_config.py` resolves:
 
 - source table + output table names ← `config/entity-types/<entity>.yaml: tables`

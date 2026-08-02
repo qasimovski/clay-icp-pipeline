@@ -36,7 +36,7 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
-import clay_state
+import csv_push_state
 import clay_ui
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -228,7 +228,7 @@ def main():
         sync_normalized(args)
         return
 
-    state = clay_state.load_state()
+    state = csv_push_state.load_state()
     events = discover(only_folder=args.folder)
 
     if not events:
@@ -243,14 +243,14 @@ def main():
         tables = events[folder]
         sigs, any_new, any_changed = {}, False, False
         for _, path in tables:
-            changed, sha, mtime = clay_state.needs_sync(path, state)
+            changed, sha, mtime = csv_push_state.needs_sync(path, state)
             sigs[path] = (sha, mtime)
-            if clay_state.rel_key(path) not in state:
+            if csv_push_state.rel_key(path) not in state:
                 any_new = True
             elif changed:
                 any_changed = True
 
-        seen_before = any(clay_state.rel_key(p) in state for _, p in tables)
+        seen_before = any(csv_push_state.rel_key(p) in state for _, p in tables)
         if folder in MANUAL_FOLDERS:
             action = "manual"          # known-broken import — add to Clay by hand
         elif args.force or not seen_before:
@@ -352,11 +352,11 @@ def main():
                 now = datetime.datetime.now().isoformat(timespec="seconds")
                 for table, path in tables:
                     sha, mtime = sigs[path]
-                    state[clay_state.rel_key(path)] = {
+                    state[csv_push_state.rel_key(path)] = {
                         "sha256": sha, "mtime": mtime,
                         "workbook": folder, "table": table, "last_synced": now,
                     }
-                clay_state.save_state(state)
+                csv_push_state.save_state(state)
             except Exception as e:
                 failed.append((folder, str(e)))
                 print(f"  FAILED {folder}: {e}")

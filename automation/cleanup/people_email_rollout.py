@@ -1,7 +1,7 @@
 """Fleet driver for the people-tables "Waterfall and Validate Email" pass.
 
 Loops over events whose Sellers/Buyers - People tables still lack WORK EMAIL and
-runs the guarded per-event flow from people_email_event.py:
+runs the guarded per-event flow from people_email.py:
   apply (no run) -> fix Validate Email (input + !!{{WORK EMAIL}} + Auto-run OFF)
   -> run only if WORK EMAIL is still empty.
 
@@ -25,8 +25,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation"))
 
-import common                          # noqa: E402
-import people_email_event as E         # noqa: E402
+import browser_session                          # noqa: E402
+import people_email         # noqa: E402
 
 AUDIT = os.path.join(SCRIPT_DIR, "people_email_audit.json")
 STATE = os.path.join(SCRIPT_DIR, "people_email_state.json")
@@ -97,15 +97,15 @@ def main():
     args = ap.parse_args()
 
     if args.tables:
-        bad = [t for t in args.tables if t not in E.ALLOWED_PREFIXES]
+        bad = [t for t in args.tables if t not in people_email.ALLOWED_PREFIXES]
         if bad:
             raise SystemExit(f"refusing to touch tables outside the allowed "
                              f"list: {bad}")
-        E.TABLES = tuple(args.tables)
+        people_email.TABLES = tuple(args.tables)
     audit_path = args.audit or AUDIT
     if not os.path.isabs(audit_path):
         audit_path = os.path.join(SCRIPT_DIR, audit_path)
-    print(f"audit={os.path.basename(audit_path)} tables={E.TABLES}", flush=True)
+    print(f"audit={os.path.basename(audit_path)} tables={people_email.TABLES}", flush=True)
     audit = load(audit_path, None)
     if audit is None:
         raise SystemExit("run audit_people_email.py (in WSL) first")
@@ -158,7 +158,7 @@ def main():
     print(f"batch of {len(batch)}: "
           f"{[e['workbook_name'] for e in batch]}", flush=True)
 
-    with common.clay_page(headless=not args.headed) as page, \
+    with browser_session.clay_page(headless=not args.headed) as page, \
             open(log_path, "a", encoding="utf-8") as logf:
         def say(m):
             print(m, flush=True); logf.write(m + "\n"); logf.flush()
@@ -169,11 +169,11 @@ def main():
             entry = {"workbook_id": ev["workbook_id"], "workbook_name": name}
             say(f"\n--- [{i+1}/{len(batch)}] {name} (rows={ev.get('rows','?')}) ---")
             rec = state.setdefault(name, {})
-            for table in E.TABLES:
+            for table in people_email.TABLES:
                 if table not in ev["tables"]:
                     continue
                 try:
-                    r = E.do_table(page, entry, table,
+                    r = people_email.do_table(page, entry, table,
                                    ev["tables"][table]["table_id"], say,
                                    skip_run=args.skip_run)
                 except Exception as exc:
