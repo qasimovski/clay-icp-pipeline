@@ -24,6 +24,7 @@ a second and touches no Clay account.
 | `test_blocklist_destination_memo.py` | the destination memo carrying past Clay's source cap |
 | `test_workbook_navigation_reuse.py` | redundant workbook loads in two-table passes |
 | `test_local_settings.py` | live Clay ids reappearing in tracked source |
+| `test_people_email_run_guard.py` | the email waterfall re-firing on a table that already ran (the write-ahead log's retry semantics) |
 
 What is **not** covered: the Playwright UI interactions themselves (selector
 drift against the live Clay DOM). Those are only verifiable against a real
