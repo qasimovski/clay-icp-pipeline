@@ -28,18 +28,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 import browser_session               # noqa: E402
 import seller_people_searches   # noqa: E402
 import pipeline_config as pcfg  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 LOG_DIR = os.path.join(SCRIPT_DIR, "people_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def main():
@@ -105,7 +101,7 @@ def main():
             try:
                 r = seller_people_searches.run_searches(page, wid, name, say)
                 state[wid] = {"status": "ok", "ts": stamp, "detail": r}
-                json.dump(state, open(STATE, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+                state_io.save_json(STATE, state)
                 cf = 0
                 saved = [b["build"] for b in r["builds"] if b["saved"]]
                 say(f"EVENT_DONE {name} | table_created={r['created_table']} | "
@@ -115,7 +111,7 @@ def main():
                 say(f"!! EXCEPTION on {name}: {str(e)[:200]}")
                 logf.write(traceback.format_exc()); logf.flush()
                 state[wid] = {"status": "error", "ts": stamp, "error": str(e)[:300]}
-                json.dump(state, open(STATE, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+                state_io.save_json(STATE, state)
                 try:
                     page.keyboard.press("Escape")
                 except Exception:

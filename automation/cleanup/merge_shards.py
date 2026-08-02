@@ -18,6 +18,7 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 import pipeline_config as pcfg  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 
 def main():
@@ -35,7 +36,7 @@ def main():
             master[wid] = rec
             merged += 1
         print(f"  merged {len(shard)} entries from {os.path.basename(f)}")
-    json.dump(master, open(state_path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(state_path, master)
     from collections import Counter
     c = Counter(v.get("status") for v in master.values())
     print(f"merged {merged} shard entries -> {os.path.basename(state_path)} now: {dict(c)}")

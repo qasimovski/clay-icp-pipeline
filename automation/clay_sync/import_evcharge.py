@@ -32,6 +32,7 @@ import datetime
 import json
 import os
 import sys
+import tempfile
 
 from playwright.sync_api import sync_playwright
 
@@ -132,8 +133,20 @@ def load_state():
 
 
 def save_state(state):
-    with open(STATE_PATH, "w", encoding="utf-8") as fh:
-        json.dump(state, fh, indent=1, sort_keys=True)
+    # Temp file + os.replace: never leave a truncated state file (which would
+    # read as "nothing imported" and recreate every workbook next run).
+    fd, tmp = tempfile.mkstemp(prefix=os.path.basename(STATE_PATH) + ".",
+                               suffix=".tmp", dir=SCRIPT_DIR)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(state, fh, indent=1, sort_keys=True)
+        os.replace(tmp, STATE_PATH)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def open_subfolder(page):

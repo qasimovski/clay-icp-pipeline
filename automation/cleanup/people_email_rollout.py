@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 
 import browser_session                          # noqa: E402
 import people_email         # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 AUDIT = os.path.join(SCRIPT_DIR, "people_email_audit.json")
 STATE = os.path.join(SCRIPT_DIR, "people_email_state.json")
@@ -38,16 +39,11 @@ SKIP_PATH = os.path.join(SCRIPT_DIR, "people_email_skip.json")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def pending_events(audit):

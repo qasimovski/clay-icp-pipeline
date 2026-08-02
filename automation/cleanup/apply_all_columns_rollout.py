@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 import browser_session          # noqa: E402
 import apply_all_columns  # noqa: E402
 import pipeline_config as pcfg  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 _SLUG = pcfg.load().slug()  # entity slug namespaces manifest + state (shared workbooks)
 MANIFEST_PATH = os.path.join(SCRIPT_DIR, f"cols_manifest_{_SLUG}.json")
@@ -31,16 +32,11 @@ def state_path(tag):
 
 
 def load_state(p):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return {}
+    return state_io.load_json(p)
 
 
 def save_state(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def main():

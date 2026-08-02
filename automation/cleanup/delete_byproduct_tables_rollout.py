@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 
 import browser_session          # noqa: E402  (clay_page)
 import delete_byproduct_tables   # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 MANIFEST_PATH = os.path.join(SCRIPT_DIR, "cleanup_manifest.json")
 FOLDER_PATH = os.path.join(SCRIPT_DIR, "competitive_events_workbooks.json")
@@ -61,16 +62,11 @@ def state_tag(args):
 
 
 def load_state(path):
-    if os.path.exists(path):
-        try:
-            return json.load(open(path, encoding="utf-8"))
-        except Exception:
-            pass
-    return {}
+    return state_io.load_json(path)
 
 
 def save_state(path, state):
-    json.dump(state, open(path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(path, state)
 
 
 def folder_scope(workbooks, dry_run, no_folder_scope):

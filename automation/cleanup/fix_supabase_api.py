@@ -32,6 +32,7 @@ import clay_ui        # noqa: E402
 import browser_session         # noqa: E402
 import column_config as colcfg  # noqa: E402
 import add_workemail_waterfall as panel  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 AUDIT = os.path.join(SCRIPT_DIR, "product_services_companies.json")
 STATE_IN = os.path.join(SCRIPT_DIR, "ps_supabase_state.json")
@@ -318,12 +319,7 @@ def fix_event(page, entry, say, do_run=True, audit_only=False):
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def main():
@@ -372,8 +368,7 @@ def main():
                     pass
             if not args.audit:
                 state[wb] = r
-                json.dump(state, open(STATE, "w", encoding="utf-8"), indent=1,
-                          ensure_ascii=False)
+                state_io.save_json(STATE, state)
             else:
                 print(f"  AUDIT {wb}: {r}", flush=True)
 

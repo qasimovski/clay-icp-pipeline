@@ -22,6 +22,7 @@ gate is right, and so a run can never fire twice.
 import argparse
 import datetime
 import json
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 import os
 import subprocess
 import sys
@@ -71,12 +72,9 @@ def _wsl(script, *args, timeout=180):
 
 
 def _load_runs():
-    if os.path.exists(RUNS):
-        try:
-            return json.load(open(RUNS, encoding="utf-8"))
-        except Exception:
-            pass
-    return {}
+    # The run log is the double-charge guard: a corrupt file must abort, not
+    # read as "nothing ever ran" (state_io fails loud on corruption).
+    return state_io.load_json(RUNS)
 
 
 # Labels that mean the run definitely did NOT happen — safe to retry. Anything
@@ -104,8 +102,7 @@ def record_trigger(table_id, event, table, label=None):
     if label:
         rec["label"] = label
     runs[table_id] = rec
-    json.dump(runs, open(RUNS, "w", encoding="utf-8"), indent=1,
-              ensure_ascii=False)
+    state_io.save_json(RUNS, runs)
 
 
 def table_columns(table_id, say):

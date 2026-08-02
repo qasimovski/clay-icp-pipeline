@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 
 import browser_session                        # noqa: E402
 import apply_findlinkedin  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 SCOPE_PATH = os.path.join(SCRIPT_DIR, "speakers_normalized_workbooks.json")
 STATE_PATH = os.path.join(SCRIPT_DIR, "findlinkedin_state.json")
@@ -39,16 +40,11 @@ _FINAL_STATUSES = ("ok", "dryrun", "no_table")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def workbook_done(state, wid):

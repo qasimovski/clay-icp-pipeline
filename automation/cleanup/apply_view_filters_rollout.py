@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 import browser_session                # noqa: E402
 import apply_view_filters  # noqa: E402
 import pipeline_config as pcfg  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 _SLUG = pcfg.load().slug()  # entity slug (e.g. sponsors_labs) namespaces the manifest
 MANIFEST_PATH = os.path.join(SCRIPT_DIR, f"cols_manifest_{_SLUG}.json")
@@ -28,16 +29,11 @@ os.makedirs(LOG_DIR, exist_ok=True)
 
 
 def load_state(path):
-    if os.path.exists(path):
-        try:
-            return json.load(open(path, encoding="utf-8"))
-        except Exception:
-            pass
-    return {}
+    return state_io.load_json(path)
 
 
 def save_state(path, s):
-    json.dump(s, open(path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(path, s)
 
 
 def main():

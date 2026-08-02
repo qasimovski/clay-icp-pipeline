@@ -15,6 +15,7 @@ import json
 import os
 import socket
 import sys
+import tempfile
 import time
 import traceback
 
@@ -31,6 +32,20 @@ NEEDS_HUMAN = {"MEDICA", "Medtech Japan", "Pittcon", "SLAS Europe", "SLAS2026",
 SKIP = {"Interphex"}
 
 
+def _read_json(path):
+    """Corrupt state must abort, not read as empty — an empty merge would mark
+    every already-built event pending and rebuild the fleet (duplicate columns,
+    re-run credits; see the CMEF collision in CLEANUP_NOTES.md)."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        raise SystemExit(
+            f"state file {path!r} unreadable ({e}); restore or delete it "
+            f"deliberately before re-running — continuing would rebuild "
+            f"already-done events.")
+
+
 def load_state(own_path=STATE_PATH):
     """Merge the legacy state file and every worker shard state file, so any
     worker (and the summary) sees all completed events."""
@@ -40,22 +55,26 @@ def load_state(own_path=STATE_PATH):
         os.path.join(browser_session.SCRIPT_DIR, "rollout_state_w*.json")))
     for p in paths:
         if os.path.exists(p):
-            try:
-                merged.update(json.load(open(p, encoding="utf-8")))
-            except Exception:
-                pass
+            merged.update(_read_json(p))
     return merged
 
 
 def save_state_entry(own_path, folder, entry):
-    own = {}
-    if os.path.exists(own_path):
-        try:
-            own = json.load(open(own_path, encoding="utf-8"))
-        except Exception:
-            pass
+    own = _read_json(own_path) if os.path.exists(own_path) else {}
     own[folder] = entry
-    json.dump(own, open(own_path, "w", encoding="utf-8"), indent=1)
+    # Temp file + os.replace so a kill mid-write can't truncate the state.
+    fd, tmp = tempfile.mkstemp(prefix=os.path.basename(own_path) + ".",
+                               suffix=".tmp", dir=os.path.dirname(own_path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(own, fh, indent=1)
+        os.replace(tmp, own_path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def discover_workbook_folders():

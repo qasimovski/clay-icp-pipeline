@@ -27,18 +27,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 import browser_session               # noqa: E402
 import buyer_people_searches   # noqa: E402
 import pipeline_config as pcfg  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 LOG_DIR = os.path.join(SCRIPT_DIR, "buyer_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def main():
@@ -131,7 +127,7 @@ def main():
                 sd = st.setdefault("segments_done", [])
                 if seg_name not in sd:
                     sd.append(seg_name)
-                json.dump(out, open(state_write, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+                state_io.save_json(state_write, out)
 
             try:
                 r = buyer_people_searches.run_buyer_searches(page, wid, name, say,
@@ -139,7 +135,7 @@ def main():
                 out[wid] = {"status": "ok", "ts": stamp, "detail": r,
                             "created_table": r["created_table"],
                             "segments_done": [s["segment"] for s in r["segments"]] + done_segs}
-                json.dump(out, open(state_write, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+                state_io.save_json(state_write, out)
                 cf = 0; nf = 0
                 built = [s["segment"] for s in r["segments"] if s.get("saved")]
                 say(f"EVENT_DONE {name} | table_created={r['created_table']} | "
@@ -159,7 +155,7 @@ def main():
                 errst["status"] = "error"; errst["ts"] = stamp
                 errst["error"] = msg[:300]
                 out[wid] = errst
-                json.dump(out, open(state_write, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+                state_io.save_json(state_write, out)
                 try:
                     page.keyboard.press("Escape")
                 except Exception:

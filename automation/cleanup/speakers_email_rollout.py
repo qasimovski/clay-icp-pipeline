@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 import browser_session                              # noqa: E402
 import add_workemail_waterfall as panel  # noqa: E402
 import add_validate_email       # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 SCOPE_PATH = os.path.join(SCRIPT_DIR, "speakers_normalized_workbooks.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "speakers_email_logs")
@@ -51,16 +52,11 @@ SKIP = ("no_table", "no_gate_column")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def step_done(rec, step):

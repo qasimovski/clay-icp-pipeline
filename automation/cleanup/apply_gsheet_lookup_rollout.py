@@ -40,6 +40,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 import browser_session                  # noqa: E402
 import apply_gsheet_lookup  # noqa: E402
 import pipeline_config as pcfg    # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 LOG_DIR = os.path.join(SCRIPT_DIR, "gsheet_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -54,16 +55,11 @@ _FINAL_STATUSES = ("ok", "dryrun", "no_table", "skip_requested")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def table_done(rec, table):

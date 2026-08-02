@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIR), "build_automation")
 import browser_session                               # noqa: E402
 import apply_email_template      # noqa: E402
 import configure_validate_email  # noqa: E402
+import state_io           # noqa: E402  (atomic, fail-loud state files)
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, "check_table_columns.py")
 
@@ -99,16 +100,11 @@ DONE = ("ok", "dryrun")
 
 
 def load(p, d):
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8"))
-        except Exception:
-            pass
-    return d
+    return state_io.load_json(p, d)
 
 
 def save(p, s):
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    state_io.save_json(p, s)
 
 
 def step_done(rec, step):

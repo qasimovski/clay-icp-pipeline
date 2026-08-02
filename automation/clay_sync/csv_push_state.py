@@ -15,6 +15,7 @@ State file: .clay_sync_state.json at the scrapers root. Each entry:
 import hashlib
 import json
 import os
+import tempfile
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # CSV keys stay relative to the scrapers root (the parent of this scripts
@@ -31,8 +32,20 @@ def load_state():
 
 
 def save_state(state):
-    with open(STATE_PATH, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2, ensure_ascii=False)
+    # Temp file + os.replace: a kill mid-write can never truncate the state
+    # file (which would make every CSV look never-pushed on the next run).
+    fd, tmp = tempfile.mkstemp(prefix=".clay_sync_state.", suffix=".tmp",
+                               dir=SCRIPT_DIR)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, STATE_PATH)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def rel_key(csv_path):
@@ -62,6 +75,6 @@ def needs_sync(csv_path, state):
         sha, _ = file_signature(csv_path)
         return True, sha, mtime
     if entry.get("mtime") == mtime:
-        return False, entry["sha256"], mtime
+        return False, entry.get("sha256"), mtime
     sha, _ = file_signature(csv_path)
     return sha != entry.get("sha256"), sha, mtime
