@@ -147,10 +147,23 @@ def main():
 
     batch = events[: args.limit]
     state_path = STATE
+    log_path = os.path.join(LOG_DIR, "run.log")
     if args.shards > 1:
         state_path = STATE.replace(".json", f"_w{args.shard}.json")
+        log_path = os.path.join(LOG_DIR, f"run_w{args.shard}.log")
+        # The write-ahead run log is the double-charge guard, and it is only
+        # safe under parallel workers when each worker has its OWN file
+        # (people_email.py documents the read-modify-write loss). It used to
+        # rely on the operator remembering to export CLAY_RUNS_FILE — now the
+        # shard sets it automatically unless one was given explicitly.
+        # Merge shard run logs back with merge_shards.py before a non-sharded
+        # run, so already_triggered() sees every past trigger.
+        if not os.environ.get("CLAY_RUNS_FILE"):
+            people_email.RUNS = people_email.RUNS.replace(
+                ".json", f"_w{args.shard}.json")
+            print(f"run log (per-shard): "
+                  f"{os.path.basename(people_email.RUNS)}", flush=True)
     state = load(state_path, {})
-    log_path = os.path.join(LOG_DIR, "run.log")
     print(f"batch of {len(batch)}: "
           f"{[e['workbook_name'] for e in batch]}", flush=True)
 
