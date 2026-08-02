@@ -32,13 +32,19 @@ Workspace: **{{WORKSPACE_URL}}** — "**{{WORKSPACE_NAME}}**".
   Each workbook is named **exactly** after its source folder in the
   scrapers directory — one workbook per scraper folder, same name, no
   reformatting.
-- **`{{BLOCKLIST_TABLE}}`** — lives **one level up from `{{EVENTS_FOLDER}}`**,
-  not inside it. Shared cross-event registry (Company Name, Company Domain)
-  — every company that passes through this pipeline's main table gets
-  logged here. This is what ultimately protects against double-contacting
-  the same company from two different events' Contacts tables later —
-  dedupe against this table at outreach/CRM sync time, not inside the
-  per-event tables themselves.
+- **The blocklist ledger** — a central Supabase registry (see
+  `blocklist_ledger/`), **not** a Clay table. Every workbook reaches it
+  through one HTTP API column (step 5 below) that does lookup-and-insert in
+  a single call and returns `Is New`. That is what stops the same company
+  being worked twice across two different events, and it does it *inline*,
+  before the paid columns run — not downstream at CRM-sync time.
+
+  > Earlier builds sent rows to a shared Clay "Block List" table one level up
+  > from `{{EVENTS_FOLDER}}` instead. That table was a passive sink: it
+  > recorded companies but gated nothing, so every event still paid to
+  > enrich repeats. The ledger replaces it. If you are looking at an older
+  > workbook that still has a `Send to Blocklist` column, that is the legacy
+  > mechanism.
 
 ## Role and hard constraint
 
@@ -53,10 +59,13 @@ Configure those fully — exact prompt, exact output fields, preview on the
 handful of test rows Clay requires to save the config — but do not run them
 against the full row set.
 
-**Everything else should actually be created and executed**, since none of
-it calls a paid provider: creating tables and workbooks, importing CSVs,
-formula columns, Send Table Data actions between tables, and the Send Table
-Data to the Blocklist.
+**Everything else should actually be created and executed**: creating tables
+and workbooks, importing CSVs, formula columns, and Send Table Data actions
+between tables — none of which call a paid provider.
+
+**The one exception you run anyway** is the blocklist ledger check (step 5).
+It costs 1 Clay Action per row and 0 data credits, and it must run before
+the filter it feeds — running it is what makes everything after it cheaper.
 
 **One thing to verify rather than assume**: if a `Website`-resolution step
 is built as an "AI Formula" column, check whether that column type in this
@@ -91,8 +100,9 @@ The pipeline gets built inside each event's workbook independently. Each
 workbook holds five tables for this pipeline: `{{MAIN_TABLE}}`,
 `{{SELLER_TABLE}}`, `{{BUYER_TABLE}}`, `{{SELLER_CONTACTS_TABLE}}`,
 `{{BUYER_CONTACTS_TABLE}}`. There is no shared master table pooling
-companies across events — the Blocklist table (one level up) is the only
-cross-event element.
+companies across events — the Supabase blocklist ledger is the only
+cross-event element, and it is reached per row over HTTP, not by a Clay
+table relationship.
 
 **Build the reusable pieces once, not per event.** Three things belong in
 Clay's Claygent builder / reusable-formula layer rather than being rebuilt
@@ -104,10 +114,12 @@ inside each event's workbook:
 Every event's workbook should deploy these same saved agents rather than
 having the prompts rewritten each time.
 
-**Known tradeoff, not a bug to fix:** a company exhibiting at multiple
-competitor shows will get reprocessed in each event's workbook rather than
-recognized once — that's what the shared Blocklist table is for downstream,
-not something to re-solve inside these tables.
+**Cross-event repeats are handled, not tolerated:** a company exhibiting at
+several competitor shows appears in each event's workbook, but the ledger
+check at step 5 recognizes it the second time and the `Is New` filter keeps
+it out of every paid column downstream. (This used to be a known tradeoff —
+the old Clay Blocklist table only recorded repeats, so each event still paid
+to enrich them.)
 
 ## Known data-integrity flags
 
@@ -132,22 +144,43 @@ Then, in order:
    return the bare registrable domain only). **Configure only — do not run.**
 4. **`Company Domain`** (formula) — coalesce `Normalize a Domain`, else
    `Official Domain`'s result (unless it returned `unknown`).
-5. **`Normalized Country`** (formula) — map raw `{{COUNTRY_SOURCE_FIELD}}`
+5. **Blocklist ledger check → `Is New`** (HTTP API action, template
+   "{{BLOCKLIST_LEDGER_TEMPLATE}}", connected account
+   `{{BLOCKLIST_API_ACCOUNT}}`) — identifier: `Company Domain`. One call per
+   row does lookup-and-insert atomically against the central Supabase ledger
+   (`blocklist_ledger/`) and returns `Is New`. **Create and run it now.**
+   Costs **1 Clay Action per row, 0 data credits** — it is not free, but it is
+   the cheapest column here and it is what stops the expensive ones below
+   from running on companies you have already worked.
+
+   **Then filter the view to `Is New` is checked**, and build everything
+   after this point against the filtered view. Click the `Is New` column
+   header and set it to *is checked*.
+
+   **Verify the filter before continuing** — the filtered row count must look
+   like your new companies, not the whole table. If the filter is not really
+   applied, every paid column below runs against the full company set and
+   burns Actions at the full-table rate. This is the highest-leverage check
+   in the build.
+
+   *Why here and not earlier:* the ledger keys on the normalized domain, so
+   it has to sit after `Company Domain`. Rows whose domain only exists
+   because `Official Domain` resolved it have already paid for that one
+   Claygent call — unavoidable, since a company with no domain cannot be
+   deduped at all — but `Enrich Company` and the classifier below, which are
+   the expensive steps, are all gated by the filter.
+6. **`Normalized Country`** (formula) — map raw `{{COUNTRY_SOURCE_FIELD}}`
    values to canonical tiering-sheet names:
    {{COUNTRY_NORMALIZATION_BLOCK}}
    Anything unmapped passes through unchanged. Create and run — it's a plain
    formula.
-6. **`Enrich Company`** (Clay Action — Companies, People, Jobs) —
+7. **`Enrich Company`** (Clay Action — Companies, People, Jobs) —
    identifier: company domain. Columns: {{ENRICH_COMPANY_FIELDS}}. **This
    calls a paid data provider — configure only, do not run.**
-7. **`Resolved Description`** (formula) — prefer the `description` field
+8. **`Resolved Description`** (formula) — prefer the `description` field
    returned by `Enrich Company`; if blank, fall back to the raw CSV
    `{{DESCRIPTION_SOURCE_FIELD}}` column. This is what feeds the classifier's
    Description input below.
-8. **Send table data → `{{BLOCKLIST_TABLE}}`** (one level up from
-   `{{EVENTS_FOLDER}}`) — columns sent: Company Name, Company Domain. Free
-   data-copy action — **create and run it now**, unconditionally, for every
-   row that reaches this point regardless of what classification comes next.
 9. **`Side` / `Classification`** (Claygent — "{{CLASSIFIER_NAME}}") —
    outputs `Side` (Buyer/Seller) and `Classification` (one label from the
    closed taxonomy below). **Configure only — do not run.**
@@ -297,17 +330,18 @@ using the company's `Fit` × the contact's `JT Fit` × the company's
 1. What Step 0 produced: which workbook(s) got created from `{{SOURCE_CSV}}`,
    confirming each name matches its scraper folder exactly.
 2. Every table and column you created, with types, and which were actually
-   run (should only be formulas, Send Table Data, and the Blocklist send)
-   versus which you configured but left unrun (Claygents, Enrich Company,
-   Find People).
+   run (should only be formulas, Send Table Data, and the step-5 ledger
+   check) versus which you configured but left unrun (Claygents, Enrich
+   Company, Find People).
 3. Whether `Normalize a Domain` / `Normalize Company Name` already existed
    elsewhere in the workspace and were reused, or had to be created fresh.
 4. Whether the `Website`-resolution column is paid or free in this workspace.
 5. Confirmation of the `Resolved Description` precedence (Enrich Company →
    raw CSV fallback) — flag if you think a different precedence makes more
    sense.
-6. Confirmation the Blocklist send correctly targets the table one level up
-   from `{{EVENTS_FOLDER}}`, not a table created inside it.
+6. The `Is New` reading from step 5 — how many rows came back new versus
+   already-in-ledger — and confirmation that the view filter is applied, with
+   the filtered row count, before any paid column was configured.
 7. The saved Claygents (`Official Domain`, `{{CLASSIFIER_NAME}}`, `Sub
    Level` if used) and confirmation they're reusable across event workbooks.
 8. Whether each Send Table Data action fires automatically once a human

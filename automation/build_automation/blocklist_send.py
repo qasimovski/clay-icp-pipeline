@@ -1,4 +1,16 @@
-"""Dynamic destination routing for the shared Labs - Block List - Companies
+"""SUPERSEDED — the blocklist is the Supabase ledger now, not a Clay table.
+
+Dedupe moved to `blocklist_ledger/`: one HTTP API column per workbook does
+lookup-and-insert against Supabase and returns `Is New`, and the view is
+filtered on it so paid columns never run on already-worked companies. That
+gates spend inline; this module's Clay table only ever recorded it, so every
+event still paid to enrich repeats.
+
+Kept because `build_workbook.py` (the Interphex-era reference build) still
+calls it. New builds should follow step 5 of `template/BUILD_PROMPT.template.md`.
+See `docs/PIPELINE_ARCHITECTURE.md` for the current design.
+
+Dynamic destination routing for the shared Labs - Block List - Companies
 workbook.
 
 Clay caps a merged/union table at 20 incoming "Send table data" sources AND

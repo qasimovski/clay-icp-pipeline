@@ -13,25 +13,29 @@ Variance is governed by two config layers:
 
 - **`Competitive Events` folder** — one workbook per competitor event, named
   exactly after its scraper source folder. No reformatting, no added suffixes.
-- **Blocklist table** — lives **one level up** from `Competitive Events`, not
-  inside it. Shared cross-event registry (Company Name, Company Domain) —
-  every company that passes through any event's source table gets logged
-  here. This is what protects against double-contacting the same company
-  from two different events' Contacts tables later — dedupe against this
-  table at outreach/CRM sync time, not inside the per-event tables.
-  Not to be confused with the **blocklist ledger** (`blocklist_ledger/`): that is
-  a separate Supabase registry queried per row as an HTTP API enrichment, whose
-  `Is New` output gates paid columns inline (see `docs/PEOPLE_PASSES.md`). The
-  Blocklist *table* is a passive sink; the *ledger* is an active per-row gate.
+- **Blocklist ledger** (`blocklist_ledger/`) — a central **Supabase** registry,
+  not a Clay table. Each workbook reaches it through one HTTP API column that
+  does lookup-and-insert in a single call and returns `Is New`; the view is
+  then filtered to `Is New` is checked, so the paid columns only ever run on
+  companies not already worked. Active per-row gate, inline, before the spend.
+  See `docs/PEOPLE_PASSES.md` for the same gate on the people side.
+
+  > **Superseded:** a shared Clay "Block List" table one level up from
+  > `Competitive Events`, fed by a Send Table Data action. It only recorded
+  > companies — dedupe was meant to happen downstream at CRM-sync time — so
+  > every event still paid to enrich repeats. Older workbooks may still carry
+  > a `Send to Blocklist` column; that is the legacy mechanism, and
+  > `automation/build_automation/blocklist_send.py` is the code that built it.
 - **Build reusable Claygents once, not per event.** `Official Domain`, the
   ICP classifier (e.g. "Labs Series Registrar"), and `Sub Level` (if the ICP
   has one) belong in Clay's reusable-formula/Claygent layer. Every event's
   workbook deploys the same saved agent rather than the prompt being
   rewritten each time.
-- **Known tradeoff, not a bug:** a company exhibiting at multiple competitor
-  shows gets reprocessed in each event's workbook rather than recognized
-  once — the shared Blocklist table is for downstream dedupe, not something
-  solved inside these tables.
+- **Cross-event repeats are gated, not just recorded:** a company exhibiting
+  at several competitor shows still appears in each event's workbook, but the
+  ledger check recognizes it from the second event onward and the `Is New`
+  filter keeps it out of every paid column. (Under the old Blocklist table
+  this was a standing tradeoff — repeats were logged but still enriched.)
 
 ## The run-now vs configure-only rule (always true)
 
@@ -43,8 +47,13 @@ Only steps that call a paid external provider per row are configure-only —
 - Any Find People / contact-finding run
 
 **Everything else should actually be created and executed** — it costs
-nothing: creating tables/workbooks, importing CSVs, formula columns, Send
-Table Data actions (including the Blocklist send).
+nothing: creating tables/workbooks, importing CSVs, formula columns, and
+Send Table Data actions between tables.
+
+**One paid step is run anyway:** the blocklist ledger check (step 5). At
+1 Action/row and 0 data credits it is the cheapest column in the pipeline,
+and running it is what keeps the expensive ones off already-worked
+companies.
 
 ## The column pipeline, in order
 
@@ -64,22 +73,31 @@ Base columns from import — entity-specific, see `config/entity-types/<type>.ya
    exclude social/directory domains, return the bare registrable domain.
 4. **`Company Domain`** (formula, identical) — coalesce: normalized domain,
    else Official Domain's result (unless it returned "unknown").
-5. **`Normalized Country`** (formula, identical lookup — sourced from the
+5. **Blocklist ledger check → `Is New`** (HTTP API action against the
+   Supabase ledger, keyed on `Company Domain`; **run now** — 1 Action/row,
+   0 data credits) — one call does lookup-and-insert atomically. **Then
+   filter the view to `Is New` is checked** and build everything below
+   against the filtered view; verify the filtered row count before
+   continuing, because an unapplied filter means every paid column below
+   runs against the whole table.
+
+   Placed here because the ledger keys on the normalized domain, so it must
+   follow `Company Domain` — but it still precedes `Enrich Company` and the
+   classifier, which are the expensive steps it exists to gate.
+6. **`Normalized Country`** (formula, identical lookup — sourced from the
    entity-specific country field, see `config/entity-types/<type>.yaml:
    country_source_field`) — map raw country strings to canonical names
    (e.g. `Great Britain`→`United Kingdom`). Unmapped values pass through
    unchanged.
-6. **`Enrich Company`** (Clay's native action, keyed on `Company Domain`;
+7. **`Enrich Company`** (Clay's native action, keyed on `Company Domain`;
    **configure only, do not run**) — passthrough field set is
    entity-specific, see `config/entity-types/<type>.yaml:
    enrich_company_fields` (use the fuller set — see `KNOWN_ISSUES.md` on
    why the narrower set some tables use is drift, not intentional).
-7. **`Resolved Description`** (formula, identical logic) — prefer
+8. **`Resolved Description`** (formula, identical logic) — prefer
    `Enrich Company`'s returned description; fall back to the raw CSV
    description field (entity-specific field name — see
    `config/entity-types/<type>.yaml: description_source_field`).
-8. **Send table data → Blocklist** (identical pattern) — Company Name +
-   Company Domain, unconditional, run now — free.
 9. **ICP classifier** (Claygent, e.g. "Labs Series Registrar";
    **configure only, do not run**) — outputs `Side` (Buyer/Seller) and
    `Classification` (one label from the ICP's closed taxonomy). Prompt body

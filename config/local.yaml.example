@@ -5,6 +5,17 @@
 workspace_url: "https://app.clay.com/workspaces/REPLACE_ME/home/REPLACE_ME"
 workspace_name: "REPLACE_ME"          # e.g. "Labs [2026 - Qasim - Fable]"
 events_folder: "Competitive Events"    # folder holding one workbook per event
+
+# Blocklist = the Supabase ledger (blocklist_ledger/), reached from Clay by an
+# HTTP API column that returns `Is New`. These name the Clay-side saved
+# template and the connected account it runs under. Both optional; the
+# defaults below are what the Labs workspace uses.
+blocklist_ledger_template: "Companies - Supabase"
+blocklist_api_account: "REPLACE_ME"    # e.g. "Qasim - Labs"
+
+# Legacy: the shared Clay "Block List" table the pipeline used to Send Table
+# Data into, before the Supabase ledger replaced it. Only needed if you still
+# run automation/build_automation (the Interphex-era reference build).
 blocklist_table: "REPLACE_ME - Blocklist - Companies"   # one level up from events_folder
 
 # EVCharge import (automation/clay_sync/import_evcharge.py). Find these by

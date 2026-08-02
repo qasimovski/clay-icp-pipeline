@@ -174,7 +174,13 @@ def render(entity_key, icp_key):
         "{{WORKSPACE_URL}}": local_cfg["workspace_url"],
         "{{WORKSPACE_NAME}}": local_cfg["workspace_name"],
         "{{EVENTS_FOLDER}}": local_cfg["events_folder"],
-        "{{BLOCKLIST_TABLE}}": local_cfg["blocklist_table"],
+        # The blocklist is the Supabase ledger reached over HTTP, not a Clay
+        # table (see blocklist_ledger/). These name the Clay-side saved
+        # template and connected account that call it.
+        "{{BLOCKLIST_LEDGER_TEMPLATE}}": local_cfg.get(
+            "blocklist_ledger_template", "Companies - Supabase"),
+        "{{BLOCKLIST_API_ACCOUNT}}": local_cfg.get(
+            "blocklist_api_account", "(your Clay HTTP API connected account)"),
         "{{RAW_COLUMNS}}": ", ".join(entity_cfg["raw_columns"]),
         "{{WEBSITE_SOURCE_FIELD}}": field_sources["website"],
         "{{COUNTRY_SOURCE_FIELD}}": field_sources["country"],
