@@ -149,6 +149,21 @@ promo, status) so no source is rebuilt twice.
 - **Tier 1/2/3** — the composite action tier (mass build / narrow build / inbound only).
 - **Claygent** — Clay's AI research/classification agent (costs credits).
 - **Waterfall** — chained enrichment providers, cheapest first, stop on first hit.
+- **Event** — a competitor trade show. One Clay **workbook** per event; in code,
+  "workbook" is always used for the Clay object, "event" for the show itself.
+- **Pass** — one fleet-wide automation run over the event workbooks
+  (`automation/cleanup/`: `<verb>.py` = one workbook, `<verb>_rollout.py` = fleet).
+- **Step** — one column/action inside a table (the 14 steps in
+  `docs/PIPELINE_ARCHITECTURE.md`). A pass builds one or more steps across the fleet.
+- **Rollout** — the fleet driver for a pass (resumable, sharded, `--only`/`--limit`).
+- **Marker column** — a column whose presence proves a Clay template was already
+  applied; the idempotency check every pass runs before touching a workbook.
+- **Run condition** — Clay's "Only run if" setting on an enrichment column
+  (Run settings); gates paid columns so they only fire on qualifying rows.
+- **Blocklist table** vs **blocklist ledger** — two different systems: the shared
+  Clay *Blocklist table* (a Send Table Data destination used for downstream dedupe)
+  and the Supabase *blocklist ledger* (`blocklist_ledger/`, an HTTP API enrichment
+  that gates paid columns inline via `Is New`).
 
 See also: `docs/examples/aviation-reference-notes.md` — a second, independently
 built vertical (Aviation) that follows this exact same shape (normalize →

@@ -3,10 +3,10 @@
 A single central "have I seen this record before?" ledger for hundreds of Clay
 tables.
 
-| Ledger | Columns (identity) | Plus |
-|---|---|---|
-| `people_ledger` | `"Full Name"`, `"Linkedin Profile"` | `first_seen` |
-| `company_ledger` | `"Name"`, `"Company Domain"` | `first_seen` |
+| Ledger | Identity key | Payload (first sighting) | Plus |
+|---|---|---|---|
+| `people_ledger` | `linkedin_key` (normalized `/in/` slug) | `"Full Name"`, `"Linkedin Profile"` | `first_seen` |
+| `company_ledger` | `domain_key` (normalized domain) | `"Name"`, `"Company Domain"` | `first_seen` |
 
 There is no `source` column — removed by request. Provenance (which table first
 recorded a key) is therefore not tracked; `first_seen` is the only metadata.
@@ -16,10 +16,13 @@ atomically. That halves Clay Action spend versus lookup-then-insert, and
 eliminates the race where two concurrent Clay rows both believe they're the first
 sighting of a record.
 
-**Matching is exact.** No normalization is applied — data is assumed to arrive
-already normalized from Clay. `Acme.com` and `acme.com` are two different
-companies. The one exception is that an empty string is treated as `NULL`, so a
-blank Clay cell doesn't create a second row for the same record.
+**Matching is normalized.** Identity is a normalized key computed in the database
+(`02_functions.sql`): `normalize_domain()` lowercases, strips whitespace/scheme/
+`www.`/paths; `normalize_linkedin()` extracts the `/in/` slug (and returns NULL
+for `/company/` pages). So `Acme.com`, `https://www.acme.com/` and `acme.com`
+are the SAME company. A CHECK constraint makes an unnormalized key physically
+unstorable, and `03_verify.sql` asserts the round-trip. Empty strings are
+treated as `NULL`, so a blank Clay cell doesn't create a second row.
 
 ---
 
@@ -60,7 +63,8 @@ Only the Clay column itself is left to build (config below).
 | `01_schema.sql` | Two tables, composite unique constraints, RLS lockdown |
 | `02_functions.sql` | The check-and-insert RPCs, keepalive, grants |
 | `03_verify.sql` | Self-asserting test suite; aborts on the first bad assumption |
-| `04_backfill.sql` | Loads existing records at **0 Clay Actions** |
+| `04_backfill.sql` | **Superseded — predates the normalized schema** (missing `domain_key`, stale constraint names). Use `load_csv.js` for bulk loads. |
+| `load_csv.js` | The working bulk loader: CSV → ledger via Postgres `COPY`, normalizing with the same DB functions the RPCs use, at **0 Clay Actions** |
 
 Re-running any of them is safe.
 
@@ -203,11 +207,11 @@ enrichment. Don't let a rerun clobber an existing `true`.
 Recover with right-click column → "Run All Rows that haven't run or have errors".
 Each rerun is another Action.
 
-**Exact matching cuts both ways.** Since nothing is normalized, `John Smith` and
-`John  Smith` are two different people, and each will be enriched separately.
-`04_backfill.sql` Step 3 includes queries that surface case/whitespace variants in
-your staged data — if those lists come back long, the upstream data is less
-normalized than assumed and is worth cleaning in Clay first.
+**Normalization has limits.** Domains and LinkedIn slugs are normalized in the
+DB, but people with no LinkedIn URL cannot be keyed at all (`skipped: true`),
+and nothing fuzzy-matches names — the ledger keys on `linkedin_key` only. If a
+lot of rows come back `skipped`, fix the LinkedIn coverage upstream in Clay
+rather than trusting name-based dedupe.
 
 **No backups on the free tier.** Real gap. Take a periodic dump:
 

@@ -1,4 +1,4 @@
-# People step — from a filtered company table to a filtered contacts table
+# People passes — from a filtered company table to a filtered contacts table
 
 The stage between a scored company table and an enrichable contacts table:
 filter to companies you have not worked before, expand them into people, then

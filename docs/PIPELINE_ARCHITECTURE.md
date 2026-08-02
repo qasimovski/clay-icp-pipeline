@@ -19,6 +19,10 @@ Variance is governed by two config layers:
   here. This is what protects against double-contacting the same company
   from two different events' Contacts tables later — dedupe against this
   table at outreach/CRM sync time, not inside the per-event tables.
+  Not to be confused with the **blocklist ledger** (`blocklist_ledger/`): that is
+  a separate Supabase registry queried per row as an HTTP API enrichment, whose
+  `Is New` output gates paid columns inline (see `docs/PEOPLE_PASSES.md`). The
+  Blocklist *table* is a passive sink; the *ledger* is an active per-row gate.
 - **Build reusable Claygents once, not per event.** `Official Domain`, the
   ICP classifier (e.g. "Labs Series Registrar"), and `Sub Level` (if the ICP
   has one) belong in Clay's reusable-formula/Claygent layer. Every event's
