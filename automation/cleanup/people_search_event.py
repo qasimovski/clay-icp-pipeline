@@ -4,15 +4,22 @@
   2. run "Find people at these companies" -> creates a People table,
   3. paste that workbook's Clay search query (query mode) into the People table.
 
-The queries are the user's, verbatim, from "People - Filters.txt" — each one
-already carries its own `clay.filter_to_companies(@table("t_...:gv_...:f_..."))`
-reference, so they are never rewritten here.
+Queries come from a --queries file, passed in and never stored in this repo: they
+are written per group of workbooks (not part of the uniform process) and each one
+carries its own `clay.filter_to_companies(@table("t_...:gv_...:f_..."))` reference
+to a live table/view/filter. The file is read verbatim — queries are never
+rewritten here. Format is repeated blocks of:
+
+    <Workbook name>:
+
+    select from people
+    where ...
 
 Excluded by instruction: Lab Equipment & Instrumentation Suppliers,
 Testing & Diagnostics (and anything not present in the filters file).
 
   python people_search_event.py "Material Sciences" --filter-only
-  python people_search_event.py "Material Sciences" --recon-people
+  python people_search_event.py "Material Sciences" --queries <file>
 """
 
 import argparse
@@ -34,7 +41,6 @@ import common         # noqa: E402
 import build_lib as B  # noqa: E402
 
 AUDIT = os.path.join(SCRIPT_DIR, "product_services_companies.json")
-QUERIES = os.path.join(REPO, "People - Filters.txt")
 TABLE = "Companies"
 LEAVE_ALONE = {"Lab Equipment & Instrumentation Suppliers", "Testing & Diagnostics"}
 
@@ -109,7 +115,7 @@ FILTER_ROW = """()=>{
 }"""
 
 
-def load_queries(path=QUERIES):
+def load_queries(path):
     """Parse "<Workbook>:\n\n<query>" blocks out of the filters file."""
     text = open(path, encoding="utf-8").read()
     blocks, name, buf = {}, None, []
@@ -496,6 +502,9 @@ def set_query(page, query, say):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("workbook")
+    ap.add_argument("--queries",
+                    help="file of per-workbook Clay search queries "
+                         "(required unless --filter-only)")
     ap.add_argument("--filter-only", action="store_true")
     ap.add_argument("--recon-people", action="store_true")
     ap.add_argument("--force", action="store_true",
@@ -503,7 +512,14 @@ def main():
     args = ap.parse_args()
 
     audit = json.load(open(AUDIT, encoding="utf-8"))
-    queries = load_queries()
+    if args.filter_only:
+        queries = {}
+    elif not args.queries:
+        print("--queries <file> is required (see the module docstring for the "
+              "expected format)")
+        return
+    else:
+        queries = load_queries(args.queries)
     wb = args.workbook
     if wb in LEAVE_ALONE:
         print(f"REFUSING: {wb} is on the leave-alone list")
@@ -511,10 +527,11 @@ def main():
     if wb not in audit:
         print(f"unknown workbook {wb!r}")
         return
-    if wb not in queries:
-        print(f"no query for {wb!r} in {QUERIES}")
-        return
-    print(f"{wb}: query is {len(queries[wb])} chars", flush=True)
+    if not args.filter_only:
+        if wb not in queries:
+            print(f"no query for {wb!r} in {args.queries}")
+            return
+        print(f"{wb}: query is {len(queries[wb])} chars", flush=True)
 
     def say(m):
         print(m, flush=True)

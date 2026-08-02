@@ -32,9 +32,11 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Pasted inputs and vendor docs kept at the repo root. "People - Filters*.txt"
-# holds live Clay table/view/filter ids (t_/gv_/f_), which SENSITIVE_DATA.md
-# keeps out of the repo; the screenshots are run artifacts.
+# Pasted, group-specific inputs kept at the repo root. Query files like
+# "People - Filters*.txt" are written for one batch of workbooks (not part of the
+# uniform process) and hold live Clay table/view/filter ids, which
+# SENSITIVE_DATA.md keeps out of the repo; the screenshots are run artifacts.
+# Pass such a file to people_search_event.py with --queries.
 /People - Filters*.txt
 /Query Skill.md
 /*.png
