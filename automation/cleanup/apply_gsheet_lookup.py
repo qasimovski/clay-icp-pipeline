@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.join(AUTO_DIR, "build_automation"))
 import clay_ui        # noqa: E402
 import browser_session         # noqa: E402
 import column_config as colcfg  # noqa: E402
+import column_completion  # noqa: E402  (column-scoped done check)
 
 TEMPLATE = "Google Sheet - Lookup & Send Data"
 # Signature column that indicates the template is already applied to a table.
@@ -144,25 +145,21 @@ def _save_disabled(page):
     return s.evaluate("el=>el.disabled||el.getAttribute('data-disabled')!==null")
 
 
-def _pct(page):
-    """Current 'N% of table completed' reading, or None if not present."""
-    t = page.evaluate("()=>document.body.innerText")
-    m = re.search(r"(\d+)% of table completed", t)
-    return int(m.group(1)) if m else None
-
 
 def _wait_for_full_completion(page, say, table_name, max_wait_s=1800, poll_s=12):
-    """Poll the table's run-progress percentage (accurate per user 2026-07-22)
-    until it reaches 100%, so every row's action columns finish - not just
-    the first batch. Returns (reached_100: bool, last_pct: int|None)."""
+    """Poll until the run finishes, so every row's action columns complete -
+    not just the first batch. Completion needs the table-wide banner AND the
+    marker column's own status to agree, so a stale table-wide 100% can't end
+    the wait early. Returns (complete: bool, last_pct: int|None)."""
     start = time.time()
     last = None
     while time.time() - start < max_wait_s:
-        pct = _pct(page)
-        if pct == 100:
+        complete, why = column_completion.already_complete(page, MARKER, colcfg)
+        if complete:
             return True, 100
+        pct = column_completion.table_pct(page)
         if pct != last:
-            say(f"   ...{table_name} progress {pct}%")
+            say(f"   ...{table_name} progress {pct}% ({why})")
             last = pct
         page.wait_for_timeout(poll_s * 1000)
     return False, last
@@ -181,13 +178,13 @@ def apply_gsheet(page, entry, table_name, dry_run, say):
     page.wait_for_timeout(800)
 
     if clay_ui._find_header_rect(page, MARKER):
-        pct = _pct(page)
-        if pct == 100:
-            say(f"SKIP {name}/{table_name}: template already applied and 100% complete")
+        complete, why = column_completion.already_complete(page, MARKER, colcfg)
+        if complete:
+            say(f"SKIP {name}/{table_name}: template already applied and complete ({why})")
             return {"workbook_id": wid, "workbook_name": name, "table": table_name,
                     "status": "ok", "note": "already_applied"}
-        say(f"RESUME {name}/{table_name}: template already applied but at {pct}% "
-            f"- waiting for the run to finish all rows")
+        say(f"RESUME {name}/{table_name}: template already applied but not complete "
+            f"({why}) - waiting for the run to finish all rows")
         done, last_pct = _wait_for_full_completion(page, say, table_name)
         if not done:
             say(f"INCOMPLETE {name}/{table_name}: still at {last_pct}% after max wait "
