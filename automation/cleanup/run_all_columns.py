@@ -22,7 +22,7 @@ TABLE = pcfg.load().main_table
 ALL_COLUMNS_MARKER = "Official Domain"   # present only if v1 applied
 
 
-def run_v1(page, entry, dry_run, say):
+def run_v1(page, entry, dry_run, say, force=False):
     wid = entry["workbook_id"]; name = entry["workbook_name"]
     clay_ui.open_workbook_by_id(page, wid)
     colcfg.focus_table(page, TABLE)
@@ -32,8 +32,28 @@ def run_v1(page, entry, dry_run, say):
         say(f"SKIP {name}: v1 not applied (no {ALL_COLUMNS_MARKER!r}) — nothing to run")
         return {"workbook_id": wid, "workbook_name": name, "status": "skip"}
 
+    # Already-run guard. This is the only credit-spending trigger without one:
+    # 'Run N rows' fires the whole template (Claygent + Enrich Company + ...)
+    # over every row, so a lost state file must not cause a fleet re-spend.
+    # column_status is the marker COLUMN's own status cell ('0%' = dormant,
+    # never run) — not the table-wide '% of table completed' text, which is
+    # documented as a false completion signal.
+    progress = colcfg.column_status(page, ALL_COLUMNS_MARKER)
+    if not force:
+        if progress is None:
+            say(f"ABORT {name}: cannot read {ALL_COLUMNS_MARKER!r} status — "
+                f"refusing to run blind (--force to override)")
+            return {"workbook_id": wid, "workbook_name": name,
+                    "status": "aborted", "reason": "marker_status_unreadable"}
+        if progress != "0%":
+            say(f"SKIP {name}: {ALL_COLUMNS_MARKER!r} status is {progress!r} "
+                f"(not dormant) — already run; --force to re-run")
+            return {"workbook_id": wid, "workbook_name": name,
+                    "status": "already_run", "progress": progress}
+
     if dry_run:
-        say(f"DRYRUN {name}: would select all rows -> Actions -> Run N rows")
+        say(f"DRYRUN {name}: would select all rows -> Actions -> Run N rows "
+            f"(marker status {progress!r})")
         return {"workbook_id": wid, "workbook_name": name, "status": "dryrun"}
 
     page.keyboard.press("Escape"); page.wait_for_timeout(500)

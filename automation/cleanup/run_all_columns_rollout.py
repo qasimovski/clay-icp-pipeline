@@ -47,6 +47,9 @@ def main():
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--shard", type=int, default=None)
     ap.add_argument("--shards", type=int, default=1)
+    ap.add_argument("--force", action="store_true",
+                    help="re-trigger even when the marker column shows a "
+                         "previous run (credit spend — use deliberately)")
     args = ap.parse_args()
 
     manifest = json.load(open(MANIFEST_PATH, encoding="utf-8"))
@@ -62,7 +65,8 @@ def main():
            (f"w{args.shard}" if args.shard is not None else "all"))
     sp = state_path(tag)
     st = {} if args.dry_run else load(sp)
-    pending = [e for e in wbs if st.get(e["workbook_id"], {}).get("status") not in ("ok", "skip")]
+    pending = [e for e in wbs if st.get(e["workbook_id"], {}).get("status")
+               not in ("ok", "skip", "already_run")]
     if args.limit:
         pending = pending[: args.limit]
 
@@ -79,8 +83,9 @@ def main():
         for i, e in enumerate(pending):
             say(f"\n--- [{i+1}/{len(pending)}] {e['workbook_name']} ---")
             try:
-                r = run_all_columns.run_v1(page, e, args.dry_run, say)
-                if r["status"] in ("ok", "skip", "dryrun"):
+                r = run_all_columns.run_v1(page, e, args.dry_run, say,
+                                           force=args.force)
+                if r["status"] in ("ok", "skip", "dryrun", "already_run"):
                     cf = 0
                     if not args.dry_run:
                         st[e["workbook_id"]] = {"status": r["status"], "ts": stamp}
