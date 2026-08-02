@@ -30,6 +30,7 @@ sys.path.insert(0, SCRIPT_DIR)
 import apply_evcharge_template as template_op  # noqa: E402  (sets CLAY_PIPELINE_ENTITY)
 import browser_session                     # noqa: E402
 import run_all_columns as runcols        # noqa: E402
+import state_io                            # noqa: E402
 
 STATE_PATH = os.path.join(SCRIPT_DIR, "evcharge_tpl_state.json")
 LOG_DIR = os.path.join(SCRIPT_DIR, "evcharge_tpl_logs")
@@ -42,15 +43,18 @@ PRE_DONE = {
 
 
 def load_state():
-    if os.path.exists(STATE_PATH):
-        with open(STATE_PATH, encoding="utf-8") as fh:
-            return json.load(fh)
-    return {name: {"status": "ok", "note": note} for name, note in PRE_DONE.items()}
+    # Fail-loud on corruption (state_io), and seed the hand-done events even
+    # when a state file already exists — previously the PRE_DONE protection
+    # applied only when the file was absent, so deleting/recreating it put the
+    # two protected events back in scope.
+    state = state_io.load_json(STATE_PATH)
+    for name, note in PRE_DONE.items():
+        state.setdefault(name, {"status": "ok", "note": note})
+    return state
 
 
 def save_state(state):
-    with open(STATE_PATH, "w", encoding="utf-8") as fh:
-        json.dump(state, fh, indent=1, sort_keys=True)
+    state_io.save_json(STATE_PATH, state, sort_keys=True)
 
 
 def all_events():
@@ -115,14 +119,18 @@ def main():
         for name, wid in batch:
             try:
                 applied = template_op.apply_template(page, wid, name, False, False, say)
+                # run_v1 carries its own already-run guard (marker-column
+                # status), so a retried event whose previous attempt failed
+                # AFTER the run was triggered is skipped as 'already_run'
+                # instead of re-spending Domain + Enrich Company credits.
                 res = runcols.run_v1(page, {"workbook_id": wid, "workbook_name": name},
                                  False, say)
-                ok = res.get("status") == "ok"
+                ok = res.get("status") in ("ok", "already_run")
                 state[name] = {
                     "status": "ok" if ok else "failed",
                     "applied": applied,
-                    "ran": res.get("ran"),
-                    "run_state": res.get("state"),
+                    "ran": res.get("ran") or res.get("status"),
+                    "run_state": res.get("state") or res.get("progress"),
                     "at": datetime.datetime.now().isoformat(timespec="seconds"),
                 }
                 if not ok:
