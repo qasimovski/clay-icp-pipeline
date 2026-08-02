@@ -4,7 +4,7 @@ workbook.
 Clay caps a merged/union table at 20 incoming "Send table data" sources AND
 at roughly 50,000 rows, whichever is hit first: once either limit is reached,
 new sources silently stop delivering rows (the source-side send still shows
-as "created and run", but nothing lands). `ensure_target` live-checks the
+as "created and run", but nothing lands). `ensure_destination` live-checks the
 current table's row count and source count before every send and rolls over
 to the next table (Table 2, Table 3, ...), creating it if needed, so callers
 always get back a destination path with room for one more source.
@@ -56,7 +56,7 @@ MAX_TABLE_INDEX = 10  # Table 1..10 already exist (created manually); if all
                        # than risk more fragile create/rename automation.
 
 
-def ensure_target(page, log=None):
+def ensure_destination(page, log=None):
     """Return the destination path list (e.g. [..., "Table 2"]) of the first
     blocklist table (Table 1..MAX_TABLE_INDEX) with room for one more source
     and under the row cap. Raises RuntimeError if all existing tables are

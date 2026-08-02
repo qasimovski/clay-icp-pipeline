@@ -34,11 +34,11 @@ SOURCE_COLUMN = "WORK EMAIL"        # what Person's Email maps to, and the gate
 EMAIL_FIELD = "Person's Email"
 KEEP_FIELDS = ("Status", "Mx Record", "Mx Provider")
 # Columns that prove this action is already on the table.
-SIG_CANDIDATES = ("Mx Record", "Mx Provider", "Validate email")
+MARKER_CANDIDATES = ("Mx Record", "Mx Provider", "Validate email")
 
 
-def _sig_present(page):
-    for n in SIG_CANDIDATES:
+def _marker_present(page):
+    for n in MARKER_CANDIDATES:
         if clay_ui._find_header_rect(page, n):
             return n
     return None
@@ -232,7 +232,7 @@ def add_validate(page, entry, dry_run, say, recon=False, shot_dir=None):
         return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
                 "status": "no_source_column"}
 
-    already = _sig_present(page)
+    already = _marker_present(page)
     if already and not recon:
         # Already built (possibly by the user by hand): leave it alone.
         got = [f for f in KEEP_FIELDS if clay_ui._find_header_rect(page, f)]
@@ -284,8 +284,8 @@ def add_validate(page, entry, dry_run, say, recon=False, shot_dir=None):
 
     # Auto-run OFF first (user rule), then the gate.
     panel._open_run_settings(page)
-    panel.auto_run_off(page, say)
-    panel._set_gate_condition(page, SOURCE_COLUMN, say)
+    panel.auto_update_off(page, say)
+    panel.set_run_condition(page, SOURCE_COLUMN, say)
 
     if dry_run:
         st = panel.read_state(page)
@@ -456,7 +456,7 @@ def ensure_validate(page, entry, say):
     if not verify.get("ok"):
         say(f"  gate missing after field commit on {name} — repairing")
         try:
-            verify = panel.repair_gate(page, "Validate email", SOURCE_COLUMN, say)
+            verify = panel.repair_run_condition(page, "Validate email", SOURCE_COLUMN, say)
         except Exception as e:
             say(f"  !! gate repair failed: {str(e)[:140]}")
             verify = {"ok": False, "error": str(e)[:200]}

@@ -2,7 +2,7 @@
 recipe). Usage:  python build_workbook.py --folder "Forum Labo"
 
 Every step is guarded by an existence check, so rerunning resumes an
-interrupted build. Verification gates (GateError) stop the event rather than
+interrupted build. Verification gates (VerificationError) stop the event rather than
 save anything wrong. Paid columns are configured with auto-run OFF and never
 run; the only executed actions are formulas, CSV imports, and Send Table Data.
 """
@@ -156,7 +156,7 @@ _FIT_C = '","'.join(["Government & Public Sector", "Investors & Venture Capital"
     "Real Estate, Facilities, Architecture", "Strategic Management Consultants",
     "Forensics & Security"])
 
-MANUAL_FORMULAS = {
+HANDWRITTEN_FORMULAS = {
     "Normalize a Domain":
         '({{Website}}||"").toLowerCase().replace(/^https?:\/\//,"").replace(/^www\./,"").split("/")[0].replace(/\/$/,"")',
     "Normalize Company Name":
@@ -203,7 +203,7 @@ def slug(folder):
     return re.sub(r"[^A-Za-z0-9]+", "_", folder).strip("_")
 
 
-class EventBuilder:
+class WorkbookBuilder:
     def __init__(self, page, folder, log):
         self.page = page
         self.folder = folder
@@ -211,7 +211,7 @@ class EventBuilder:
         self.shots = os.path.join(ROLLOUT_SHOTS, slug(folder))
         os.makedirs(self.shots, exist_ok=True)
 
-    def snap(self, name):
+    def screenshot(self, name):
         p = os.path.join(self.shots, f"{name}.png")
         try:
             self.page.screenshot(path=p)
@@ -243,7 +243,7 @@ class EventBuilder:
         unknown = [h for h in colcfg.unknown_headers(self.page)
                    if not h.startswith("Send")]
         if not unknown:
-            raise colcfg.GateError(f"{name}: not found after re-navigation")
+            raise colcfg.VerificationError(f"{name}: not found after re-navigation")
         if len(unknown) > 1:
             self.say(f"WARN multiple unknown columns {unknown}; renaming"
                      f" newest -> {name}; strays need manual cleanup")
@@ -256,7 +256,7 @@ class EventBuilder:
         page = self.page
         csv_path = os.path.join(SCRAPERS_ROOT, self.folder, "Exhibitors_normalized.csv")
         if not os.path.exists(csv_path):
-            raise colcfg.GateError("no Exhibitors_normalized.csv")
+            raise colcfg.VerificationError("no Exhibitors_normalized.csv")
         last = None
         for attempt in range(4):
             try:
@@ -266,21 +266,21 @@ class EventBuilder:
                 if not exists:
                     self.say("workbook missing -> creating with normalized CSV")
                     clay_ui.create_workbook_with_csvs(page, self.folder, [csv_path])
-                    self.snap("00_workbook_created")
+                    self.screenshot("00_workbook_created")
                     return
                 clay_ui.open_workbook(page, self.folder)
                 if colcfg.table_exists(page, "Exhibitors_normalized"):
                     self.say("normalized table already present")
                     return
                 colcfg.add_csv_table_robust(page, csv_path)
-                self.snap("00_imported")
+                self.screenshot("00_imported")
                 self.say("normalized table imported")
                 return
             except Exception as e:
                 last = e
                 self.say(f"import attempt {attempt} failed: {str(e)[:120]}")
                 page.wait_for_timeout(6000)
-        raise colcfg.GateError(f"import failed after retries: {last}")
+        raise colcfg.VerificationError(f"import failed after retries: {last}")
 
     # ------------------------------------------------------------- formulas
     NULL_SAFE = (' Very important: treat any input value that is null or '
@@ -310,18 +310,18 @@ class EventBuilder:
                     self.say(f"NOTE leftover {h!r} kept (status 100% but not "
                              f"confirmably broken)")
         f, preview = "", []
-        template = MANUAL_FORMULAS.get(
+        template = HANDWRITTEN_FORMULAS.get(
             "Contacts Composite Tier" if (name == "Composite Tier" and
                                           getattr(self, "_contacts_ct", False))
             else name)
         if template:
             try:
-                f, preview = formula_columns.build_formula_manual(
+                f, preview = formula_columns.build_formula_handwritten(
                     page, template, f"f_{slug(name)}")
                 ne = [p for p in (preview or []) if p and p != "None"]
                 ok, _why = gate(f, ne)
                 if not ok and ne:
-                    raise colcfg.GateError("manual result failed gate")
+                    raise colcfg.VerificationError("manual result failed gate")
             except Exception as e:
                 self.say(f"WARN {name}: manual editor failed ({str(e)[:80]}); "
                          f"falling back to AI generation")
@@ -354,12 +354,12 @@ class EventBuilder:
             self.say(f"WARN {name}: empty generation (attempt {attempt}), retrying")
             page.wait_for_timeout(4000)
         if not f.strip():
-            raise colcfg.GateError(f"{name}: formula generation returned empty 3x")
+            raise colcfg.VerificationError(f"{name}: formula generation returned empty 3x")
         nonempty = [p for p in (preview or []) if p and p != "None"]
         ok, why = gate(f, nonempty)
         if not ok and not (allow_empty_preview and not nonempty and why == "preview"):
             formula_columns.cancel_panel(page)
-            raise colcfg.GateError(f"{name}: gate failed ({why}); formula={f[:200]!r}")
+            raise colcfg.VerificationError(f"{name}: gate failed ({why}); formula={f[:200]!r}")
         formula_columns.save_column(page, f"f_{slug(name)}_save")
         try:
             colcfg.rename_last_column(page, name)
@@ -374,7 +374,7 @@ class EventBuilder:
                     colcfg.delete_column(page, auto)
             except Exception:
                 pass
-            raise colcfg.GateError(f"{name}: rename failed; column removed for retry")
+            raise colcfg.VerificationError(f"{name}: rename failed; column removed for retry")
         # post-save health: '' (checkmark icon) = healthy; a persistent '100%'
         # WITHOUT any cell values = per-row errors. Large tables keep '100%'
         # visible for a while after computing, so poll long and, if it stays,
@@ -399,7 +399,7 @@ class EventBuilder:
             elif cells and any(c is not None for c in cells):
                 # cells located and all empty with a persistent red 100%
                 colcfg.delete_column(page, name)
-                raise colcfg.GateError(f"{name}: formula errored on rows "
+                raise colcfg.VerificationError(f"{name}: formula errored on rows "
                                   f"(deleted for clean retry); formula={f[:200]!r}")
             else:
                 self.say(f"WARN {name}: health check inconclusive "
@@ -460,13 +460,13 @@ class EventBuilder:
                             [("Company Name: ", "Company Name"),
                              ("Country: ", "Country")])
         if "UNKNOWN" not in txt or "Company Name" not in txt:
-            raise colcfg.GateError("official domain prompt incomplete")
-        colcfg.auto_run_off(page)
+            raise colcfg.VerificationError("official domain prompt incomplete")
+        colcfg.auto_update_off(page)
         colcfg.add_run_condition(page, "!", "Website")
         colcfg.save_plain(page)
         self.rename_new("Official Domain", "Exhibitors_normalized",
                         ("Primary Corporate", "Corporate Domain", "Verified Corporate"))
-        self.snap("04_official_domain")
+        self.screenshot("04_official_domain")
         self.say("Official Domain configured (dormant)")
 
     def step_company_domain(self):
@@ -485,12 +485,12 @@ class EventBuilder:
             self.say("column exists: Enrich Company")
             return
         colcfg.open_card(page, "Enrich Company", ("Enrich Company", "Companies, People"))
-        colcfg.auto_run_off(page)
+        colcfg.auto_update_off(page)
         page.get_by_role("button", name="Continue to add fields").click(timeout=15000)
         page.wait_for_timeout(3000)
         search = page.get_by_placeholder("Search data columns")
         if not search.count():
-            raise colcfg.GateError("enrich field search not found")
+            raise colcfg.VerificationError("enrich field search not found")
         for term in ("Size", "Type", "Domain", "Url", "Founded", "Industry",
                      "Description", "Annual revenue"):
             search.fill(term)
@@ -506,8 +506,8 @@ class EventBuilder:
         page.wait_for_timeout(900)
         colcfg.save_plain(page)
         if not colcfg.header_exists(page, "Enrich Company"):
-            raise colcfg.GateError("Enrich Company column missing after save")
-        self.snap("06_enrich")
+            raise colcfg.VerificationError("Enrich Company column missing after save")
+        self.screenshot("06_enrich")
         self.say("Enrich Company configured (dormant)")
 
     def step_resolved_description(self):
@@ -540,16 +540,16 @@ class EventBuilder:
         for marker in ("#CONTEXT#", "#EXAMPLES#", "Forensics & Security",
                        "Non-industry Specific JT Searches"):
             if marker not in txt:
-                raise colcfg.GateError(f"registrar prompt missing {marker!r}")
-        colcfg.auto_run_off(page)   # collapses Configuration, revealing outputs
+                raise colcfg.VerificationError(f"registrar prompt missing {marker!r}")
+        colcfg.auto_update_off(page)   # collapses Configuration, revealing outputs
         if not colcfg.rename_response_output(page, "Side"):
-            raise colcfg.GateError("response output not found")
+            raise colcfg.VerificationError("response output not found")
         colcfg.add_output(page, "Classification")
         colcfg.save_plain(page)
         self.rename_new("Labs Series Registrar", "Exhibitors_normalized",
                         ("Side:", "Classification", "Side"),
                         allow=("Classification", "Side"))
-        self.snap("08_registrar")
+        self.screenshot("08_registrar")
         self.say("Labs Series Registrar configured (dormant)")
 
     def step_extractors_and_tiering(self):
@@ -627,7 +627,7 @@ class EventBuilder:
         if colcfg.recover_leftover(page, ("Send table data",), "Send to Blocklist"):
             self.say("recovered unrenamed send -> Send to Blocklist")
             return
-        target = blocklist_send.ensure_target(page, log=self.log)
+        target = blocklist_send.ensure_destination(page, log=self.log)
         self.say(f"blocklist target: {target[-1]}")
         colcfg.open_workbook(page, self.folder)
         colcfg.focus_table(page, "Exhibitors_normalized")
@@ -638,10 +638,10 @@ class EventBuilder:
             self.say(f"WARN blocklist mapping kept locked extras: {extras}")
         colcfg.save_via_menu(page, r"Save and run .* rows in this view")
         self.rename_new("Send to Blocklist", "Exhibitors_normalized", ("Send table data",))
-        self.snap("14_blocklist")
+        self.screenshot("14_blocklist")
         self.say("Blocklist send created AND run")
 
-    def _split(self, side, table):
+    def _send_split(self, side, table):
         page = self.page
         col = f"Send to {table}"
         if colcfg.header_exists(page, col):
@@ -662,7 +662,7 @@ class EventBuilder:
             try:
                 self.rename_new(col, "Exhibitors_normalized", ("Send table data",))
                 break
-            except colcfg.GateError as e:
+            except colcfg.VerificationError as e:
                 if attempt == 0 and "not found after re-navigation" in str(e):
                     self.say(f"WARN {col}: send did not commit — rebuilding")
                     colcfg.open_workbook(page, self.folder)
@@ -673,8 +673,8 @@ class EventBuilder:
 
     def step_splits(self):
         colcfg.focus_table(self.page, "Exhibitors_normalized")
-        self._split("Seller", "Sellers")
-        self._split("Buyer", "Buyers")
+        self._send_split("Seller", "Sellers")
+        self._send_split("Buyer", "Buyers")
 
     # -------------------------------------------------- sellers/buyers layer
     def step_sublevel(self):
@@ -714,17 +714,17 @@ class EventBuilder:
                              ("Company Domain: ", "Company Domain"),
                              ("Description: ", "Resolved Description")])
         if "Forensics & Security" not in txt or "TAXONOMY" not in txt:
-            raise colcfg.GateError("sub level prompt incomplete")
+            raise colcfg.VerificationError("sub level prompt incomplete")
         colcfg.rename_panel_title(page, "Sub Level")
-        colcfg.auto_run_off(page)   # collapses Configuration, revealing outputs
+        colcfg.auto_update_off(page)   # collapses Configuration, revealing outputs
         colcfg.rename_response_output(page, "Sub Level")
         colcfg.add_run_condition(page, "!!", "Classification")
         colcfg.save_plain(page)
         self.rename_new("Sub Level", "Sellers", ("Sub Level", "Sub-Level", "Sublevel"))
-        self.snap("17_sublevel")
+        self.screenshot("17_sublevel")
         self.say("Sub Level configured (dormant)")
 
-    def step_routes(self):
+    def step_sends(self):
         page = self.page
         # Sellers -> Contacts – Sellers (Tier 1-2)
         colcfg.focus_table_maybe_empty(page, "Sellers")
@@ -803,7 +803,7 @@ class EventBuilder:
             page.keyboard.press("Escape")   # close the inline naming popover
             page.wait_for_timeout(800)
         if not colcfg.header_exists(page, "JT Fit"):
-            raise colcfg.GateError("JT Fit column not created")
+            raise colcfg.VerificationError("JT Fit column not created")
         self.say("JT Fit text column ready")
         self._contacts_ct = True
         self.formula(
@@ -836,7 +836,7 @@ class EventBuilder:
                 ta = el
                 break
         if ta is None:
-            raise colcfg.GateError("FP chat textarea not found")
+            raise colcfg.VerificationError("FP chat textarea not found")
         ta.click(timeout=5000)
         page.keyboard.insert_text(desc)
         page.wait_for_timeout(600)
@@ -856,7 +856,7 @@ class EventBuilder:
                 done = True
                 break
         if not done:
-            raise colcfg.GateError("FP sculptor never completed")
+            raise colcfg.VerificationError("FP sculptor never completed")
         js2 = """() => {
           for (const el of document.querySelectorAll('*')) {
             if (el.children.length === 0) {
@@ -868,7 +868,7 @@ class EventBuilder:
         }"""
         nf = page.evaluate(js2)
         if nf < min_filters:
-            raise colcfg.GateError(f"FP filters too few: {nf} < {min_filters}")
+            raise colcfg.VerificationError(f"FP filters too few: {nf} < {min_filters}")
         page.get_by_role("button", name="Save search", exact=True).first.click(timeout=10000)
         page.wait_for_timeout(2200)
         inp = None
@@ -882,7 +882,7 @@ class EventBuilder:
                 inp = el
                 break
         if inp is None:
-            raise colcfg.GateError("FP save-search name input not found")
+            raise colcfg.VerificationError("FP save-search name input not found")
         inp.click(timeout=5000)
         page.keyboard.type(name, delay=12)
         page.get_by_role("button", name="Save search", exact=True).last.click(timeout=10000)
@@ -940,7 +940,7 @@ class EventBuilder:
              "step_company_domain", "step_enrich", "step_resolved_description",
              "step_registrar", "step_extractors_and_tiering", "step_ref_tables",
              "step_send_blocklist", "step_splits", "step_sublevel",
-             "step_routes", "step_contacts", "step_find_people"]
+             "step_sends", "step_contacts", "step_find_people"]
 
     def run(self):
         t0 = time.time()
@@ -954,13 +954,13 @@ class EventBuilder:
         self.say(f"EVENT COMPLETE in {int((time.time()-t0)/60)} min")
 
 
-def run_event(folder, log):
+def build_workbook(folder, log):
     with browser_session.clay_page() as page:
-        b = EventBuilder(page, folder, log)
+        b = WorkbookBuilder(page, folder, log)
         try:
             b.run()
         except Exception:
-            b.snap("FAIL")
+            b.screenshot("FAIL")
             raise
 
 
@@ -968,4 +968,4 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--folder", required=True)
     args = ap.parse_args()
-    run_event(args.folder, sys.stdout)
+    build_workbook(args.folder, sys.stdout)

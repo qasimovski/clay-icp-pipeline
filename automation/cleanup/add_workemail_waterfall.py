@@ -45,9 +45,9 @@ import column_config as colcfg  # noqa: E402
 TABLE = "Speakers_normalized"
 # Card to open, and the column it creates (the card's own panel title).
 CARD_MUST_CONTAIN = ("TERRAPINN", "Find Work Email Waterfall")
-SIG = "WORK EMAIL"
+MARKER = "WORK EMAIL"
 # Gate: only spend credits on rows that actually have a speaker name.
-GATE_COLUMN = "Speaker Name"
+RUN_IF_COLUMN = "Speaker Name"
 
 _PANEL = """()=>{
   const norm=s=>(s||'').replace(/\\s+/g,' ').trim();
@@ -183,7 +183,7 @@ def open_column_config(page, column):
     misses often enough to fail a batch ("'Edit column' menu item not found").
     """
     if not find_header_scrolling(page, column):
-        raise colcfg.GateError(f"column {column!r} not found")
+        raise colcfg.VerificationError(f"column {column!r} not found")
     clay_ui.open_column_menu(page, column)
     page.wait_for_timeout(800)
     for el in page.get_by_role("menuitem").all():
@@ -194,7 +194,7 @@ def open_column_config(page, column):
                 return True
         except Exception:
             pass
-    raise colcfg.GateError("'Edit column' menu item not found")
+    raise colcfg.VerificationError("'Edit column' menu item not found")
 
 
 def _condition_y(page):
@@ -230,7 +230,7 @@ _SWITCH_ROWS = """()=>{
 }"""
 
 
-def auto_run_off(page, say):
+def auto_update_off(page, say):
     """Turn the Auto-run switch OFF. User rule (2026-07-27): auto-run must
     ALWAYS be off - an action saved with it on starts running every row
     immediately, before any gate is in place.
@@ -252,7 +252,7 @@ def auto_run_off(page, say):
         now = next((r["state"] for r in page.evaluate(_SWITCH_ROWS)
                     if r["label"].startswith("Auto-run")), None)
         if now in ("true", "checked"):
-            raise colcfg.GateError("auto-run switch would not turn off")
+            raise colcfg.VerificationError("auto-run switch would not turn off")
         say("  auto-run turned OFF")
         flipped += 1
     if flipped == 0:
@@ -317,7 +317,7 @@ def verify_persisted(page, column, gate_column, say):
                 pass
             page.wait_for_timeout(2500)
     else:
-        raise colcfg.GateError(f"could not reopen {column!r} to verify: {last}")
+        raise colcfg.VerificationError(f"could not reopen {column!r} to verify: {last}")
     _open_run_settings(page)
     st = read_state(page)
     # Exact match: a mangled formula like "!!{{!!{{WORK EMAIL}}_0tit6v...}}"
@@ -587,7 +587,7 @@ def _focus_condition_editor(page, label_y, say):
     return None
 
 
-def _set_gate_condition(page, column, say):
+def set_run_condition(page, column, say):
     """Tick 'Add run condition' and put !!{{column}} in the formula box.
 
     Types the formula literally (the "/" menu picks the wrong row) and verifies
@@ -596,7 +596,7 @@ def _set_gate_condition(page, column, say):
     """
     lab = page.get_by_text("Add run condition", exact=True)
     if not lab.count():
-        raise colcfg.GateError("run condition label not visible")
+        raise colcfg.VerificationError("run condition label not visible")
     lb = lab.first.bounding_box()
     cb = None
     for el in page.locator('[role="checkbox"]').all():
@@ -609,7 +609,7 @@ def _set_gate_condition(page, column, say):
             cb = el
             break
     if cb is None:
-        raise colcfg.GateError("run condition checkbox not found")
+        raise colcfg.VerificationError("run condition checkbox not found")
     st = cb.get_attribute("aria-checked") or cb.get_attribute("data-state")
     if st not in ("true", "checked"):
         cb.click(timeout=8000)
@@ -618,7 +618,7 @@ def _set_gate_condition(page, column, say):
     label_y = (lb or {}).get("y", 0)
     pick = _cond_pick(page, label_y)
     if not pick:
-        raise colcfg.GateError("condition editor not found")
+        raise colcfg.VerificationError("condition editor not found")
     say(f"  condition editor: {{'y': {pick['y']}, 'text': {pick['text'][:40]!r}}}")
     existing = pick["text"]
     # Only a real formula counts as already set; descriptive text that mentions
@@ -632,7 +632,7 @@ def _set_gate_condition(page, column, say):
     want = expected_condition(column)
     for attempt in range(3):
         if not _focus_condition_editor(page, label_y, say):
-            raise colcfg.GateError("could not focus the condition editor")
+            raise colcfg.VerificationError("could not focus the condition editor")
         cur = (_cond_pick(page, label_y) or {}).get("text", "")
         if cur and not cur.startswith("E.g.,"):
             # Untick/retick rather than editing the DOM: only the checkbox
@@ -651,7 +651,7 @@ def _set_gate_condition(page, column, say):
         if _norm_cond(got) == _norm_cond(want):
             return got
         say(f"  condition attempt {attempt+1}: got {got[:60]!r}, want {want!r}")
-    raise colcfg.GateError(f"condition never became {want!r}")
+    raise colcfg.VerificationError(f"condition never became {want!r}")
 
 
 def _verify_card(page):
@@ -659,14 +659,14 @@ def _verify_card(page):
     txt = _panel_text(page)
     joined = " | ".join(txt)
     return {
-        "is_work_email": SIG in txt,
+        "is_work_email": MARKER in txt,
         "inputs_mapped": bool(re.search(r"Required inputs mapped for \d+/\d+",
                                         joined)),
         "providers": next((t for t in txt if "providers configured" in t), None),
     }
 
 
-def repair_gate(page, column, gate_column, say):
+def repair_run_condition(page, column, gate_column, say):
     """Set Auto-run OFF + !!{{gate_column}} on an EXISTING column, then verify.
 
     Generalised from fix_workemail_run_condition.py: any save path can drop a run
@@ -675,8 +675,8 @@ def repair_gate(page, column, gate_column, say):
     """
     open_column_config(page, column)
     _open_run_settings(page)
-    auto_run_off(page, say)
-    _set_gate_condition(page, gate_column, say)
+    auto_update_off(page, say)
+    set_run_condition(page, gate_column, say)
     saved = save_column(page, say)
     say(f"  gate repair saved via {saved}")
     page.wait_for_timeout(2500)
@@ -696,20 +696,20 @@ def add_waterfall(page, entry, dry_run, say, recon=False, run_after=False):
     colcfg.focus_table_maybe_empty(page, TABLE)
     page.wait_for_timeout(800)
 
-    if not clay_ui._find_header_rect(page, GATE_COLUMN):
-        say(f"SKIP {name}/{TABLE}: no {GATE_COLUMN!r} column to gate on")
+    if not clay_ui._find_header_rect(page, RUN_IF_COLUMN):
+        say(f"SKIP {name}/{TABLE}: no {RUN_IF_COLUMN!r} column to gate on")
         return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
                 "status": "no_gate_column"}
 
-    if clay_ui._find_header_rect(page, SIG) and not recon:
+    if clay_ui._find_header_rect(page, MARKER) and not recon:
         # Already built (possibly by the user by hand). Don't rebuild and don't
         # wait on the table-wide "% of table completed" text — it is not this
         # column's progress.
-        say(f"SKIP {name}/{TABLE}: {SIG!r} column already present "
-            f"(column status {column_progress(page, SIG)!r})")
+        say(f"SKIP {name}/{TABLE}: {MARKER!r} column already present "
+            f"(column status {column_progress(page, MARKER)!r})")
         return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
                 "status": "exists", "note": "already_present",
-                "column_status": column_progress(page, SIG)}
+                "column_status": column_progress(page, MARKER)}
 
     colcfg.open_card(page, "Waterfall", must_contain=CARD_MUST_CONTAIN,
                 must_not=("Create a column",))
@@ -718,7 +718,7 @@ def add_waterfall(page, entry, dry_run, say, recon=False, run_after=False):
     card = _verify_card(page)
     say(f"  card: {card}")
     if not card["is_work_email"]:
-        say(f"ABORT {name}/{TABLE}: opened panel is not the {SIG!r} waterfall")
+        say(f"ABORT {name}/{TABLE}: opened panel is not the {MARKER!r} waterfall")
         page.keyboard.press("Escape")
         return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
                 "status": "aborted", "reason": "wrong_card", "card": card}
@@ -743,14 +743,14 @@ def add_waterfall(page, entry, dry_run, say, recon=False, run_after=False):
 
     # !!{{Speaker Name}} — column_config types the "!!" then inserts /<column>.
     try:
-        cond = _set_gate_condition(page, GATE_COLUMN, say)
+        cond = set_run_condition(page, RUN_IF_COLUMN, say)
     except Exception as e:
         say(f"ABORT {name}/{TABLE}: run condition failed: {str(e)[:160]}")
         page.keyboard.press("Escape")
         return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
                 "status": "aborted", "reason": "run_condition",
                 "error": str(e)[:200]}
-    say(f"  run condition set: !!{{{{{GATE_COLUMN}}}}}")
+    say(f"  run condition set: !!{{{{{RUN_IF_COLUMN}}}}}")
 
     if dry_run:
         say(f"DRYRUN {name}/{TABLE}: card ok, condition {cond}; not saving")
@@ -761,7 +761,7 @@ def add_waterfall(page, entry, dry_run, say, recon=False, run_after=False):
     # Auto-run OFF before saving. Saving with it on made the very first attempt
     # start running every row immediately — ungated, because the condition was
     # silently dropped by the same save.
-    auto_run_off(page, say)
+    auto_update_off(page, say)
 
     saved = save_column(page, say)
     say(f"  saved via {saved}")
@@ -769,24 +769,24 @@ def add_waterfall(page, entry, dry_run, say, recon=False, run_after=False):
     # Confirm the real column appeared — never trust the page's status text.
     confirmed = None
     for _ in range(10):
-        if clay_ui._find_header_rect(page, SIG):
-            confirmed = SIG
+        if clay_ui._find_header_rect(page, MARKER):
+            confirmed = MARKER
             break
         page.wait_for_timeout(2500)
     if not confirmed:
-        say(f"UNCONFIRMED {name}/{TABLE}: saved but no {SIG!r} column appeared")
+        say(f"UNCONFIRMED {name}/{TABLE}: saved but no {MARKER!r} column appeared")
         return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
                 "status": "unconfirmed", "saved": saved}
 
     # The gate is only real if reopening the column shows it.
-    v = verify_persisted(page, SIG, GATE_COLUMN, say)
+    v = verify_persisted(page, MARKER, RUN_IF_COLUMN, say)
     if not v["ok"]:
         say(f"ABORT {name}/{TABLE}: gate did not persist — NOT running. {v}")
         return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
                 "status": "gate_not_persisted", "saved": saved, "verify": v}
 
     if not run_after:
-        say(f"READY {name}/{TABLE}: {SIG} added, gated on !!{{{{{GATE_COLUMN}}}}}, "
+        say(f"READY {name}/{TABLE}: {MARKER} added, gated on !!{{{{{RUN_IF_COLUMN}}}}}, "
             f"auto-run off, NOT run (pass --run to run it)")
         return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
                 "status": "ready", "saved": saved, "verify": v}
@@ -799,10 +799,10 @@ def add_waterfall(page, entry, dry_run, say, recon=False, run_after=False):
     # Progress is reported per column; the table-wide "% of table completed"
     # string is NOT this column's progress and previously made a 4%-run column
     # look finished.
-    say(f"  column status now: {column_progress(page, SIG)!r}")
+    say(f"  column status now: {column_progress(page, MARKER)!r}")
     return {"workbook_id": wid, "workbook_name": name, "table": TABLE,
             "status": "running", "saved": saved, "verify": v, "ran": trig,
-            "column_status": column_progress(page, SIG)}
+            "column_status": column_progress(page, MARKER)}
 
 
 def run_only(page, entry, say):
@@ -817,14 +817,14 @@ def run_only(page, entry, say):
     colcfg.focus_table_maybe_empty(page, TABLE)
     page.wait_for_timeout(1000)
 
-    if not clay_ui._find_header_rect(page, SIG):
-        say(f"SKIP {name}/{TABLE}: no {SIG!r} column")
+    if not clay_ui._find_header_rect(page, MARKER):
+        say(f"SKIP {name}/{TABLE}: no {MARKER!r} column")
         return {"workbook_id": wid, "workbook_name": name, "status": "no_column"}
 
-    open_column_config(page, SIG)
+    open_column_config(page, MARKER)
     _open_run_settings(page)
     st = read_state(page)
-    cond_ok = GATE_COLUMN in (st.get("condition") or "")
+    cond_ok = RUN_IF_COLUMN in (st.get("condition") or "")
     auto_off = all(sw.get("state") not in ("true", "checked")
                    for sw in st.get("switches", [])
                    if "Auto-run" in (sw.get("label") or ""))
@@ -842,7 +842,7 @@ def run_only(page, entry, say):
         return {"workbook_id": wid, "workbook_name": name,
                 "status": "run_not_triggered"}
     return {"workbook_id": wid, "workbook_name": name, "status": "running",
-            "ran": trig, "column_status": column_progress(page, SIG)}
+            "ran": trig, "column_status": column_progress(page, MARKER)}
 
 
 if __name__ == "__main__":

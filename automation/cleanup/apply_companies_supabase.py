@@ -320,9 +320,9 @@ def set_name_field(page, say):
     return "ok" if got == "Name" else "failed"
 
 
-def already_applied(table_id, sig, say):
+def already_applied(table_id, marker, say):
     """Fail-closed check against Clay's real column list."""
-    if not table_id or not sig:
+    if not table_id or not marker:
         return False
     path = COLS_SCRIPT.replace("C:\\", "/mnt/c/").replace("\\", "/")
     try:
@@ -337,7 +337,7 @@ def already_applied(table_id, sig, say):
     if not cols:
         say("  !! column pre-check empty — skipping for safety")
         return True
-    hit = [c for c in sig if c in cols]
+    hit = [c for c in marker if c in cols]
     if hit:
         say(f"  already applied (has {hit})")
         return True
@@ -345,7 +345,7 @@ def already_applied(table_id, sig, say):
 
 
 def apply_supabase(page, entry, dry_run, say, recon=False, run_after=False,
-                   sig=()):
+                   marker=()):
     wid, name = entry["workbook_id"], entry["workbook_name"]
     clay_ui.open_workbook_by_id(page, wid)
     if not colcfg.table_exists(page, TABLE):
@@ -354,7 +354,7 @@ def apply_supabase(page, entry, dry_run, say, recon=False, run_after=False,
     colcfg.focus_table_maybe_empty(page, TABLE)
     page.wait_for_timeout(1200)
 
-    if not (recon or dry_run) and already_applied(entry.get("table_id"), sig, say):
+    if not (recon or dry_run) and already_applied(entry.get("table_id"), marker, say):
         return {"workbook_name": name, "status": "already_applied"}
 
     open_template(page, say)
@@ -400,7 +400,7 @@ if __name__ == "__main__":
     ap.add_argument("--recon", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--run", action="store_true")
-    ap.add_argument("--sig", nargs="*", default=[],
+    ap.add_argument("--marker", nargs="*", default=[],
                     help="column names proving the template is already applied")
     ap.add_argument("--headed", action="store_true")
     a = ap.parse_args()
@@ -416,4 +416,4 @@ if __name__ == "__main__":
             print(m, flush=True)
         print("\nRESULT:", apply_supabase(page, entry, a.dry_run, say,
                                           recon=a.recon, run_after=a.run,
-                                          sig=tuple(a.sig)))
+                                          marker=tuple(a.marker)))

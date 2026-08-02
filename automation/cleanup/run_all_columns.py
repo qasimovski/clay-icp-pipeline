@@ -19,7 +19,7 @@ import pipeline_config as pcfg  # noqa: E402
 
 # Entity-driven (default exhibitors; override via CLAY_PIPELINE_ENTITY).
 TABLE = pcfg.load().main_table
-V1_SIGNATURE = "Official Domain"   # present only if v1 applied
+ALL_COLUMNS_MARKER = "Official Domain"   # present only if v1 applied
 
 
 def run_v1(page, entry, dry_run, say):
@@ -28,8 +28,8 @@ def run_v1(page, entry, dry_run, say):
     colcfg.focus_table(page, TABLE)
     page.wait_for_timeout(1000)
 
-    if not clay_ui._find_header_rect(page, V1_SIGNATURE):
-        say(f"SKIP {name}: v1 not applied (no {V1_SIGNATURE!r}) — nothing to run")
+    if not clay_ui._find_header_rect(page, ALL_COLUMNS_MARKER):
+        say(f"SKIP {name}: v1 not applied (no {ALL_COLUMNS_MARKER!r}) — nothing to run")
         return {"workbook_id": wid, "workbook_name": name, "status": "skip"}
 
     if dry_run:

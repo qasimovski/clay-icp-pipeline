@@ -251,7 +251,7 @@ def _click_exact(page, txt, timeout_s=8):
     return False
 
 
-def save_new_and_rename(page, wid, say, snap=None):
+def save_new_and_rename(page, wid, say, screenshot=None):
     """build1: Continue -> Save to new table (auto-creates + runs), then rename
     the newly-created people table to PEOPLE_TABLE. Returns False if the Continue
     menu never enabled (i.e. the build produced no results)."""
@@ -261,8 +261,8 @@ def save_new_and_rename(page, wid, say, snap=None):
     if not _click_exact(page, "Save to new table"):
         raise clay_ui.ClayUIError("'Save to new table' not clickable")
     page.wait_for_timeout(6000)   # table is created + run kicked off server-side
-    if snap:
-        snap("save_new_done")
+    if screenshot:
+        screenshot("save_new_done")
     return _rename_new_people_table(page, wid, say)
 
 
@@ -312,7 +312,7 @@ def _rename_new_people_table(page, wid, say):
     return True
 
 
-def save_existing(page, say, snap=None):
+def save_existing(page, say, screenshot=None):
     """builds 2 & 3: Continue -> Save to existing table -> select PEOPLE_TABLE
     -> Select table -> Import and run. Returns False if no results."""
     if not _open_continue_menu(page):
@@ -321,8 +321,8 @@ def save_existing(page, say, snap=None):
     if not _click_exact(page, "Save to existing table"):
         raise clay_ui.ClayUIError("'Save to existing table' not clickable")
     page.wait_for_timeout(2500)
-    if snap:
-        snap("existing_select")
+    if screenshot:
+        screenshot("existing_select")
     if not _click_exact(page, PEOPLE_TABLE, timeout_s=10):
         raise clay_ui.ClayUIError(f"could not select {PEOPLE_TABLE!r} in table picker")
     page.wait_for_timeout(1200)
@@ -330,8 +330,8 @@ def save_existing(page, say, snap=None):
     if not _click_exact(page, "Select table", timeout_s=8):
         raise clay_ui.ClayUIError("'Select table' confirm button not found")
     page.wait_for_timeout(2500)
-    if snap:
-        snap("existing_importrun")
+    if screenshot:
+        screenshot("existing_importrun")
     if not _click_exact(page, "Import and run", timeout_s=12):
         raise clay_ui.ClayUIError("'Import and run' not found")
     page.wait_for_timeout(4000)
@@ -371,7 +371,7 @@ def _prepare_people_table(page, wid, say):
     return False
 
 
-def run_event(page, wid, name, say):
+def run_searches(page, wid, name, say):
     """Run all 3 builds for one event into a single 'Sellers - People' table.
     The first build that yields results creates the table (Save to new +
     rename); later builds append (Save to existing). Builds with no results

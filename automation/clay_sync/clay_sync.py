@@ -50,7 +50,7 @@ SKIP_DIRS = {".claude", "__pycache__", ".git", "node_modules", ".venv", "venv",
 # Folders that repeatedly fail to import through the UI (import commits but
 # Clay never renders data). Retrying these created duplicate workbooks, so the
 # tool now leaves them alone entirely — add them to Clay manually.
-MANUAL_FOLDERS = {
+NEEDS_HUMAN_FOLDERS = {
     "MEDICA",
     "Medtech Japan",
     "Pittcon",
@@ -74,7 +74,7 @@ UA = (
 )
 
 
-def discover(only_folder=None):
+def discover_csv_folders(only_folder=None):
     """Return {folder_name: [(table_name, csv_path), ...]} for every event
     folder that has at least one standard CSV. Non-standard CSV names are
     ignored. Tables are ordered Exhibitors/Speakers/Sponsors/Attendees."""
@@ -229,7 +229,7 @@ def main():
         return
 
     state = csv_push_state.load_state()
-    events = discover(only_folder=args.folder)
+    events = discover_csv_folders(only_folder=args.folder)
 
     if not events:
         where = f" in folder {args.folder!r}" if args.folder else ""
@@ -251,7 +251,7 @@ def main():
                 any_changed = True
 
         seen_before = any(csv_push_state.rel_key(p) in state for _, p in tables)
-        if folder in MANUAL_FOLDERS:
+        if folder in NEEDS_HUMAN_FOLDERS:
             action = "manual"          # known-broken import — add to Clay by hand
         elif args.force or not seen_before:
             action = "create"          # workbook expected to be missing

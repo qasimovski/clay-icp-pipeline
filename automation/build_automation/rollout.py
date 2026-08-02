@@ -6,7 +6,7 @@ Exhibitors_normalized.csv (excluding Interphex, already built).
   python rollout.py --limit N       # first N pending events
 
 State in rollout_state.json; per-event logs in rollout_logs/. Healthy events
-(existing workbook) run first; the 7 known-broken MANUAL folders are attempted
+(existing workbook) run first; the 7 known-broken NEEDS_HUMAN folders are attempted
 once at the end. Aborts after 3 consecutive failures (systemic problem).
 """
 import argparse
@@ -26,7 +26,7 @@ STATE_PATH = os.path.join(browser_session.SCRIPT_DIR, "rollout_state.json")
 LOG_DIR = os.path.join(browser_session.SCRIPT_DIR, "rollout_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
-MANUAL = {"MEDICA", "Medtech Japan", "Pittcon", "SLAS Europe", "SLAS2026",
+NEEDS_HUMAN = {"MEDICA", "Medtech Japan", "Pittcon", "SLAS Europe", "SLAS2026",
           "WHX Dubai", "World Health Expo Lagos"}
 SKIP = {"Interphex"}
 
@@ -58,15 +58,15 @@ def save_state_entry(own_path, folder, entry):
     json.dump(own, open(own_path, "w", encoding="utf-8"), indent=1)
 
 
-def discover():
+def discover_workbook_folders():
     events = []
     for d in sorted(os.listdir(SCRAPERS_ROOT)):
         if d in SKIP:
             continue
         if os.path.isfile(os.path.join(SCRAPERS_ROOT, d, "Exhibitors_normalized.csv")):
             events.append(d)
-    healthy = [e for e in events if e not in MANUAL]
-    tricky = [e for e in events if e in MANUAL]
+    healthy = [e for e in events if e not in NEEDS_HUMAN]
+    tricky = [e for e in events if e in NEEDS_HUMAN]
     return healthy + tricky
 
 
@@ -98,7 +98,7 @@ def main():
     own_path = STATE_PATH if args.shard is None else os.path.join(
         browser_session.SCRIPT_DIR, f"rollout_state_w{args.shard}.json")
     state = load_state()
-    events = [args.only] if args.only else discover()
+    events = [args.only] if args.only else discover_workbook_folders()
     if args.shard is not None:
         # shard over the FULL stable event list, not the pending snapshot —
         # otherwise two workers with slightly different snapshots overlap
@@ -119,7 +119,7 @@ def main():
         try:
             with open(log_path, "a", encoding="utf-8") as log:
                 log.write(f"\n===== run {stamp} =====\n")
-                build_workbook.run_event(folder, log)
+                build_workbook.build_workbook(folder, log)
             state[folder] = {"status": "done", "ts": stamp}
             save_state_entry(own_path, folder, state[folder])
             consecutive_failures = 0

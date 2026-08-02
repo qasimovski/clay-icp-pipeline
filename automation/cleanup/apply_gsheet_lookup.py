@@ -39,7 +39,7 @@ TEMPLATE = "Google Sheet - Lookup & Send Data"
 # templates — it adds three action columns ("Lookup in Audiences", "Lookup
 # row", "Add row"). "Lookup in Audiences" is the first of the three and a
 # name unlikely to collide with anything else on a People table.
-SIG = "Lookup in Audiences"
+MARKER = "Lookup in Audiences"
 
 # Config-panel field-label column: same DOM region used by the other
 # template-apply passes (apply_lookup.py, apply_all_columns.py) — Clay
@@ -123,11 +123,11 @@ def recon(page, entry, table_name, say, screenshot=None):
                 "status": "no_table"}
     colcfg.focus_table_maybe_empty(page, table_name)
     page.wait_for_timeout(800)
-    already = clay_ui._find_header_rect(page, SIG)
+    already = clay_ui._find_header_rect(page, MARKER)
     _open_template_retry(page)
     rows = page.evaluate(_LABEL_SCAN_JS)
     rows.sort(key=lambda r: (r["y"], r["x"]))
-    say(f"RECON {name}/{table_name}: already_has_{SIG!r}={bool(already)}")
+    say(f"RECON {name}/{table_name}: already_has_{MARKER!r}={bool(already)}")
     for r in rows:
         say(f"  y={r['y']:<4} x={r['x']:<4} w={r['w']:<4} {r['text']!r}".encode(
             "ascii", "backslashreplace").decode("ascii"))
@@ -180,7 +180,7 @@ def apply_gsheet(page, entry, table_name, dry_run, say):
     colcfg.focus_table_maybe_empty(page, table_name)
     page.wait_for_timeout(800)
 
-    if clay_ui._find_header_rect(page, SIG):
+    if clay_ui._find_header_rect(page, MARKER):
         pct = _pct(page)
         if pct == 100:
             say(f"SKIP {name}/{table_name}: template already applied and 100% complete")
@@ -242,12 +242,12 @@ def apply_gsheet(page, entry, table_name, dry_run, say):
     # really there before calling this "ok".
     confirmed = False
     for _ in range(8):
-        if clay_ui._find_header_rect(page, SIG):
+        if clay_ui._find_header_rect(page, MARKER):
             confirmed = True
             break
         page.wait_for_timeout(2500)
     if not confirmed:
-        say(f"UNCONFIRMED {name}/{table_name}: clicked {lbl!r} but {SIG!r} column "
+        say(f"UNCONFIRMED {name}/{table_name}: clicked {lbl!r} but {MARKER!r} column "
             f"never appeared | {st}")
         return {"workbook_id": wid, "workbook_name": name, "table": table_name,
                 "status": "unconfirmed", "ran": lbl, "state": st}

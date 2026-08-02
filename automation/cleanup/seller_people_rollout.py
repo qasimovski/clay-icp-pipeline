@@ -103,7 +103,7 @@ def main():
         for i, (wid, name) in enumerate(pending):
             say(f"\n=== [{i+1}/{len(pending)}] {name} ===")
             try:
-                r = seller_people_searches.run_event(page, wid, name, say)
+                r = seller_people_searches.run_searches(page, wid, name, say)
                 state[wid] = {"status": "ok", "ts": stamp, "detail": r}
                 json.dump(state, open(STATE, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
                 cf = 0

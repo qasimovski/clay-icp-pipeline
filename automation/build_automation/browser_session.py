@@ -28,7 +28,7 @@ WORKBOOK = "Interphex"
 MAIN_TABLE = "Exhibitors_normalized"
 
 
-def shot(page, name):
+def screenshot(page, name):
     path = os.path.join(SHOTS_DIR, f"{name}.png")
     page.screenshot(path=path)
     print(f"[shot] {path}")

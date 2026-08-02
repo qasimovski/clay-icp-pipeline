@@ -35,7 +35,7 @@ LOG_DIR = os.path.join(SCRIPT_DIR, "ps_supabase_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 SKIP = {"Cleanroom Technology", "Chemicals & Reagents", "Digital & AI Services"}
-SIG = ("HTTP API", "Is New")
+MARKER = ("HTTP API", "Is New")
 DONE = ("ok", "already_applied", "dryrun")
 
 
@@ -93,7 +93,7 @@ def main():
                      "table_id": rec.get("table_id")}
             try:
                 r = apply_companies_supabase.apply_supabase(page, entry, False, say,
-                                     run_after=not args.skip_run, sig=SIG)
+                                     run_after=not args.skip_run, marker=MARKER)
             except Exception as e:
                 say(f"!! EXCEPTION {wb}: {str(e)[:160]}")
                 logf.write(traceback.format_exc()); logf.flush()

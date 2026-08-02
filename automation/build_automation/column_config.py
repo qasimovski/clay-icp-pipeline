@@ -27,7 +27,7 @@ import formula_columns
 import clay_ui
 
 
-class GateError(Exception):
+class VerificationError(Exception):
     """A verification gate failed — stop this event, never click past it."""
 
 
@@ -45,7 +45,7 @@ def open_workbook(page, folder, table=None, retries=4):
         except Exception as e:
             last = e
             time.sleep(4)
-    raise GateError(f"cannot open workbook {folder!r}: {last}")
+    raise VerificationError(f"cannot open workbook {folder!r}: {last}")
 
 
 def focus_table(page, table, retries=3):
@@ -64,7 +64,7 @@ def focus_table(page, table, retries=3):
             last = e
             page.keyboard.press("Escape")
             page.wait_for_timeout(5000)
-    raise GateError(f"focus_table {table!r} failed: {last}")
+    raise VerificationError(f"focus_table {table!r} failed: {last}")
 
 
 def focus_table_maybe_empty(page, table, retries=3):
@@ -81,7 +81,7 @@ def focus_table_maybe_empty(page, table, retries=3):
             last = e
             page.keyboard.press("Escape")
             page.wait_for_timeout(5000)
-    raise GateError(f"focus_table_maybe_empty {table!r} failed: {last}")
+    raise VerificationError(f"focus_table_maybe_empty {table!r} failed: {last}")
 
 
 def table_exists(page, name):
@@ -158,7 +158,7 @@ def open_enrichment_search(page, term):
         except Exception:
             pass
     if not filled:
-        raise GateError("no search box in enrichment panel")
+        raise VerificationError("no search box in enrichment panel")
     page.wait_for_timeout(2200)
 
 
@@ -198,7 +198,7 @@ def click_native_card(page, must_contain, must_not=("Create a column", "Owler",
                 except Exception:
                     pass
             page.wait_for_timeout(2200)
-    raise GateError(f"native card {must_contain} not found")
+    raise VerificationError(f"native card {must_contain} not found")
 
 
 def open_card(page, search_term, must_contain, must_not=None, retries=3):
@@ -220,7 +220,7 @@ def open_card(page, search_term, must_contain, must_not=None, retries=3):
             last = e
             page.keyboard.press("Escape")
             page.wait_for_timeout(5000)
-    raise GateError(f"could not open card {must_contain}: {last}")
+    raise VerificationError(f"could not open card {must_contain}: {last}")
 
 
 def set_model_gpt41mini(page):
@@ -265,7 +265,7 @@ def prompt_editor(page):
     }"""
     eds = [e for e in page.evaluate(js) if e["y"] > 330]
     if not eds:
-        raise GateError("prompt editor not found")
+        raise VerificationError("prompt editor not found")
     return page.locator('[contenteditable="true"]').nth(eds[0]["i"])
 
 
@@ -309,7 +309,7 @@ def add_output(page, name):
     page.wait_for_timeout(1000)
     f1 = page.locator('input[value="field1"]')
     if not f1.count():
-        raise GateError("new output input (field1) not found")
+        raise VerificationError("new output input (field1) not found")
     f1.first.click(timeout=8000)
     page.keyboard.press("Control+a")
     page.keyboard.type(name, delay=15)
@@ -330,7 +330,7 @@ def collapse_configuration(page):
     return False
 
 
-def auto_run_off(page):
+def auto_update_off(page):
     """Turn OFF every ON auto-run switch in the right panel. The switch can sit
     below the fold behind a long prompt — collapse Configuration first and use
     locator clicks (they auto-scroll). Raises if no switch is found at all."""
@@ -350,10 +350,10 @@ def auto_run_off(page):
                 page.wait_for_timeout(700)
                 now = el.get_attribute("aria-checked") or el.get_attribute("data-state")
                 if now in ("true", "checked"):
-                    raise GateError("auto-run switch would not turn off")
+                    raise VerificationError("auto-run switch would not turn off")
                 flipped += 1
     if found == 0:
-        raise GateError("no auto-run switch found in panel")
+        raise VerificationError("no auto-run switch found in panel")
     return flipped
 
 
@@ -361,7 +361,7 @@ def add_run_condition(page, pre_text, token, post_text=""):
     """Check 'Add run condition' and type pre_text + {{token}} + post_text."""
     lab = page.get_by_text("Add run condition", exact=True)
     if not lab.count():
-        raise GateError("run condition label not visible")
+        raise VerificationError("run condition label not visible")
     lb = lab.first.bounding_box()
     cb = None
     for el in page.locator('[role="checkbox"]').all():
@@ -374,7 +374,7 @@ def add_run_condition(page, pre_text, token, post_text=""):
             cb = el
             break
     if cb is None:
-        raise GateError("run condition checkbox not found")
+        raise VerificationError("run condition checkbox not found")
     st = cb.get_attribute("aria-checked") or cb.get_attribute("data-state")
     if st not in ("true", "checked"):
         cb.click(timeout=8000)
@@ -390,7 +390,7 @@ def add_run_condition(page, pre_text, token, post_text=""):
     }"""
     eds = page.evaluate(js)
     if not eds:
-        raise GateError("condition editor not found")
+        raise VerificationError("condition editor not found")
     ed = page.locator('[contenteditable="true"]').nth(eds[-1]["i"])
     ed.click(timeout=8000)
     if ed.inner_text().strip().replace("﻿", ""):
@@ -408,7 +408,7 @@ def add_run_condition(page, pre_text, token, post_text=""):
     page.wait_for_timeout(400)
     cond = ed.inner_text()
     if token not in cond:
-        raise GateError(f"condition text missing token: {cond[:80]!r}")
+        raise VerificationError(f"condition text missing token: {cond[:80]!r}")
 
 
 def save_plain(page):
@@ -418,7 +418,7 @@ def save_plain(page):
     save = page.get_by_role("button", name="Save", exact=True).last
     bb = save.bounding_box()
     if not bb or bb["x"] < 1400:
-        raise GateError("save button not in panel position")
+        raise VerificationError("save button not in panel position")
     save.click(timeout=10000)
     page.wait_for_timeout(2500)
     opt = page.get_by_text("Save and don't run", exact=True)
@@ -435,7 +435,7 @@ def save_via_menu(page, option_regex):
     save = page.get_by_role("button", name="Save", exact=True).last
     bb = save.bounding_box()
     if not bb or bb["x"] < 1400:
-        raise GateError("save button not in panel position")
+        raise VerificationError("save button not in panel position")
     page.mouse.click(bb["x"] + bb["width"] - 12, bb["y"] + bb["height"] / 2)
     page.wait_for_timeout(1500)
     rx = re.compile(option_regex, re.I)
@@ -451,7 +451,7 @@ def save_via_menu(page, option_regex):
         if target:
             break
     if not target:
-        raise GateError(f"save option {option_regex!r} not found")
+        raise VerificationError(f"save option {option_regex!r} not found")
     target.click(timeout=8000)
     page.wait_for_timeout(5000)
 
@@ -495,7 +495,7 @@ def rename_last_column(page, name, timeout_s=60):
         except Exception as e:
             last_err = e
             page.wait_for_timeout(2000)
-    raise GateError(f"column {name!r} not present after rename: {last_err}")
+    raise VerificationError(f"column {name!r} not present after rename: {last_err}")
 
 
 def column_status(page, name):
@@ -521,7 +521,7 @@ def delete_column(page, name):
     """Delete a column WE created (broken formula recovery only)."""
     pos = formula_columns.header_click_pos(page, name)
     if not pos:
-        raise GateError(f"cannot find column {name!r} to delete")
+        raise VerificationError(f"cannot find column {name!r} to delete")
     page.mouse.click(pos["x"] + 10, pos["y"])
     page.wait_for_timeout(1200)
     page.get_by_role("menuitem", name="Delete", exact=True).click(timeout=10000)
@@ -593,7 +593,7 @@ def recover_leftover(page, prefixes, name, attempts=4, allow=()):
             last = e
             page.keyboard.press("Escape")
             page.wait_for_timeout(3000)
-    raise GateError(f"leftover {prefixes} rename to {name!r} failed: {last}")
+    raise VerificationError(f"leftover {prefixes} rename to {name!r} failed: {last}")
 
 
 def add_csv_table_robust(page, path):
@@ -621,7 +621,7 @@ def add_csv_table_robust(page, path):
                 except Exception:
                     pass
             if not filled:
-                raise GateError("no visible search box in create-table modal")
+                raise VerificationError("no visible search box in create-table modal")
             page.wait_for_timeout(1500)
             page.get_by_role("button", name="Import from CSV",
                              exact=True).first.click(timeout=10000)
@@ -636,7 +636,7 @@ def add_csv_table_robust(page, path):
         except Exception as e:
             last = e
             page.wait_for_timeout(3000)
-    raise GateError(f"csv import failed for {table}: {last}")
+    raise VerificationError(f"csv import failed for {table}: {last}")
 
 
 # -------------------------------------------------------------- send actions
@@ -707,7 +707,7 @@ def set_mapping(page, keep, required=None, budget=4):
     # columns not offered at all (e.g. dormant claygent outputs) are reported,
     # not fatal, IF they were merely in keep; required must be present.
     if missing:
-        raise GateError(f"mapping missing required columns: {missing}")
+        raise VerificationError(f"mapping missing required columns: {missing}")
     return sorted(set(on) - set(keep))  # tolerated extras
 
 
@@ -721,7 +721,7 @@ def open_send_panel(page, retries=3):
             last = e
             page.keyboard.press("Escape")
             page.wait_for_timeout(5000)
-    raise GateError(f"send panel would not open: {last}")
+    raise VerificationError(f"send panel would not open: {last}")
 
 
 def _open_send_panel_once(page):
@@ -737,12 +737,12 @@ def _open_send_panel_once(page):
     }"""
     pos = page.evaluate(js)
     if not pos:
-        raise GateError("Send table data item not found")
+        raise VerificationError("Send table data item not found")
     page.mouse.click(pos["x"], pos["y"])
     page.wait_for_timeout(4000)
     # confirm config panel (Select table + Create present)
     if not page.get_by_role("button", name="Select table", exact=True).count():
-        raise GateError("send config panel did not open")
+        raise VerificationError("send config panel did not open")
 
 
 def dest_existing(page, path_buttons):
@@ -791,16 +791,16 @@ def dest_create_table(page, name, retries=3):
                         break
                     page.wait_for_timeout(2000)
             if not inp.count():
-                raise GateError("new-table name input not found")
+                raise VerificationError("new-table name input not found")
             inp.first.click(timeout=8000)
             page.keyboard.press("Control+a")
             page.keyboard.type(name, delay=25)
             page.keyboard.press("Tab")
             page.wait_for_timeout(1200)
             if not committed():
-                raise GateError("destination name did not commit")
+                raise VerificationError("destination name did not commit")
             return
         except Exception as e:
             last = e
             page.wait_for_timeout(4000)
-    raise GateError(f"dest_create_table {name!r} failed: {last}")
+    raise VerificationError(f"dest_create_table {name!r} failed: {last}")

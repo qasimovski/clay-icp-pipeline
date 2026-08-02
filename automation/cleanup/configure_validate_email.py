@@ -37,7 +37,7 @@ import apply_email_template  # noqa: E402  (_click_opt)
 TABLE = "Speakers_normalized"
 VALIDATE_COL = "Validate Email"
 SOURCE_COL = "WORK EMAIL"
-GATE_COL = "Speaker Name"          # the waterfall's own gate
+RUN_IF_COL = "Speaker Name"          # the waterfall's own gate
 
 # The email input row sits between "Setup Inputs" and "Run settings"; when
 # unmapped its box reads "Please select a valid value" (or the usual
@@ -145,10 +145,10 @@ def configure(page, entry, say, run_after=False, table=None):
     mapped = map_email_input(page, say)
 
     panel._open_run_settings(page)
-    panel.auto_run_off(page, say)
+    panel.auto_update_off(page, say)
     # Always retype: the inherited condition references the template's original
     # table by field id, which resolves to nothing here.
-    cond = panel._set_gate_condition(page, SOURCE_COL, say)
+    cond = panel.set_run_condition(page, SOURCE_COL, say)
     say(f"  condition now: {cond!r}")
 
     saved = panel.save_column(page, say)
@@ -177,14 +177,14 @@ def configure(page, entry, say, run_after=False, table=None):
         # Exact match required: the template can carry a gate over as a raw
         # field id from its source table, which resolves to nothing here.
         if panel._norm_cond(st.get("condition")) != panel._norm_cond(
-                panel.expected_condition(GATE_COL)):
+                panel.expected_condition(RUN_IF_COL)):
             say(f"  {SOURCE_COL} gate is {st.get('condition')!r}, not "
-                f"{panel.expected_condition(GATE_COL)!r} — retyping")
-            panel.auto_run_off(page, say)
-            panel._set_gate_condition(page, GATE_COL, say)
+                f"{panel.expected_condition(RUN_IF_COL)!r} — retyping")
+            panel.auto_update_off(page, say)
+            panel.set_run_condition(page, RUN_IF_COL, say)
             panel.save_column(page, say)
             page.wait_for_timeout(2500)
-            st = panel.verify_persisted(page, SOURCE_COL, GATE_COL, say).get("state", {})
+            st = panel.verify_persisted(page, SOURCE_COL, RUN_IF_COL, say).get("state", {})
         else:
             page.keyboard.press("Escape")
             page.wait_for_timeout(1200)

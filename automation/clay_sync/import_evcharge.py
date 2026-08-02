@@ -114,7 +114,7 @@ _ROWS_JS = """() => {
 }"""
 
 
-def discover():
+def discover_import_folders():
     """[(folder, csv_path), ...] for every scraper folder holding CSV_NAME."""
     out = []
     for name in sorted(os.listdir(SCRAPERS_ROOT)):
@@ -219,7 +219,7 @@ def main():
         print(f"No Clay session at {SESSION_PATH} — run clay_login.py")
         sys.exit(1)
 
-    targets = discover()
+    targets = discover_import_folders()
     if args.only:
         wanted = set(args.only)
         unknown = wanted - {f for f, _ in targets}

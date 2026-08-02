@@ -64,7 +64,7 @@ def preview_cells(page, n=8, header="Preview"):
     return page.evaluate(js, [n, header])
 
 
-def build_formula_column(page, description, shot_prefix, gen_timeout=150000):
+def build_formula_column(page, description, screenshot_prefix, gen_timeout=150000):
     """Open add-column -> Formula, describe, Generate, and return
     (formula_text, preview) WITHOUT saving. Caller verifies then saves."""
     assert "/" not in description and "\n" not in description, \
@@ -94,14 +94,14 @@ def build_formula_column(page, description, shot_prefix, gen_timeout=150000):
         page.wait_for_timeout(2000)
         waited += 2000
     page.wait_for_timeout(2500)  # let preview column materialize
-    browser_session.shot(page, f"{shot_prefix}_generated")
+    browser_session.screenshot(page, f"{screenshot_prefix}_generated")
     return formula, preview_cells(page)
 
 
-def save_column(page, shot_prefix):
+def save_column(page, screenshot_prefix):
     page.get_by_role("button", name="Save column", exact=True).click(timeout=15000)
     page.wait_for_timeout(4000)
-    browser_session.shot(page, f"{shot_prefix}_saved")
+    browser_session.screenshot(page, f"{screenshot_prefix}_saved")
 
 
 def cancel_panel(page):
@@ -170,7 +170,7 @@ def header_click_pos(page, name, max_rounds=10):
         page.wait_for_timeout(600)
     return None
 
-def rename_column(page, current, new, shot_prefix=None):
+def rename_column(page, current, new, screenshot_prefix=None):
     """Rename a column via its header menu. Grid must show the header
     (call scroll_grid_right first for right-end columns)."""
     pos = header_click_pos(page, current)
@@ -200,8 +200,8 @@ def rename_column(page, current, new, shot_prefix=None):
     page.keyboard.type(new, delay=15)
     page.keyboard.press("Enter")
     page.wait_for_timeout(1500)
-    if shot_prefix:
-        browser_session.shot(page, f"{shot_prefix}_renamed")
+    if screenshot_prefix:
+        browser_session.screenshot(page, f"{screenshot_prefix}_renamed")
     # commit can lag under load — poll before declaring failure
     for _ in range(8):
         if _header_pos(page, new):
@@ -249,7 +249,7 @@ def grid_headers(page):
     return page.evaluate(js)
 
 
-def build_formula_manual(page, template, shot_prefix):
+def build_formula_handwritten(page, template, screenshot_prefix):
     """Write a formula directly in the manual Formula editor — no AI
     generation. `template` uses {{Column Name}} placeholders; literal text is
     inserted via insert_text (no key events, so "/" in regexes is safe) and
@@ -290,5 +290,5 @@ def build_formula_manual(page, template, shot_prefix):
     # the manual editor parses literal {{Column}} syntax directly (probed)
     page.keyboard.insert_text(template)
     page.wait_for_timeout(4000)   # let tokens bind and the preview compute
-    browser_session.shot(page, f"{shot_prefix}_manual")
+    browser_session.screenshot(page, f"{screenshot_prefix}_manual")
     return read_formula_text(page), preview_cells(page)

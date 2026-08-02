@@ -29,9 +29,9 @@ import column_config as colcfg  # noqa: E402
 
 TEMPLATE = "Find LinkedIn and Enrich Person"
 # Signature column indicating the template is already applied - confirmed via
-# --recon before real use (see apply_gsheet_lookup.py's SIG discovery process;
+# --recon before real use (see apply_gsheet_lookup.py's MARKER discovery process;
 # update this once we've seen the real Configure panel / resulting columns).
-SIG = "Enrich person"
+MARKER = "Enrich person"
 
 # Unlike the Google Sheet template, this one's 4 Configure fields (Name, Bio,
 # LinkedIn, Email) are NOT auto-mapped (confirmed via --recon on Automation UK,
@@ -131,11 +131,11 @@ def recon(page, entry, table_name, say, screenshot=None):
                 "status": "no_table"}
     colcfg.focus_table_maybe_empty(page, table_name)
     page.wait_for_timeout(800)
-    already = clay_ui._find_header_rect(page, SIG)
+    already = clay_ui._find_header_rect(page, MARKER)
     _open_template_retry(page)
     rows = page.evaluate(_LABEL_SCAN_JS)
     rows.sort(key=lambda r: (r["y"], r["x"]))
-    say(f"RECON {name}/{table_name}: already_has_{SIG!r}={bool(already)}")
+    say(f"RECON {name}/{table_name}: already_has_{MARKER!r}={bool(already)}")
     for r in rows:
         say(f"  y={r['y']:<4} x={r['x']:<4} w={r['w']:<4} {r['text']!r}".encode(
             "ascii", "backslashreplace").decode("ascii"))
@@ -184,7 +184,7 @@ def apply_findlinkedin(page, entry, table_name, dry_run, say):
     colcfg.focus_table_maybe_empty(page, table_name)
     page.wait_for_timeout(800)
 
-    if clay_ui._find_header_rect(page, SIG):
+    if clay_ui._find_header_rect(page, MARKER):
         pct = _pct(page)
         if pct == 100:
             say(f"SKIP {name}/{table_name}: template already applied and 100% complete")
@@ -268,12 +268,12 @@ def apply_findlinkedin(page, entry, table_name, dry_run, say):
                         "return (t.match(/\\d+% of table completed/)||['?'])[0];}")
     confirmed = False
     for _ in range(8):
-        if clay_ui._find_header_rect(page, SIG):
+        if clay_ui._find_header_rect(page, MARKER):
             confirmed = True
             break
         page.wait_for_timeout(2500)
     if not confirmed:
-        say(f"UNCONFIRMED {name}/{table_name}: clicked {lbl!r} but {SIG!r} column "
+        say(f"UNCONFIRMED {name}/{table_name}: clicked {lbl!r} but {MARKER!r} column "
             f"never appeared | {st}")
         return {"workbook_id": wid, "workbook_name": name, "table": table_name,
                 "status": "unconfirmed", "ran": lbl, "state": st}

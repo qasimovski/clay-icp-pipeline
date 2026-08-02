@@ -140,7 +140,7 @@ def open_filter_popover(page, say):
             break
         page.wait_for_timeout(1500)
     if not a:
-        raise colcfg.GateError("toolbar 'N/N rows' anchor not found")
+        raise colcfg.VerificationError("toolbar 'N/N rows' anchor not found")
     say(f"  rows chip: {a['t']}")
     for attempt in range(4):
         page.mouse.click(a["right"] + 32, a["y"])
@@ -151,7 +151,7 @@ def open_filter_popover(page, say):
         say(f"  filter popover did not open (attempt {attempt + 1})")
         page.keyboard.press("Escape")
         page.wait_for_timeout(1200)
-    raise colcfg.GateError("filter popover would not open")
+    raise colcfg.VerificationError("filter popover would not open")
 
 
 def read_filter_row(page):
@@ -224,7 +224,7 @@ def apply_is_new_filter(page, say):
 
     add = page.evaluate(FIND, "Add filter")
     if not add:
-        raise colcfg.GateError("'Add filter' not found")
+        raise colcfg.VerificationError("'Add filter' not found")
     page.mouse.click(add["x"], add["y"])
     page.wait_for_timeout(2500)
 
@@ -244,7 +244,7 @@ def apply_is_new_filter(page, say):
         page.wait_for_timeout(900)
     if not opt:
         page.keyboard.press("Escape")
-        raise colcfg.GateError("'Is New' not in the column dropdown")
+        raise colcfg.VerificationError("'Is New' not in the column dropdown")
     page.mouse.click(opt["x"], opt["y"])
     page.wait_for_timeout(3000)
 
@@ -363,7 +363,7 @@ def open_tools_import(page, say):
         page.wait_for_timeout(2500)
         tab = page.evaluate(TAB, "Import")
     if not tab:
-        raise colcfg.GateError("Tools sidebar 'Import' tab not found")
+        raise colcfg.VerificationError("Tools sidebar 'Import' tab not found")
     page.mouse.click(tab["x"], tab["y"])
     page.wait_for_timeout(2500)
     say("  Tools > Import open")
@@ -379,7 +379,7 @@ def start_find_people(page, say):
             break
         page.wait_for_timeout(900)
     if not item:
-        raise colcfg.GateError("'Find people at these companies' not in Import tab")
+        raise colcfg.VerificationError("'Find people at these companies' not in Import tab")
     say(f"  clicking Find people at these companies {item}")
     page.mouse.click(item["x"], item["y"])
     page.wait_for_timeout(6000)
@@ -429,7 +429,7 @@ def rename_table(page, new_name, say):
     """Rename the currently open table via the breadcrumb menu."""
     c = page.evaluate(CRUMB)
     if not c:
-        raise colcfg.GateError("breadcrumb table name not found")
+        raise colcfg.VerificationError("breadcrumb table name not found")
     say(f"  current table name: {c['t']!r}")
     if c["t"] == new_name:
         say("  already named correctly")
@@ -439,7 +439,7 @@ def rename_table(page, new_name, say):
     item = page.evaluate(FIND, "Rename")
     if not item:
         page.keyboard.press("Escape")
-        raise colcfg.GateError("'Rename' not in the table menu")
+        raise colcfg.VerificationError("'Rename' not in the table menu")
     page.mouse.click(item["x"], item["y"])
     page.wait_for_timeout(1800)
     page.keyboard.press("Control+A")
@@ -476,7 +476,7 @@ def enter_query_mode(page, say):
             say("  query mode on")
             return True
         page.wait_for_timeout(1200)
-    raise colcfg.GateError("could not switch the Filters panel to query mode")
+    raise colcfg.VerificationError("could not switch the Filters panel to query mode")
 
 
 def set_query(page, query, say):
@@ -579,7 +579,7 @@ def main():
         say(f"shot: {shot2}")
         newt = page.evaluate(FIND, "Save to new table")
         if not newt:
-            raise colcfg.GateError("'Save to new table' not offered after Continue")
+            raise colcfg.VerificationError("'Save to new table' not offered after Continue")
         say(f"  clicking Save to new table {newt}")
         page.mouse.click(newt["x"], newt["y"])
         page.wait_for_timeout(20000)

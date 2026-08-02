@@ -42,7 +42,7 @@ TEMPLATE_CANDIDATES = [n for n in (
 ) if n]
 TEMPLATE_USED = None
 
-SIG = "WORK EMAIL"
+MARKER = "WORK EMAIL"
 PEOPLE_TABLES = ("Sellers - People", "Buyers - People")
 
 # Only these two need filling; the rest arrive pre-filled.
@@ -294,7 +294,7 @@ def apply_people_template(page, entry, table, dry_run, say, recon=False,
     say(f"  saved via {saved}")
     page.wait_for_timeout(6000)
 
-    confirmed = clay_ui._find_header_rect(page, SIG) is not None
+    confirmed = clay_ui._find_header_rect(page, MARKER) is not None
     return {"workbook_id": wid, "workbook_name": name, "table": table,
             "status": "ok", "saved": saved, "fields": final,
             "statuses": statuses, "sig_visible": confirmed,

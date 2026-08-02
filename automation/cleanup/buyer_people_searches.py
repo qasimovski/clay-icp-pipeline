@@ -281,7 +281,7 @@ def _reopen_view(page, wid):
         raise clay_ui.ClayUIError("filter panel did not open")
 
 
-def run_buyer_event(page, wid, name, say, done_segments=None, on_segment=None):
+def run_buyer_searches(page, wid, name, say, done_segments=None, on_segment=None):
     """Run all segments for one event. `done_segments` (set of segment names)
     are skipped (segment-level resume for events that exceed one process
     lifetime). `on_segment(seg_name, created)` is called after each segment

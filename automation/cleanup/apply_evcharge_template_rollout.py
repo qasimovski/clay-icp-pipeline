@@ -109,7 +109,7 @@ def main():
     os.makedirs(LOG_DIR, exist_ok=True)
     say = lambda m: print(m, flush=True)
     runcols.TABLE = template_op.TABLE
-    runcols.V1_SIGNATURE = template_op.SIGNATURE
+    runcols.ALL_COLUMNS_MARKER = template_op.MARKER
 
     with browser_session.clay_page(headless=not args.headed) as page:
         for name, wid in batch:

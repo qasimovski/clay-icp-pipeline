@@ -134,7 +134,7 @@ def main():
                 json.dump(out, open(state_write, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
 
             try:
-                r = buyer_people_searches.run_buyer_event(page, wid, name, say,
+                r = buyer_people_searches.run_buyer_searches(page, wid, name, say,
                                        done_segments=done_segs, on_segment=on_segment)
                 out[wid] = {"status": "ok", "ts": stamp, "detail": r,
                             "created_table": r["created_table"],

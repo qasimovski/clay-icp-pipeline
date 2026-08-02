@@ -45,7 +45,7 @@ if _EXPLICIT_FILL:
 else:
     FILL = [(_COUNTRY_FIELD, _COUNTRY_FIELD), (_DESC_FIELD, _DESC_FIELD)]
 # a column v1 adds that the reverted base lacks — its presence => already applied
-V1_SIGNATURE = "Official Domain"
+ALL_COLUMNS_MARKER = "Official Domain"
 
 _FIELD_BOX = """(label)=>{
   const norm=s=>(s||'').replace(/\\s+/g,' ').trim();
@@ -132,8 +132,8 @@ def apply_v1(page, entry, dry_run, say):
     colcfg.focus_table(page, TABLE)
 
     # idempotency: already has v1?
-    if clay_ui._find_header_rect(page, V1_SIGNATURE):
-        say(f"SKIP {name}: v1 already applied ({V1_SIGNATURE!r} present)")
+    if clay_ui._find_header_rect(page, ALL_COLUMNS_MARKER):
+        say(f"SKIP {name}: v1 already applied ({ALL_COLUMNS_MARKER!r} present)")
         return {"workbook_id": wid, "workbook_name": name, "status": "ok",
                 "note": "already_applied"}
 

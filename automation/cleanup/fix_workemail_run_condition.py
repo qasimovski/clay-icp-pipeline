@@ -31,7 +31,7 @@ import add_workemail_waterfall as panel  # noqa: E402
 
 TABLE = "Speakers_normalized"
 COL = "WORK EMAIL"
-GATE_COLUMN = "Speaker Name"
+RUN_IF_COLUMN = "Speaker Name"
 
 _STATE = """()=>{
   const norm=s=>(s||'').replace(/\\s+/g,' ').trim();
@@ -84,7 +84,7 @@ def open_column_config(page, column):
     """Open a column's config via its header menu -> Edit column."""
     rect = clay_ui._find_header_rect(page, column)
     if not rect:
-        raise colcfg.GateError(f"column {column!r} not found")
+        raise colcfg.VerificationError(f"column {column!r} not found")
     w = rect.get("w") or rect.get("width") or 80
     page.mouse.click(rect["x"] + w - 12, rect["y"] + 12)
     page.wait_for_timeout(1500)
@@ -96,7 +96,7 @@ def open_column_config(page, column):
                 return True
         except Exception:
             pass
-    raise colcfg.GateError("'Edit column' menu item not found")
+    raise colcfg.VerificationError("'Edit column' menu item not found")
 
 
 def read_state(page):
@@ -106,7 +106,7 @@ def read_state(page):
         return {"error": str(e)[:120]}
 
 
-def _auto_run_off(page, say):
+def _auto_update_off(page, say):
     """Turn the Auto-run switch OFF (user rule: always off)."""
     flipped = 0
     for s in page.locator('[role="switch"]').all():
@@ -125,7 +125,7 @@ def _auto_run_off(page, say):
             page.wait_for_timeout(900)
             now = s.get_attribute("aria-checked") or s.get_attribute("data-state")
             if now in ("true", "checked"):
-                raise colcfg.GateError("auto-run switch would not turn off")
+                raise colcfg.VerificationError("auto-run switch would not turn off")
             flipped += 1
             say("  auto-run turned OFF")
     return flipped
@@ -157,8 +157,8 @@ def repair(page, entry, say, inspect=False):
         return {"workbook_id": wid, "workbook_name": name, "status": "inspect",
                 "before": before}
 
-    _auto_run_off(page, say)
-    panel._set_gate_condition(page, GATE_COLUMN, say)
+    _auto_update_off(page, say)
+    panel.set_run_condition(page, RUN_IF_COLUMN, say)
     after_edit = read_state(page)
     say(f"  AFTER EDIT: {after_edit}")
 
@@ -200,7 +200,7 @@ def repair(page, entry, say, inspect=False):
     say(f"  PERSISTED: {persisted}")
     page.keyboard.press("Escape")
 
-    cond_ok = GATE_COLUMN in (persisted.get("condition") or "")
+    cond_ok = RUN_IF_COLUMN in (persisted.get("condition") or "")
     cb_ok = (persisted.get("checkbox") or {}).get("state") in ("true", "checked")
     auto_off = all(s.get("state") not in ("true", "checked")
                    for s in persisted.get("switches", [])

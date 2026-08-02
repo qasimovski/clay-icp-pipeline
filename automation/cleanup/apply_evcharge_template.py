@@ -49,7 +49,7 @@ import run_all_columns as runcols   # noqa: E402
 _CFG = pcfg.load()
 TABLE = _CFG.main_table
 TEMPLATE = _CFG.templates["all_columns"]
-SIGNATURE = "Official Domain"          # present only once the template is applied
+MARKER = "Official Domain"          # present only once the template is applied
 COLUMNS = _CFG.entity_cfg["raw_columns"]
 
 WB_IDS = os.path.join(AUTO_DIR, "clay_sync", "evcharge_logs", "wb_ids.json")
@@ -108,8 +108,8 @@ def apply_template(page, wid, event, inspect, dry_run, say):
     clay_ui.open_workbook_by_id(page, wid)
     colcfg.focus_table(page, TABLE)
 
-    if clay_ui._find_header_rect(page, SIGNATURE):
-        say(f"SKIP {event}: template already applied ({SIGNATURE!r} present)")
+    if clay_ui._find_header_rect(page, MARKER):
+        say(f"SKIP {event}: template already applied ({MARKER!r} present)")
         return "already_applied"
 
     allcols.TEMPLATE = TEMPLATE          # reuse the template-picker flow, our name
@@ -188,7 +188,7 @@ def main():
     # run_all_columns resolved TABLE at import time from the default entity config;
     # point it at this entity's table.
     runcols.TABLE = TABLE
-    runcols.V1_SIGNATURE = SIGNATURE
+    runcols.ALL_COLUMNS_MARKER = MARKER
 
     with browser_session.clay_page(headless=not args.headed) as page:
         if not args.run_only:

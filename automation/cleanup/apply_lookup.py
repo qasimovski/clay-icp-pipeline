@@ -27,7 +27,7 @@ _CFG = pcfg.load()
 TABLE = _CFG.main_table
 TEMPLATE = _CFG.templates.get("lookup", "Exhibitors - Lookup & Send Table Data - v1")
 EC = "Enrich Company - Terrapinn - Competitors"
-SIG = "Send table data"   # present => this template already applied
+MARKER = "Send table data"   # present => this template already applied
 
 # find a dropdown entry by exact text, strictly within the field popover column.
 # Wide y-band because the config panel's vertical position varies per workbook;
@@ -175,8 +175,8 @@ def apply_lookup(page, entry, dry_run, say):
     colcfg.focus_table(page, TABLE)
     page.wait_for_timeout(800)
 
-    if clay_ui._find_header_rect(page, SIG):
-        say(f"SKIP {name}: template already applied ({SIG!r} present)")
+    if clay_ui._find_header_rect(page, MARKER):
+        say(f"SKIP {name}: template already applied ({MARKER!r} present)")
         return {"workbook_id": wid, "workbook_name": name, "status": "ok",
                 "note": "already_applied"}
 
