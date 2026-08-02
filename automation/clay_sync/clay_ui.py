@@ -22,8 +22,6 @@ import re
 
 from playwright.sync_api import Page, TimeoutError as PWTimeout
 
-import humanize
-
 TARGET_FOLDER = "Labs [2026 - Qasim]"
 TARGET_SUBFOLDER = "Competitive Events"
 CLAY_URL = "https://app.clay.com"
@@ -90,7 +88,7 @@ def open_target_location(page: Page, subfolder: str = TARGET_SUBFOLDER) -> None:
             return
         except Exception as e:
             last_err = e
-            humanize.dwell(1.5, 3.0)  # let Clay settle, then retry from the top
+            page.wait_for_timeout(1500)  # let Clay settle, then retry from the top
     raise ClayUIError(
         f"Could not navigate to {TARGET_FOLDER!r} / {subfolder!r} after "
         f"3 attempts: {last_err}")
@@ -133,7 +131,7 @@ def list_workbooks(page: Page) -> dict:
         raise ClayUIError(
             f"Workbook listing never hydrated — cannot tell what exists, "
             f"refusing to risk creating a duplicate: {e}")
-    humanize.dwell(1.0, 1.5)
+    page.wait_for_timeout(1000)
     page.wait_for_timeout(3000)  # let the first screen of rows hydrate
 
     first_cell = page.get_by_role("cell").first
@@ -191,7 +189,7 @@ def open_workbook(page: Page, name: str) -> None:
         _scroll_to_cell(page, name)
         _open_cell(page, name)
         _add_table_button(page).wait_for(state="visible", timeout=30000)
-        humanize.dwell(0.5, 1.0)  # let the remaining table tabs render
+        page.wait_for_timeout(500)  # let the remaining table tabs render
     except Exception as e:
         raise ClayUIError(f"Could not open workbook {name!r}: {e}")
 
@@ -223,14 +221,14 @@ def create_workbook_with_csvs(page: Page, name: str, csv_paths: list) -> None:
     """
     try:
         page.get_by_test_id("create-new").click(timeout=15000)
-        humanize.dwell()
+        page.wait_for_timeout(150)
         page.get_by_test_id("new-workbook").click(timeout=15000)
-        humanize.dwell(0.5, 1.0)
+        page.wait_for_timeout(500)
 
         # Name the workbook (label is "title"), commit with Enter.
-        humanize.type_into(page, page.get_by_label("title"), name)
+        page.get_by_label("title").fill(name)
         page.keyboard.press("Enter")
-        humanize.dwell()
+        page.wait_for_timeout(150)
 
         # First table: the empty workbook's "Import from CSV" entry point.
         # No "Continue" step in this flow — straight to the commit footer.
@@ -251,15 +249,15 @@ def _import_csv(page: Page, csv_path: str, has_continue: bool) -> None:
     the first-import flow goes straight to the footer. Readiness is confirmed
     by the caller via _wait_for_table_data — we never wait on networkidle,
     because Clay keeps connections open and it never fires."""
-    humanize.dwell()
+    page.wait_for_timeout(150)
     with page.expect_file_chooser(timeout=15000) as fc:
         page.get_by_text("Browse files").click()
     fc.value.set_files(os.path.abspath(csv_path))
-    humanize.dwell(0.5, 1.0)
+    page.wait_for_timeout(500)
 
     if has_continue:
         page.get_by_role("button", name="Continue").click(timeout=15000)
-        humanize.dwell()
+        page.wait_for_timeout(150)
         # A commit footer may or may not follow Continue — best-effort.
         try:
             _click_footer_commit(page, timeout=10000)
@@ -290,14 +288,14 @@ def add_csv_table(page: Page, csv_path: str) -> None:
     add_table = _add_table_button(page)
     add_table.wait_for(state="visible", timeout=20000)
     add_table.click(timeout=15000)
-    humanize.dwell()
+    page.wait_for_timeout(150)
     # The "Create new table" modal is a large, partly virtualized source picker;
     # clicking the bare "Import from CSV" text is unreliable (off-screen / animated
     # duplicates). Filter via the modal search box to leave a single match, then click.
     search = page.get_by_placeholder("Search")
     search.wait_for(state="visible", timeout=10000)
     search.fill("Import from CSV")
-    humanize.dwell(0.5, 1.0)
+    page.wait_for_timeout(500)
     page.get_by_role("button", name="Import from CSV", exact=True).first.click(timeout=10000)
     _import_csv(page, csv_path, has_continue=True)
 
@@ -312,7 +310,7 @@ def add_csv_table(page: Page, csv_path: str) -> None:
         raise ClayUIError(
             f"Added-table import committed but no {table_name!r} tab appeared: {e}")
     tab.click(timeout=10000)
-    humanize.dwell(0.6, 1.2)  # let the grid re-render for the new table
+    page.wait_for_timeout(600)  # let the grid re-render for the new table
     _wait_for_table_data(page)
 
 
@@ -327,7 +325,7 @@ def _wait_for_table_data(page: Page, timeout: int = 300000) -> None:
         raise ClayUIError(
             f"Import committed but no table data appeared within "
             f"{timeout // 1000}s: {e}")
-    humanize.dwell(0.3, 0.7)  # let the rest of the rows settle
+    page.wait_for_timeout(300)  # let the rest of the rows settle
 
 
 # --------------------------------------------------------------------------
@@ -371,11 +369,11 @@ def open_workbook_by_id(page, workbook_id: str) -> None:
             # The add-table bottom-bar button only exists inside an open
             # workbook, so its presence confirms we landed on the workbook view.
             _add_table_button(page).wait_for(state="visible", timeout=nav_to)
-            humanize.dwell(0.6, 1.2)  # let the table tabs render
+            page.wait_for_timeout(600)  # let the table tabs render
             return
         except Exception as e:
             last_err = e
-            humanize.dwell(1.5, 3.0)
+            page.wait_for_timeout(1500)
     raise ClayUIError(
         f"Could not open workbook id {workbook_id!r} after {attempts} attempts: {last_err}")
 
@@ -702,7 +700,7 @@ def delete_table(page, name: str, verify: bool = True) -> bool:
         raise ClayUIError(
             f"'Delete' menu item not found for table {name!r}; "
             f"visible menu items = {items!r}")
-    humanize.dwell(0.6, 1.1)
+    page.wait_for_timeout(600)
 
     # Confirm dialog if one appears. Scope the button lookup to the dialog so we
     # never click an unrelated page 'Delete'. If no dialog, the delete was
@@ -720,7 +718,7 @@ def delete_table(page, name: str, verify: bool = True) -> bool:
                 break
         except Exception:
             pass
-    humanize.dwell(0.8, 1.5)
+    page.wait_for_timeout(800)
 
     if verify:
         # Poll until the bottom-bar tab is gone (data-heavy tables take a beat).

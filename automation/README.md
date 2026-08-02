@@ -15,8 +15,9 @@ Copied (the reusable engine parts):
 - `clay_sync/` — copy of the original `scrapers/_clay_sync/`: the
   Playwright-driven CSV → Clay-workbook importer (`clay_sync.py`), session
   management (`clay_login.py`, `clay_state.py`), UI navigation primitives
-  (`clay_ui.py`), human-like interaction pacing (`humanize.py`), and an
-  audit script (`clay_audit.py`).
+  (`clay_ui.py`), and an audit script (`clay_audit.py`). (The original
+  randomized human-pacing layer, `humanize.py`, was removed 2026-08-02 in
+  favor of fixed minimal waits — see git history.)
 - `build_automation/` — copy of the original
   `scrapers/Exhibitors_Clay/pilot_interphex/automation/`: shared navigation
   helpers (`common.py`), the column/formula builders (`formula_lib.py`,

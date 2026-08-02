@@ -18,7 +18,6 @@ sys.path.insert(0, CLAY_SYNC_DIR)
 
 import clay_ui          # noqa: E402
 import clay_sync        # noqa: E402  (SESSION_PATH, UA)
-import humanize         # noqa: E402
 
 from playwright.sync_api import sync_playwright  # noqa: E402
 
@@ -122,7 +121,7 @@ def focus_table(page, table):
     tab = page.get_by_role("button", name=table, exact=True).first
     tab.wait_for(state="visible", timeout=30000)
     tab.click(timeout=10000)
-    humanize.dwell(0.6, 1.2)
+    page.wait_for_timeout(600)
     clay_ui._wait_for_table_data(page)
 
 

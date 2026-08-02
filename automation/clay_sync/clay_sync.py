@@ -38,7 +38,6 @@ from playwright.sync_api import sync_playwright
 
 import clay_state
 import clay_ui
-import humanize
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # The scrapers root (with the event folders) is the parent of this folder.
@@ -151,11 +150,7 @@ def sync_normalized(args):
         ctx.add_init_script(
             "Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
 
-        first = True
         for folder, csv_path in targets:
-            if not first:
-                humanize.pace()  # human gap before the next workbook
-            first = False
             # Fresh page per folder: a stuck/slow import shouldn't cascade to
             # every subsequent folder (same reasoning as the create loop below).
             # The is_logged_in check happens on this SAME page (not a separate
@@ -322,11 +317,7 @@ def main():
             sys.exit(1)
         page.close()
 
-        first = True
         for folder, tables, action, sigs in creates:
-            if not first:
-                humanize.pace()  # human gap before the next workbook
-            first = False
             # Give every folder a fresh page. A stuck/slow import (e.g. a very
             # large CSV) can wedge the page; without this, the failure cascades
             # to every subsequent folder in the run.

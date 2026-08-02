@@ -25,7 +25,6 @@ import time
 import common
 import formula_lib
 import clay_ui
-import humanize
 
 
 class GateError(Exception):
@@ -56,7 +55,7 @@ def focus_table(page, table, retries=3):
             tab = page.get_by_role("button", name=table, exact=True).first
             tab.wait_for(state="visible", timeout=30000)
             tab.click(timeout=15000)
-            humanize.dwell(0.6, 1.2)
+            page.wait_for_timeout(600)
             # wait for ANY data cell — c0 may be virtualized out when scrolled right
             page.get_by_test_id(re.compile(r"^cell-r\d+-c\d+$")).first.wait_for(
                 state="visible", timeout=120000)

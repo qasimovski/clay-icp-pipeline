@@ -36,7 +36,6 @@ import sys
 from playwright.sync_api import sync_playwright
 
 import clay_ui
-import humanize
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SESSION_PATH = os.path.join(SCRIPT_DIR, ".clay_session.json")
@@ -153,11 +152,11 @@ def open_subfolder(page):
             if EVCHARGE_SUBFOLDER_ID not in page.url:
                 raise clay_ui.ClayUIError(
                     f"landed outside the target subfolder: {page.url}")
-            humanize.dwell(0.8, 1.5)
+            page.wait_for_timeout(800)
             return
         except Exception as e:
             last_err = e
-            humanize.dwell(1.5, 3.0)
+            page.wait_for_timeout(1500)
     raise clay_ui.ClayUIError(
         f"Could not open the EVCharge/Competitive Events subfolder: {last_err}")
 
@@ -278,11 +277,7 @@ def main():
             sys.exit(1)
         probe.close()
 
-        first = True
         for folder, csv_path in todo:
-            if not first:
-                humanize.pace()
-            first = False
             # Fresh page per folder so one stuck import can't cascade.
             page = ctx.new_page()
             try:
