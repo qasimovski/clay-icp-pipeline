@@ -14,7 +14,7 @@ Usage:
     cfg.main_table            # 'Exhibitors_normalized'
     cfg.seller_people_table   # 'Sellers - People'
     cfg.buyer_people_table    # 'Buyers - People'
-    cfg.seller_builds         # [{name, job_title_mode, job_titles, [experience]}, ...]
+    cfg.seller_searches         # [{name, job_title_mode, job_titles, [experience]}, ...]
     cfg.seller_countries      # location list for the seller Find-People searches
     cfg.buyer_segments        # [{segment, exact, contains}, ...]
     cfg.buyer_countries       # 50-country location list for buyer searches
@@ -63,7 +63,7 @@ class PipelineConfig:
         self.buyer_people_table = tables.get("buyer_people", "Buyers - People")
         seller = self.people_cfg.get("seller", {})
         buyer = self.people_cfg.get("buyer", {})
-        self.seller_builds = seller.get("builds", [])
+        self.seller_searches = seller.get("searches", [])
         self.seller_countries = seller.get("location_countries", [])
         self.buyer_segments = buyer.get("segments", [])
         self.buyer_countries = buyer.get("location_countries", [])
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     print(f"  main_table         = {c.main_table}")
     print(f"  seller_people_table= {c.seller_people_table}")
     print(f"  buyer_people_table = {c.buyer_people_table}")
-    print(f"  seller_builds      = {[b['name'] for b in c.seller_builds]}")
+    print(f"  seller_searches      = {[b['name'] for b in c.seller_searches]}")
     print(f"  seller_countries   = {len(c.seller_countries)}")
     print(f"  buyer_segments     = {len(c.buyer_segments)}")
     print(f"  buyer_countries    = {len(c.buyer_countries)}")

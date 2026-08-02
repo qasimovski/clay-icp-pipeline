@@ -34,9 +34,9 @@ raw_columns:
   - Website
 
 field_sources:
-  country_source_field: Country
-  description_source_field: Description
-  website_source_field: Website
+  country: Country
+  description: Description
+  website: Website
 
 # trim_columns pass: the through-import base is the 6 raw columns above, in CSV
 # order, so the cut is Website (the last one).

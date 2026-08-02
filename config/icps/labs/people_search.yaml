@@ -5,7 +5,7 @@
 # the table names (config/entity-types/<entity>.yaml: tables) change per entity.
 #
 # seniority: the 11 Find-People seniority levels (shared seller+buyer).
-# seller.builds: the 3 sequential 'Find people' seller searches (exact/contains).
+# seller.searches: the 3 sequential 'Find people' seller searches (exact/contains).
 # buyer.segments: per-Classification job-title lists; each runs an exact then a
 #   contains Find-People search (Clay's Job Title field is single-mode).
 # *.location_countries: the Find-People Location filter (Germany intentionally excluded).
@@ -31,7 +31,7 @@ seller:
   - Netherlands
   - Japan
   - China
-  builds:
+  searches:
   - name: 1st
     job_title_mode: exact
     job_titles:

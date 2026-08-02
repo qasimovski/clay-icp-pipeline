@@ -53,7 +53,7 @@ def configure(entity=None, icp=None):
     BUILDS = [{"name": b["name"], "jobTitleMode": b["job_title_mode"],
                "jobTitles": b["job_titles"],
                **({"experience": b["experience"]} if b.get("experience") else {})}
-              for b in cfg.seller_builds]
+              for b in cfg.seller_searches]
     return cfg
 
 

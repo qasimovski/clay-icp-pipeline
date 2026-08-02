@@ -35,8 +35,8 @@ TEMPLATE = _CFG.templates.get("all_columns", "Exhibitors - All Columns - v1")
 # both taken from config/entity-types/<entity>.yaml: field_sources. Company Name /
 # Website are pre-filled by auto-map and skipped.
 _FS = _CFG.entity_cfg.get("field_sources", {})
-_COUNTRY_FIELD = _FS.get("country_source_field", "Country")
-_DESC_FIELD = _FS.get("description_source_field", "Description")
+_COUNTRY_FIELD = _FS.get("country", "Country")
+_DESC_FIELD = _FS.get("description", "Description")
 # Prefer an explicit template_v1_fill from the entity config (list of
 # [field_label, column]); else fall back to the field_sources-derived pair.
 _EXPLICIT_FILL = _CFG.entity_cfg.get("template_v1_fill")

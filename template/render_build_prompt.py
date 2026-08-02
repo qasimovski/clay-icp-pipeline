@@ -128,7 +128,7 @@ def render(entity_key, icp_key):
 
     tables = entity_cfg["tables"]
     field_sources = entity_cfg["field_sources"]
-    gating = entity_cfg["gating"]
+    run_conditions = entity_cfg["run_conditions"]
 
     replacements = {
         "{{ICP_NAME}}": icp_cfg["icp_name"],
@@ -144,9 +144,9 @@ def render(entity_key, icp_key):
         "{{EVENTS_FOLDER}}": local_cfg["events_folder"],
         "{{BLOCKLIST_TABLE}}": local_cfg["blocklist_table"],
         "{{RAW_COLUMNS}}": ", ".join(entity_cfg["raw_columns"]),
-        "{{WEBSITE_SOURCE_FIELD}}": field_sources["website_source_field"],
-        "{{COUNTRY_SOURCE_FIELD}}": field_sources["country_source_field"],
-        "{{DESCRIPTION_SOURCE_FIELD}}": field_sources["description_source_field"],
+        "{{WEBSITE_SOURCE_FIELD}}": field_sources["website"],
+        "{{COUNTRY_SOURCE_FIELD}}": field_sources["country"],
+        "{{DESCRIPTION_SOURCE_FIELD}}": field_sources["description"],
         "{{ENRICH_COMPANY_FIELDS}}": ", ".join(entity_cfg["enrich_company_fields"]),
         "{{COUNTRY_NORMALIZATION_BLOCK}}": format_country_normalization(icp_cfg["country_normalization"]),
         "{{CLASSIFIER_NAME}}": icp_cfg["classifier"]["name"],
@@ -160,13 +160,13 @@ def render(entity_key, icp_key):
         "{{KNOWN_ISSUES_BLOCK}}": format_known_issues(icp_cfg),
         "{{OFFICIAL_DOMAIN_GATING_TEXT}}": (
             "only runs when the domain is still unknown after normalization —"
-            if gating.get("official_domain_skip_if_domain_known") else
+            if run_conditions.get("official_domain_skip_if_domain_known") else
             "runs unconditionally —"
         ),
         "{{FANOUT_GATING_TEXT}}": (
             "Gate each action on `{{Side}}` matching its destination (do not send Buyer rows to the Seller table or vice versa)."
-            if gating.get("fanout_gated_on_side") else
-            "(no gating configured for this entity type — see docs/KNOWN_ISSUES.md)"
+            if run_conditions.get("people_fanout_only_if_side") else
+            "(no run conditions configured for this entity type — see docs/KNOWN_ISSUES.md)"
         ),
     }
 

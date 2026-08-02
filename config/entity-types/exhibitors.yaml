@@ -47,9 +47,9 @@ raw_columns:
 # Which raw column feeds each pipeline-generic step (see
 # docs/PIPELINE_ARCHITECTURE.md for what each of these does).
 field_sources:
-  country_source_field: Country
-  description_source_field: Description
-  website_source_field: Website
+  country: Country
+  description: Description
+  website: Website
 
 # trim_columns pass: keep columns up to and including this one, delete everything to
 # its right (reverts a workbook to the through-import base before re-templating).
@@ -77,9 +77,9 @@ enrich_company_fields:
 
 # Whether Send Table Data actions are gated on {{Side}} — see
 # docs/KNOWN_ISSUES.md #2 and #4. Exhibitors is the mature/correct reference.
-gating:
+run_conditions:
   official_domain_skip_if_domain_known: true
-  fanout_gated_on_side: true
+  people_fanout_only_if_side: true
 
 # Seller-only. Exhibitors uses the full 2D Fit x Country Fit matrix.
 composite_tier:

@@ -48,9 +48,9 @@ raw_columns:
   - Year
 
 field_sources:
-  country_source_field: Location
-  description_source_field: Company Description
-  website_source_field: Website
+  country: Location
+  description: Company Description
+  website: Website
 
 # trim_columns pass: keep columns up to and including this one, delete everything to
 # its right. Sponsors' raw base is Event, Company Name, Address, Website, Location,
@@ -86,12 +86,12 @@ enrich_company_fields:
   - Total Funding Amount
   - Description
 
-# Canonical/mature gating (matches Exhibitors) — see docs/KNOWN_ISSUES.md #2
+# Canonical/mature run conditions (matches Exhibitors) — see docs/KNOWN_ISSUES.md #2
 # and #4. Some live Sponsors replica tables are missing these gates; that's
 # drift to fix on those tables separately, not the intended behavior.
-gating:
+run_conditions:
   official_domain_skip_if_domain_known: true
-  fanout_gated_on_side: true
+  people_fanout_only_if_side: true
 
 # The one rule that genuinely differs from Exhibitors (not drift — this is
 # how the Labs ICP workbook itself defines Sponsors sellside tiering):
