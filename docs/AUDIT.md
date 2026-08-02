@@ -1,5 +1,11 @@
 # Repository Audit — Phase 1
 
+> **Status (2026-08-02, post-Phase 3):** the findings below are recorded **as
+> they were found**, and the file/symbol names are the pre-rename ones (see
+> `docs/NAMING.md` for the mapping). Most CRITICAL/HIGH items are now fixed —
+> see the "Remediation status" table at the end of this file for what was
+> fixed, what was deliberately left, and why.
+
 Date: 2026-08-02 · Branch: `refactor/clay-terminology` · Scope: full repo at commit `a2e89b6`
 Method: full read of `automation/build_automation` (2,545 LOC) and `automation/clay_sync` (2,082 LOC), all 59 scripts in `automation/cleanup` (12,082 LOC), `blocklist_ledger/`, `template/`, `config/`, and `docs/`. High-severity claims were re-verified by hand against source before inclusion.
 
@@ -258,6 +264,50 @@ Reference vocabulary (Clay product terms, verified in-product/docs during Phase 
 `workbook`, `table`, `column`, `view`, `waterfall`, `enrichment`, `run condition` (in comments), `auto_run_off`, `Claygent`, `open_workbook_by_id`, `focus_table`, `pipeline_config`, entity/ICP axis and its glossary (`docs/GTM_METHODOLOGY.md:143-151`). Generic infrastructure (pacing, retries, CDP, state ledger) correctly keeps generic names and should not be forced into Clay vocabulary.
 
 ---
+
+## Remediation status (Phase 3)
+
+Fixed, each in its own commit on `refactor/clay-terminology`, with tests:
+
+| Finding | Fix | Commit |
+|---|---|---|
+| C8 state corruption/truncation | `state_io.py`: atomic `os.replace` writes; corrupt load raises instead of returning `{}`. Applied to ~19 copies + `csv_push_state`, `import_evcharge`, `rollout` | `de914b7` |
+| C1 unguarded fleet re-run | `run_all_columns` checks the marker column's own status; `--force` to override | `ca3b180` |
+| C2 evcharge re-spend | `PRE_DONE` always honored; run outcome recorded; state via `state_io` | `87c7415` |
+| C3 sharded double-charge guard | per-shard run log derived automatically; `merge_shards --base` can fold them back | `524c26f` |
+| C4 CLI failure = "empty table" | `check_table_rows` prints no number on failure; unknown ≠ 0, kept and ordered last | `6f6ac12` |
+| C6 false completion signal | `column_completion.py`: table banner **and** column status must agree | `fd101c1` |
+| C10 fail-closed latch | pre-checks return tri-state; unknown defers the event instead of recording done | `ede737b` |
+| C9 / C16 / leaks | `existing_tables` raises rather than reporting absence; `is_logged_in` needs positive evidence; two browser leaks | `4e1c13e` |
+| C14 render_build_prompt | clear failures for missing keys/config, real placeholder scan, UTF-8 stdout, `REPLACE_ME` refused | `b97bfcf` |
+| C15 unstable ordering | scope sorted before sharding; `--after` default dropped | `e83ac07` |
+| C5 worker queue | settled reads, O_EXCL lock, `worker_wait` argv validation | `d19c073` |
+| MEDIUM (build path) | blocklist nav retry + badge parse, `bounding_box` guard, `_contacts_ct` try/finally, `assert` → raise | `bb55cad` |
+| E5 / E7 | one hydration + `open_workbook_by_id`; blocklist destination memoized (cap still enforced live) | `5770f58` |
+| E6 / E8 / E9 | O(N²) listing scan removed (safe direction only); 16s sleeps → condition waits; one nav per workbook | `45f5e7c` |
+| E3 superseded credit code | `CLAY_ALLOW_SUPERSEDED=1` required; SUPERSEDED banners | `d87149d` |
+| Committed live ids / E11 | ids resolve from env or `local.yaml`; `check_column_fill` marks truncation | `92a418a` |
+| Deps / line endings / test docs | `requirements.txt`, `.gitattributes`, `tests/README.md` | `f8832fe` |
+
+**Deliberately left alone** (flagged, not done):
+
+- **`worker.py`'s `exec()` design.** Its trust boundary is now documented and
+  the concrete bugs fixed, but the mechanism itself is unchanged — replacing it
+  with a named-operation dispatch is a design change, not a bug fix.
+- **Deleting the ~1,570 lines of superseded code** (`apply_findworkemail_*`,
+  `apply_tpl_*`, `apply_companies_lookup_event`). Guarded and labelled instead;
+  deletion is the owner's call.
+- **The ~1,900–2,300 lines of duplication** (§3.1). Extracting `rollout_lib` /
+  `clay_panel` is the structural rewrite the audit recommends; `state_io.py` and
+  `column_completion.py` are the two pieces that were pulled out because a
+  correctness fix needed a single home. The rest is unaddressed.
+- **Dead on-disk artifacts** (§3.3, ~700 KB JSON + 1.4 MB logs). Untracked, so
+  no repo impact; deleting another run's state is not a call to make blind.
+- **Docs drift** (§3.4): the RUNBOOK still omits the newer passes, and there is
+  still no `config/entity-types/speakers.yaml`.
+- **`04_backfill.sql`** is marked superseded rather than repaired, since
+  `load_csv.js` already replaces it.
+- **Sequential fleets / no concurrency** (E12) and the remaining fixed sleeps.
 
 ## Appendix: verification notes
 
