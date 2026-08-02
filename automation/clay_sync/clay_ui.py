@@ -360,9 +360,39 @@ def _wait_for_table_data(page: Page, timeout: int = 300000) -> None:
 # manifest or worker can never remove a normalized source table.
 KEEP_NEVER_DELETE = {"Exhibitors_normalized", "Sponsors_normalized"}
 
-# Workspace id used to build canonical workbook URLs. Override via env if the
-# session belongs to a different workspace.
-WORKSPACE_ID = os.environ.get("CLAY_WORKSPACE_ID", "448891")
+# Workspace id used to build canonical workbook URLs. A live workspace id
+# identifies a real Clay account, so per docs/SENSITIVE_DATA.md it comes from
+# the environment or gitignored config/local.yaml — it is not a tracked
+# default. Resolved lazily so importing this module never fails; only the
+# functions that build URLs need it.
+def _workspace_id():
+    val = os.environ.get("CLAY_WORKSPACE_ID")
+    if val:
+        return val.strip()
+    here = os.path.dirname(os.path.abspath(__file__))          # automation/clay_sync
+    local = os.path.join(os.path.dirname(os.path.dirname(here)),
+                         "config", "local.yaml")
+    try:
+        with open(local, encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if line.startswith("workspace_id:"):
+                    return line.split(":", 1)[1].strip().strip("\"'")
+    except OSError:
+        pass
+    raise ClayUIError(
+        "missing workspace id: set $CLAY_WORKSPACE_ID or add "
+        f"`workspace_id: \"...\"` to {local} (see config/local.yaml.example)")
+
+
+class _WorkspaceId:
+    """Resolves on first use and reads like the old module constant."""
+
+    def __str__(self):
+        return _workspace_id()
+
+
+WORKSPACE_ID = _WorkspaceId()
 
 
 def open_workbook_by_id(page, workbook_id: str) -> None:

@@ -48,6 +48,7 @@ def main():
         print("0 0")
         return 0
     rows, cur, pages = [], None, 0
+    truncated = False
     while pages < 20:
         args = ["tables", "rows", "list", tid, "--limit", "100"]
         if cur:
@@ -58,12 +59,23 @@ def main():
         pages += 1
         if not cur:
             break
+    else:
+        # Hit the 20-page cap with more rows still to come: the totals below
+        # are a floor, not the table's real size. Say so rather than letting
+        # a caller order batches by a silently-wrong row count.
+        truncated = bool(cur)
     filled = 0
     for r in rows:
         cell = (r.get("cells") or {}).get(fid)
         if isinstance(cell, dict) and cell.get("value"):
             filled += 1
-    print(f"{filled} {len(rows)}")
+    # "<filled> <sampled>" — callers only test filled > 0, which a partial
+    # sample answers correctly; the trailing marker keeps the truncation
+    # visible to anyone reading the number as a table size.
+    print(f"{filled} {len(rows)}{' truncated' if truncated else ''}")
+    if truncated:
+        print(f"note: stopped at {len(rows)} rows (20-page cap); table is "
+              f"larger", file=sys.stderr)
     return 0
 
 

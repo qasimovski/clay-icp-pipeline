@@ -9,14 +9,37 @@ current table's row count and source count before every send and rolls over
 to the next table (Table 2, Table 3, ...), creating it if needed, so callers
 always get back a destination path with room for one more source.
 """
+import os
 import re
 
+import browser_session
+import clay_ui
 import column_config as colcfg
 
-TABLE1_URL = ("https://app.clay.com/workspaces/448891/workbooks/"
-              "wb_0thngorwWnTjpruUykJ/tables/t_0thngozNZTVZ4cYPz3i/"
-              "views/gv_0thngozjQPZ8XmH6KuZ")
-BLOCKLIST_WORKBOOK_PATH = ["Home", "Labs [2026 - Qasim]", "Labs - Block List - Companies"]
+# Live workspace/workbook/table/view ids identify a real Clay account, so per
+# docs/SENSITIVE_DATA.md they belong in gitignored config/local.yaml or the
+# environment — never hard-coded here. (They were hard-coded here, which is
+# exactly what that policy forbids; see docs/AUDIT.md.)
+_BLOCKLIST_KEYS = ("blocklist_workbook_id", "blocklist_table_id",
+                   "blocklist_view_id")
+
+
+def _blocklist_url():
+    wid = browser_session.local_setting(
+        "blocklist_workbook_id", "CLAY_BLOCKLIST_WORKBOOK_ID")
+    tid = browser_session.local_setting(
+        "blocklist_table_id", "CLAY_BLOCKLIST_TABLE_ID")
+    vid = browser_session.local_setting(
+        "blocklist_view_id", "CLAY_BLOCKLIST_VIEW_ID")
+    return (f"{clay_ui.CLAY_URL}/workspaces/{clay_ui.WORKSPACE_ID}"
+            f"/workbooks/{wid}/tables/{tid}/views/{vid}")
+
+
+BLOCKLIST_WORKBOOK_PATH = [
+    "Home",
+    os.environ.get("CLAY_TARGET_FOLDER", clay_ui.TARGET_FOLDER),
+    os.environ.get("CLAY_BLOCKLIST_WORKBOOK", "Labs - Block List - Companies"),
+]
 
 MAX_SOURCES = 20
 MAX_ROWS = 50000
@@ -121,10 +144,11 @@ def ensure_destination(page, log=None):
     # pattern already proven inside every event build.
     # Retried like every other navigation in the codebase (clay_ui retries 6x):
     # a single flake here used to fail the whole blocklist step for the event.
+    table1_url = _blocklist_url()
     last = None
     for attempt in range(4):
         try:
-            page.goto(TABLE1_URL, wait_until="domcontentloaded", timeout=45000)
+            page.goto(table1_url, wait_until="domcontentloaded", timeout=45000)
             page.get_by_text(re.compile(r"^[\d,]+/[\d,]+ rows$")).first.wait_for(
                 state="visible", timeout=30000)
             break

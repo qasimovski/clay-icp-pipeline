@@ -19,7 +19,12 @@ import blocklist_send  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def fresh_memo():
+def fresh_memo(monkeypatch):
+    # The destination URL now comes from config/local.yaml or the
+    # environment (never tracked source), so supply it here.
+    monkeypatch.setattr(blocklist_send, "_blocklist_url",
+                        lambda: "https://app.clay.com/workspaces/1/"
+                                "workbooks/wb_t/tables/t_t/views/gv_t")
     blocklist_send.reset_destination_memo()
     yield
     blocklist_send.reset_destination_memo()

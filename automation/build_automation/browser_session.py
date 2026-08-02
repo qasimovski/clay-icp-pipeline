@@ -36,6 +36,49 @@ os.makedirs(SHOTS_DIR, exist_ok=True)
 WORKBOOK = "Interphex"
 MAIN_TABLE = "Exhibitors_normalized"
 
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", ".."))
+LOCAL_CONFIG = os.path.join(REPO_ROOT, "config", "local.yaml")
+
+
+def local_setting(key, env_var, default=None):
+    """Read an account-specific id from the environment or config/local.yaml.
+
+    Both are outside git (docs/SENSITIVE_DATA.md), so live workspace/workbook
+    ids never have to be hard-coded in tracked source. Parsed with a small
+    scan rather than PyYAML to keep this module's dependency set unchanged.
+
+    Unlike the older copy of this reader in import_evcharge.py, a value
+    containing '#' is not truncated: only an unquoted '#' that starts a
+    comment is stripped.
+    """
+    val = os.environ.get(env_var)
+    if val:
+        return val.strip()
+    try:
+        with open(LOCAL_CONFIG, encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line.startswith(f"{key}:"):
+                    continue
+                value = line.split(":", 1)[1].strip()
+                if value[:1] in ("'", '"'):
+                    quote = value[0]
+                    end = value.find(quote, 1)
+                    if end != -1:
+                        return value[1:end]
+                # Unquoted: a '#' only starts a comment when preceded by space.
+                cut = value.find(" #")
+                if cut != -1:
+                    value = value[:cut]
+                return value.strip()
+    except OSError:
+        pass
+    if default is not None:
+        return default
+    raise VerificationError(
+        f"missing {key!r}: set ${env_var} or add `{key}: \"...\"` to "
+        f"{LOCAL_CONFIG} (see config/local.yaml.example)")
+
 
 def screenshot(page, name):
     path = os.path.join(SHOTS_DIR, f"{name}.png")
