@@ -210,6 +210,66 @@ per-shard state (`buyer_state_<slug>_w{i}.json`), merged by `merge_shards.py
 low-RAM machine run a single worker (the builds already use memory-lean
 Chromium flags in `browser_session.py`).
 
+### Step i — export the finished tables to CSV
+
+Read-only against Clay apart from the two view edits called out below. Writes
+`<export_root>/[<Folder>/]<Workbook>/<Table name>.csv` (`export_root` comes from
+`$CLAY_EXPORT_ROOT` or `config/local.yaml`).
+
+**Clay's CSV export is the DEFAULT VIEW, not the table.** Filtered rows and
+hidden columns are both silently dropped, and the file gives no hint that it is
+short — so the order below is: audit → clear filters → unhide → export once.
+Skipping the audit ships empty CSVs that look like empty tables (nine tables
+across the 2026-08 run exported 0 rows, one of 18,299).
+
+```bash
+cd automation/cleanup
+
+# 1. which views filter rows?  (read-only; records visible/total + filter count)
+python audit_view_filters.py --out filters_audit_w0.json --shards 3 --shard 0
+python read_view_filters.py  --audit "filters_audit_w*.json" --out filters_detail.json
+
+# 2. clear those filters (screenshots each popover first — see below)
+python clear_filters_and_export.py --audit "filters_audit_w*.json" --dry-run
+python clear_filters_and_export.py --audit "filters_audit_w*.json" --no-export
+
+# 3. unhide Created At / Updated At and download, one pass
+python unhide_timestamps_and_export.py --include-missing --shards 3 --shard 0
+
+# a plain re-download, no view changes:
+python export_event_tables_rollout.py --list | --dry-run | --shards 3 --shard 0
+```
+
+Other Clay folders are the same passes with two flags — `--workbooks <manifest>`
+picks the scope file and `{event}` in `--tables` expands to the workbook name:
+
+```bash
+--workbooks other_sources_workbooks.json   --tables "{event}_normalized" "Sellers - People" "Buyers - People"
+--workbooks product_services_workbooks.json --tables "Companies" "People"
+--workbooks buyside_ps_workbooks.json       --tables "Companies" "People"
+```
+
+Guards worth keeping — each exists because it caught a silent corruption:
+
+- **Identity.** Clay names the download after the table it actually exported, so
+  it is asserted against the requested table *before* the file is saved. A tab
+  click that has not landed exports the previous table under the new name, with
+  a plausible size and no error. Clay spells `&` as `and` in that filename.
+- **Focus.** A table tab is confirmed by the header breadcrumb, never by a sleep.
+- **Post-download modal.** "Your export was downloaded!" sits behind a
+  full-viewport backdrop that swallows the next tab click; dismiss it explicitly.
+- **The Tools panel.** Ctrl+E *toggles* it, and the Export tab must be matched by
+  `role="tab"` — a plain text match also hits a grid cell reading "Export".
+- **Filters can only be screenshotted, not read.** The chip's column name is
+  absent from the DOM, so `clear_filters_shots/` is the only record of what a
+  view filtered on. Clearing is verified by funnel badge 0 **and** rows `X/X`.
+- **Hidden columns.** Unhide one column per panel session (the panel re-sorts),
+  click only what the exported header proves is missing (the eye is a toggle),
+  and verify against that header — the columns chip can read `+2` while one
+  column never arrived.
+- **The rows chip races the grid**, reading `0/N` until it populates; poll until
+  `visible == total` or the value settles.
+
 ## 4. Verify
 
 ```bash
