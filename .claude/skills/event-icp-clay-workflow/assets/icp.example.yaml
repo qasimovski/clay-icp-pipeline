@@ -1,0 +1,653 @@
+# Worked example: the Highways ICP (live in Clay, Oct 2026), in the format icp_mapping.py reads.
+# A new event replaces every list with values taken from ITS ICP workbook — confirmed with the user,
+# column by column. Category keys must match the classifier prompt's labels exactly.
+#
+# seniority: Clay slugs. seniority_groups A/B must partition it (the 10-per-search split).
+# exclude_titles: whole-word "contains" exclusions, applied in the search and again at export.
+# sell.categories: Sell Side label -> countries (people location, not company HQ).
+# buy.categories: Buy Side label -> titles (+ optional countries; else default_countries).
+seniority:
+- founder
+- owner
+- board-member
+- partner
+- c-suite
+- vp
+- director
+- head
+- manager
+- senior
+- mid-level
+seniority_groups:
+  A:
+  - founder
+  - owner
+  - board-member
+  - partner
+  - c-suite
+  - vp
+  - director
+  B:
+  - head
+  - manager
+  - senior
+  - mid-level
+exclude_titles:
+- HR
+- Human Resources
+- Talent
+- People
+- Recruitment
+- Recruiter
+- Hiring
+- Administrative
+- Admin
+- Secretary
+- Receptionist
+- Coordinator
+- Office Manager
+- Finance
+- Accounting
+- Accountant
+- Controller
+- Lawyer
+- Attorney
+- Compliance
+- Risk
+- Audit
+- Social Media
+- Content
+- Copywriter
+- Designer
+- Graphic
+- UX
+- UI
+- Developer
+- Software
+- DevOps
+- Data Analyst
+- Customer Success
+- Help Desk
+- Facilities
+- Security
+- Janitorial
+- Intern
+- Trainee
+- Contractor
+- Freelance
+- Temp
+- Vendor
+- Third Party
+- Investor
+- QA
+- Quality
+- Platform
+- Apprentice
+- Assistant
+- Graduate
+- Student
+- Volunteer
+sell:
+  titles:
+  - CEO
+  - Chief Executive Officer
+  - COO
+  - Chief Operating Officer
+  - CTO
+  - Chief Technology Officer
+  - CFO
+  - Chief Financial Officer
+  - CSO
+  - Chief Sustainability Officer
+  - CCO
+  - Chief Commercial Officer
+  - CMO
+  - Chief Marketing Officer
+  - CPO
+  - Chief Procurement Officer
+  - Chief Development Officer
+  - Managing Director
+  - MD
+  - President
+  - Partner
+  - Founder
+  - Co-Founder
+  - Owner
+  - VP
+  - Vice President
+  - General Manager
+  - Account Manager
+  - Regional Director
+  - Brand
+  - Business Development
+  - Commercial
+  - Communications
+  - Construction
+  - Country Manager
+  - Event
+  - Executive Director
+  - Growth
+  - Highways
+  - Infrastructure
+  - Innovation
+  - Lead Generation
+  - Marketing
+  - Mobility
+  - National
+  - Partnerships
+  - Portfolio Manager
+  - Product
+  - Project
+  - Public Relations
+  - PR
+  - Revenue
+  - Sales
+  - Sponsorship
+  - Strategic
+  - Strategy
+  - Technical
+  - Trade Fair
+  - Transport
+  - Transportation
+  - Procurement
+  - Bid
+  - Tender
+  - Estimating
+  - Asset
+  categories:
+    Certification and Training:
+    - Australia
+    - Indonesia
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Construction Equipment: &id001
+    - Australia
+    - China
+    - France
+    - India
+    - Indonesia
+    - Ireland
+    - Italy
+    - Netherlands
+    - New Zealand
+    - Saudi Arabia
+    - Turkey
+    - United Kingdom
+    - United Arab Emirates
+    Construction Materials: *id001
+    Construction Vehicle: *id001
+    Commercial and Traffic Management Vehicles: *id001
+    Digital, Data and AI Solutions:
+    - Australia
+    - Austria
+    - Belgium
+    - France
+    - Indonesia
+    - Ireland
+    - Italy
+    - Netherlands
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Digital Construction Solutions: &id002
+    - Australia
+    - France
+    - Indonesia
+    - Ireland
+    - Italy
+    - Netherlands
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Geotechnical and Surveying:
+    - Australia
+    - France
+    - Indonesia
+    - Netherlands
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Green Infrastructure:
+    - Australia
+    - France
+    - Indonesia
+    - Ireland
+    - Netherlands
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Intelligent Transport Systems (ITS) & Traffic Technology: *id002
+    Professional Services:
+    - Australia
+    - Indonesia
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Road Marking and Signage: *id001
+    Street and City Infrastructure: *id002
+    Traffic Management & Control:
+    - Australia
+    - Indonesia
+    - Ireland
+    - Netherlands
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Water & drainage management: &id004
+    - Australia
+    - Austria
+    - Belgium
+    - France
+    - Indonesia
+    - Netherlands
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Welfare & Site Facilities: &id003
+    - Australia
+    - Indonesia
+    - Ireland
+    - New Zealand
+    - Saudi Arabia
+    - United Kingdom
+    - United Arab Emirates
+    Major Contractors and Consultancies: *id003
+    Parking Technology: *id004
+    Road Construction & Civil: *id004
+    Asset Management & Maintenance: *id004
+    Tolling & Road User Charging: *id004
+    Utilities & Underground Infrastructure: *id004
+    Transport Operations & Systems: *id004
+buy:
+  default_countries:
+  - Australia
+  - New Zealand
+  - Saudi Arabia
+  - United Arab Emirates
+  - United Kingdom
+  categories:
+    National (State) Government:
+      titles:
+      - Planning
+      - Engineering
+      - Construction
+      - Infrastructure
+      - Road
+      - Roads
+      - Highways
+      - Transport
+      - Asset Management
+      - Maintenance
+      - Operations
+      - Traffic
+      - Resilience
+      - Emergency Planning
+      - Environment
+      - Nature Recovery
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Climate
+      - Innovation
+      - Technology
+      - Digital
+      - Smart Infrastructure
+      - Vehicles
+      - Policy
+      - Strategy
+      - Investment
+      - Procurement
+      - Commercial
+      - Corridor Planning
+      - Incident Management
+      - Emergency Response
+      - Network Operations
+      - Network Strategy
+      - Capital Projects
+      - Partnerships
+      - Funding
+      - Regulation
+      - Program Management
+      - Programme Management
+      - Chief Executive
+      - Managing Director
+      - Director General
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Chief Engineer
+      - Chief Technology Officer
+      - Chief Technical Officer
+    Regional (Federal) Government:
+      titles:
+      - Highways
+      - Road
+      - Roads
+      - Procurement
+      - Engineering
+      - Engineer
+      - Transport
+      - Investment
+      - Innovation
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Intelligent Traffic Systems
+      - Intelligent Transport Systems
+      - Data
+      - Bridge
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Waste
+      - Planning
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Incident Management
+      - Emergency Response
+      - Network Operations
+      - Capital Projects
+      - Devolution
+      - Combined Authority
+      - Program Management
+      - Programme Management
+      - Chief Executive
+      - Managing Director
+      - Director General
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Chief Engineer
+      - Chief Technology Officer
+      - Chief Technical Officer
+    Local Government:
+      titles:
+      - Road
+      - Roads
+      - Highways
+      - Procurement
+      - Engineering
+      - Transport
+      - Innovation
+      - Investment
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Asset Performance
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Intelligent Traffic Systems
+      - Intelligent Transport Systems
+      - Data
+      - Bridge
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Drainage
+      - Waste
+      - Planning
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Incident Management
+      - Emergency Response
+      - Street Works
+      - Street Scene
+      - Traffic
+      - Network Manager
+      - Program Management
+      - Programme Management
+      - Chief Executive
+      - Managing Director
+      - Director General
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Chief Engineer
+      - Chief Technology Officer
+      - Chief Technical Officer
+    Major Engineering Contractors / Tier 1 Contractor:
+      titles:
+      - Bid
+      - Supply Chain
+      - Highways
+      - Roads
+      - Procurement
+      - Engineer
+      - Transport
+      - Innovation
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Asset Performance
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Continuous Improvement
+      - Intelligent Traffic Systems
+      - Data
+      - Bridges
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Waste
+      - Planning
+      - Surveyor
+      - Preconstruction
+      - Estimator
+      - Site
+      - Chief Engineer
+      - Major Projects
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Capital Projects
+      - Program Management
+      - Programme Management
+      - Chief Executive
+      - Managing Director
+      - Director General
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Chief Technology Officer
+      - Chief Technical Officer
+      - COO
+      - CTO
+    Sub-engineering contractors:
+      titles:
+      - Bid
+      - Supply Chain
+      - Highways
+      - Roads
+      - Procurement
+      - Engineer
+      - Transport
+      - Innovation
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Asset Performance
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Intelligent Traffic Systems
+      - Intelligent Transport Systems
+      - Data
+      - Bridge
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Waste
+      - Planning
+      - Major Projects
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Program Management
+      - Programme Management
+      - Chief Executive
+      - Managing Director
+      - Director General
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Chief Engineer
+      - Chief Technology Officer
+      - Chief Technical Officer
+      - COO
+      - CTO
+    Road / Bridge / Tunnel Operator:
+      titles:
+      - Highways
+      - Roads
+      - Procurement
+      - Engineer
+      - Transport
+      - Innovation
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Intelligent Traffic Systems
+      - Intelligent Transport Systems
+      - Data
+      - Construction
+      - Bridges
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Waste
+      - Drainage
+      - Planning
+      - Major Projects
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Incident Management
+      - Network Operations
+      - Network Strategy
+      - Concession
+      - Toll
+      - Tolling
+      - Program Management
+      - Programme Management
+      - Chief Executive
+      - Managing Director
+      - Director General
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Chief Engineer
+      - Chief Technology Officer
+      - Chief Technical Officer
+    Parking Operations:
+      titles:
+      - Commercial
+      - Contract
+      - Technology
+      - Innovation
+      - Infrastructure
+      - Planning
+      - Contracts
+      - Tendering
+      - Parking
+      - Operations
+      - Chief Executive
+      - Managing Director
+      - Director General
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Chief Engineer
+      - Chief Technology Officer
+      - Chief Technical Officer
+      - CEO
+      - COO
+    Finance, Investment, Legal:
+      titles:
+      - Investment
+      - Portfolio Manager
+      - Advisor
+      - Infrastructure
+      - Public Policy
+      - Consultant
+      - Principal
+      - Business Development
+      - Project Finance
+      - Transaction
+      - Legal
+      - Counsel
+      - Chief Executive
+      - Managing Director
+      - Director General
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Chief Engineer
+      - Chief Technology Officer
+      - Chief Technical Officer
+# rescue_titles: EXACT senior titles that survive an exclusion hit at export
+# ("Chief Executive Officer - Software" is still a CEO). Exact titles only — never the
+# contains list, or function words like Operations rescue almost everything.
+rescue_titles:
+- CEO
+- Chief Executive Officer
+- COO
+- Chief Operating Officer
+- CTO
+- Chief Technology Officer
+- CFO
+- Chief Financial Officer
+- CSO
+- Chief Sustainability Officer
+- CCO
+- Chief Commercial Officer
+- CMO
+- Chief Marketing Officer
+- CPO
+- Chief Procurement Officer
+- Chief Development Officer
+- Managing Director
+- MD
+- President
+- Partner
+- Founder
+- Co-Founder
+- Owner
+- VP
+- Vice President
+- General Manager
+- Chief Executive
+- Director General
+- Chief Engineer
+- Chief Technical Officer
+- Chief Technical Officer

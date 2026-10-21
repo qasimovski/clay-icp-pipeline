@@ -1,0 +1,17 @@
+{
+  "skill_name": "event-icp-clay-workflow",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "hey, I've got the Seamless Fintech event scraped and cleaned already. exhibitors and sponsors are in C:\Users\qasim\terrapinn\scrapers_seamless (one folder per event, files are exhibitors_normalized.csv and sponsors_normalized.csv) and the ICP is C:\Users\qasim\terrapinn\scrapers_seamless\ICP - Seamless Fintech new.xlsx. I want to do the same thing Qasim did for Highways — classify them in Clay workflows, find people for buy side and sell side and end up with the Salesforce CSV. can you set it up?",
+      "expected_output": "Asks intake questions (prompt, entities, Salesforce schema/event ids, Supabase .env, credit ceiling), inspects the CSVs and the ICP workbook read-only, proposes a column map and ICP field mapping with evidence, flags ambiguities (e.g. the second Seller JTs title column, per-event JOB TITLES in Competitor, sparse Country), and spends nothing.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "before I send this list through the email waterfall can you check which of these people we already have emails for in supabase so we don't pay twice? file is C:\Users\qasim\terrapinn\clay-icp-pipeline\automation\cleanup\ce_classification_exports\Highways Other Sources - people - v7 20.csv and the supabase connection is in C:\Users\qasim\terrapinn\clay_to_claude\.env",
+      "expected_output": "Runs a read-only Supabase lookup keyed on the person LinkedIn URL column, reports counts (reused emails, valid, searched-before-no-email, still to enrich) without printing contact rows, writes the enriched CSV and the still-to-enrich worklist, and does not write to Supabase or start any paid step.",
+      "files": []
+    }
+  ]
+}

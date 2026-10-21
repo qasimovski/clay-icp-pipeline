@@ -1,0 +1,61 @@
+{
+ "nodeType": "conditional",
+ "name": "Fit Keep?",
+ "description": "Scraper-side ICP fit filter. DROP rows stop here - no people call.",
+ "conditionalMode": "rules",
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "fit_keep": {
+    "type": "boolean",
+    "sourceNodeId": "<BUILD_NODE_ID>",
+    "sourcePath": "$.fit_keep"
+   }
+  }
+ },
+ "rulesConditionalConfig": {
+  "rules": [
+   {
+    "id": "fit_drop",
+    "name": "Dropped by fit filter - stop",
+    "condition": {
+     "type": "GroupOp",
+     "combinationMode": "And",
+     "items": [
+      {
+       "type": "BinOp",
+       "dataPath": [
+        "fit_keep"
+       ],
+       "operator": "False"
+      }
+     ]
+    }
+   },
+   {
+    "id": "fit_keep",
+    "name": "Fit kept - find people",
+    "condition": {
+     "type": "GroupOp",
+     "combinationMode": "And",
+     "items": [
+      {
+       "type": "BinOp",
+       "dataPath": [
+        "fit_keep"
+       ],
+       "operator": "True"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "incomingEdges": [
+  {
+   "sourceNode": "<GATE_NODE_ID>",
+   "ruleId": "searchable",
+   "ruleName": "Mapped - find people"
+  }
+ ]
+}

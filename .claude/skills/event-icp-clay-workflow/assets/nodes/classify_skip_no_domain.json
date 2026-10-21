@@ -1,0 +1,50 @@
+{
+ "nodeType": "code",
+ "name": "Skipped - No Domain",
+ "description": "Terminal for rows with no Domain. No Claygent call, no spend.",
+ "code": "def handler(context):\n    # The prompt researches by domain, so there is nothing to classify against.\n    # Emitted rather than dropped so the export can account for every input row.\n    def s(key):\n        v = context.get_input(key)\n        return \"\" if v is None else str(v).strip()\n\n    return {\"company_name\": s(\"company_name\"), \"domain\": \"\",\n            \"Side\": \"\", \"Classification\": \"\", \"skipped_reason\": \"no domain\"}\n",
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "domain": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_COMPANY_RECORD_NODE_ID>",
+    "sourcePath": "$.domain"
+   },
+   "company_name": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_COMPANY_RECORD_NODE_ID>",
+    "sourcePath": "$.company_name"
+   }
+  }
+ },
+ "outputSchema": {
+  "Side": {
+   "type": "string",
+   "description": "Empty - not classified"
+  },
+  "domain": {
+   "type": "string",
+   "description": "Empty by definition"
+  },
+  "company_name": {
+   "type": "string",
+   "description": "Company name"
+  },
+  "Classification": {
+   "type": "string",
+   "description": "Empty - not classified"
+  },
+  "skipped_reason": {
+   "type": "string",
+   "description": "Why it was skipped"
+  }
+ },
+ "incomingEdges": [
+  {
+   "sourceNode": "<HAS_DOMAIN_NODE_ID>",
+   "ruleId": "no_domain",
+   "ruleName": "No domain - skip"
+  }
+ ]
+}

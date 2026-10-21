@@ -1,0 +1,57 @@
+{
+ "nodeType": "conditional",
+ "name": "Has Domain?",
+ "description": "Run condition: classify only rows with a non-empty Domain.",
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "domain": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_COMPANY_RECORD_NODE_ID>",
+    "sourcePath": "$.domain"
+   }
+  }
+ },
+ "conditionalMode": "rules",
+ "rulesConditionalConfig": {
+  "rules": [
+   {
+    "name": "No domain - skip",
+    "condition": {
+     "type": "GroupOp",
+     "items": [
+      {
+       "type": "BinOp",
+       "dataPath": [
+        "domain"
+       ],
+       "operator": "Empty"
+      }
+     ],
+     "combinationMode": "And"
+    }
+   },
+   {
+    "name": "Has domain - classify",
+    "condition": {
+     "type": "GroupOp",
+     "items": [
+      {
+       "type": "BinOp",
+       "dataPath": [
+        "domain"
+       ],
+       "operator": "NotEmpty"
+      }
+     ],
+     "combinationMode": "And"
+    }
+   }
+  ]
+ },
+ "incomingEdges": [
+  {
+   "sourceNode": "<BUILD_COMPANY_RECORD_NODE_ID>"
+  }
+ ]
+}

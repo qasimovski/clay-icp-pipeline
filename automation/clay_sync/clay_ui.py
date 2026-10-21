@@ -19,6 +19,7 @@ is still not implemented (see clay_sync.py).
 
 import os
 import re
+import time
 
 from playwright.sync_api import Page, TimeoutError as PWTimeout
 
@@ -268,26 +269,61 @@ def create_workbook_with_csvs(page: Page, name: str, csv_paths: list) -> None:
 
 def _import_csv(page: Page, csv_path: str, has_continue: bool) -> None:
     """From an open CSV import dialog: browse to the file, set it, and commit.
-    The Add-table modal has an extra 'Continue' step before the commit footer;
-    the first-import flow goes straight to the footer. Readiness is confirmed
-    by the caller via _wait_for_table_data — we never wait on networkidle,
-    because Clay keeps connections open and it never fires."""
+
+    BOTH flows commit through the footer. `has_continue` is kept because both
+    callers pass it, but it is deliberately ignored — see below. We never wait
+    on networkidle, because Clay keeps connections open and it never fires.
+
+    WHY THERE IS NO LONGER A 'Continue' CLICK (2026-09-15). The Add-table modal
+    grew a 'Continue' button and this function used to click it. Clicking it
+    ADVANCES PAST THE UPLOAD: Clay then creates the table with its header and
+    ZERO ROWS, and the commit footer disappears, so the follow-up footer click
+    always failed — silently, because it was wrapped in `except Exception:
+    pass`. That is how three delivery tables landed empty while the importer
+    reported success, and how retrying on top of them produced `Sponsors (2)`.
+
+    Measured on the live UI, importing the same 3-row CSV:
+        click 'Continue'          -> table created, 0 rows   (x3, reproducible)
+        click the footer commit   -> table created, 3 rows
+    The footer is present in the Add-table modal too, from the moment the file
+    is parsed, so one path serves both. If a future Clay build genuinely needs
+    'Continue', bring it back only with a row-count check behind it."""
     page.wait_for_timeout(150)
     with page.expect_file_chooser(timeout=15000) as fc:
         page.get_by_text("Browse files").click()
     fc.value.set_files(os.path.abspath(csv_path))
-    page.wait_for_timeout(500)
 
-    if has_continue:
-        page.get_by_role("button", name="Continue").click(timeout=15000)
-        page.wait_for_timeout(150)
-        # A commit footer may or may not follow Continue — best-effort.
+    # Clay parses the file before the commit control means anything (~4s for a
+    # 4KB CSV). The old code waited a blind 500ms.
+    _wait_for_import_ready(page)
+    _click_footer_commit(page, timeout=30000)
+
+
+def _wait_for_import_ready(page: Page, timeout: int = 90000) -> None:
+    """Block until the import dialog has finished parsing the chosen file.
+
+    Two signals, because neither alone is sufficient: the commit footer must be
+    present, and any 'Continue' button must have gone from disabled to enabled
+    (Clay disables it while it reads the file — ~4s for 4KB, longer for 500KB).
+    Committing before that imports the header row and nothing else.
+
+    Falls through on timeout rather than raising: the caller's footer click has
+    its own timeout, and the row-count verification after the import is the
+    real guard. Raising here would turn a slow parse into a failed table.
+    """
+    deadline = time.time() + timeout / 1000.0
+    while time.time() < deadline:
+        page.wait_for_timeout(500)
+        if not page.get_by_test_id("stage-display-footer").count():
+            continue
+        cont = page.get_by_role("button", name="Continue").first
         try:
-            _click_footer_commit(page, timeout=10000)
+            if cont.count() and not cont.is_enabled(timeout=800):
+                continue        # still parsing
         except Exception:
-            pass
-    else:
-        _click_footer_commit(page, timeout=30000)
+            pass                # no Continue in this flow, or it went away
+        page.wait_for_timeout(600)      # let the preview settle
+        return
 
 
 def _click_footer_commit(page: Page, timeout: int) -> None:

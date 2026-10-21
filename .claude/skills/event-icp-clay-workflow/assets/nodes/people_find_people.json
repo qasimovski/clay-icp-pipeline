@@ -1,0 +1,84 @@
+{
+ "name": "Find People",
+ "description": "cpj-find-lists-of-people, driven by the ICP Mapping node.",
+ "tools": [
+  {
+   "toolType": "clay_action",
+   "actionKey": "cpj-find-lists-of-people",
+   "actionPackageId": "e251a70e-46d7-4f3a-b3ef-a211ad3d8bd2",
+   "description": "Find contacts at company",
+   "inputMappingConfig": {
+    "company_identifier": {
+     "type": "reference",
+     "expression": "{{domain}}"
+    },
+    "job_title_keywords": {
+     "type": "reference",
+     "expression": "{{job_title_keywords}}"
+    },
+    "job_title_exclude_keywords": {
+     "type": "reference",
+     "expression": "{{job_title_exclude_keywords}}"
+    },
+    "job_title_seniority_levels_v2": {
+     "type": "reference",
+     "expression": "{{seniority_levels}}"
+    },
+    "location_countries_include": {
+     "type": "reference",
+     "expression": "{{countries}}"
+    },
+    "job_title_mode": {
+     "type": "static",
+     "value": "contain"
+    },
+    "job_title_seniority_match_mode": {
+     "type": "static",
+     "value": "exact"
+    },
+    "include_past_experiences": {
+     "type": "static",
+     "value": false
+    },
+    "identifiers_only": {
+     "type": "static",
+     "value": false
+    },
+    "limit": {
+     "type": "static",
+     "value": 10
+    }
+   }
+  }
+ ],
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "domain": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_NODE_ID>",
+    "sourcePath": "$.domain"
+   },
+   "job_title_keywords": {
+    "type": "string",
+    "sourceNodeId": "<MAPPING_NODE_ID>",
+    "sourcePath": "$.job_title_keywords"
+   },
+   "job_title_exclude_keywords": {
+    "type": "string",
+    "sourceNodeId": "<MAPPING_NODE_ID>",
+    "sourcePath": "$.job_title_exclude_keywords"
+   },
+   "seniority_levels": {
+    "type": "string",
+    "sourceNodeId": "<MAPPING_NODE_ID>",
+    "sourcePath": "$.seniority_levels"
+   },
+   "countries": {
+    "type": "string",
+    "sourceNodeId": "<MAPPING_NODE_ID>",
+    "sourcePath": "$.countries"
+   }
+  }
+ }
+}

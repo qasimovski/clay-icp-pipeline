@@ -1,0 +1,95 @@
+{
+ "code": "def handler(context):\n    # Shaping only. Unlike v2's node of the same name there is no description to\n    # resolve and no ledger verdict to read: this workflow's input is already\n    # classified, already domain-gated and already deduped by the feed builder.\n    def s(key):\n        v = context.get_input(key)\n        return \"\" if v is None else str(v).strip()\n\n    # Fit: the scraper-side ICP fit filter, applied after classification.\n    # Only an explicit DROP stops the search; a feed without the column\n    # (Other Sources, BuySide gap) arrives blank and is unaffected.\n    fit = s(\"Fit\").upper()\n\n    return {\n        \"company_name\": s(\"Company Name\"),\n        \"domain\": s(\"Domain\"),\n        \"side\": s(\"Side\"),\n        \"classification\": s(\"Classification\"),\n        \"event\": s(\"Company Event Name\"),\n        \"source\": s(\"Exhibitor/Sponsor\"),\n        \"countries_override\": s(\"Countries Override\"),\n        \"fit\": fit,\n        \"fit_keep\": fit != \"DROP\",\n        \"seniority_group\": s(\"Seniority Group\"),\n    }\n",
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "Side": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Side']"
+   },
+   "Domain": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Domain']"
+   },
+   "Company Name": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Company Name']"
+   },
+   "Classification": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Classification']"
+   },
+   "Exhibitor/Sponsor": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Exhibitor/Sponsor']"
+   },
+   "Company Event Name": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Company Event Name']"
+   },
+   "Fit": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Fit']"
+   },
+   "Countries Override": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Countries Override']"
+   },
+   "Seniority Group": {
+    "type": "string",
+    "sourceNodeId": "<TRIGGER_NODE_ID>",
+    "sourcePath": "$['Seniority Group']"
+   }
+  }
+ },
+ "outputSchema": {
+  "side": {
+   "type": "string",
+   "description": "Buy Side / Sell Side"
+  },
+  "event": {
+   "type": "string",
+   "description": "Company Event Name"
+  },
+  "domain": {
+   "type": "string",
+   "description": "Domain, the search key"
+  },
+  "source": {
+   "type": "string",
+   "description": "Exhibitor or Sponsor"
+  },
+  "company_name": {
+   "type": "string",
+   "description": "Company name"
+  },
+  "classification": {
+   "type": "string",
+   "description": "ICP category"
+  },
+  "countries_override": {
+   "type": "string",
+   "description": "CSV of countries, or blank"
+  },
+  "fit": {
+   "type": "string",
+   "description": "Fit decision as received, upper-cased ('' when none)"
+  },
+  "fit_keep": {
+   "type": "boolean",
+   "description": "False only when Fit is DROP"
+  },
+  "seniority_group": {
+   "type": "string",
+   "description": "A / B, or blank for the full seniority list"
+  }
+ }
+}
