@@ -1,4 +1,4 @@
-# Building the two workflows
+# Building the workflows (classify, people, and — after approval — emails)
 
 Read the Clay plugin's `clay:workflows-cli` skill first for command syntax (nodes, edges,
 conditionals, agent nodes, triggers, publish). This file says WHAT to build and which traps bit
@@ -75,6 +75,12 @@ Manual trigger  inputs: Company Name, Domain, Side, Classification, Countries Ov
   read the ICP Mapping outputs: countries, seniority and titles must be what you expect.
 - The ICP Mapping node is generated from `icp.yaml` — never hand-edit it in Clay. Change the
   YAML, regenerate with `icp_mapping.py payload`, `nodes update`, test, publish.
+
+## Workflow 3 — emails (only after the marketing manager approved the people list)
+
+Generated, not hand-built: `scripts/email_workflow.py` creates the whole graph (Supabase lookup first;
+Blitz → LeadMagic → Prospeo + ZeroBounce only for people Supabase has no email for; every paid answer
+written back). Read `references/email_workflow.md` for the accounts, the build and the draft test.
 
 ## Both workflows — finishing
 

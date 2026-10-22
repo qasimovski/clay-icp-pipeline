@@ -4,12 +4,14 @@
     people-feed  classified.csv               -> people_feed.csv (one row per searchable Domain)
     capped       people_feed + people results -> people_feed - sen A.csv / - sen B.csv
     people       classified + people results  -> people.csv (+ excluded.csv, duplicates.csv)
+    emails       approved people + email results -> people - emails.csv (+ no email / not run beside it)
 
     python collect.py classified  --feed feed.csv --results runs/classify/results --id-cols "Event,Entity,Domain" --out classified.csv
     python collect.py people-feed --classified classified.csv --out people_feed.csv [--countries-col "Countries Override"]
     python collect.py capped      --feed people_feed.csv --results runs/people/results --out-prefix people_feed
     python collect.py people      --classified classified.csv --results runs/people/results \
                                   [--split runs/sen_a/results --split runs/sen_b/results] --icp icp.yaml --out people.csv
+    python collect.py emails      --people "people - approved.csv" --results runs/emails/results --out "people - emails.csv"
 
 Nothing is dropped silently: every removed person is written out with the reason,
 and companies that returned nobody are counted by outcome.
@@ -227,6 +229,48 @@ def cmd_people(a):
     print(f"-> {a.out}  (+ excluded / duplicates beside it)")
 
 
+# ------------------------------------------------------------------ emails
+# The email workflow's unified record -> the columns deliver.py salesforce already reads.
+EMAIL_COLS = {"Contact Email": "contact_email", "Email Validation Status": "email_validation_status",
+              "Email Sub Status": "email_sub_status", "MX Provider": "mx_provider", "Validated At": "validated_at",
+              "Email Source": "email_source", "Supabase Status": "supabase_status", "Email Recorded": "recorded",
+              "Email Note": "note"}
+
+
+def email_record(rec):
+    res = (rec or {}).get("result") or {}
+    inner = res.get("result") if isinstance(res.get("result"), dict) else res
+    return inner if isinstance(inner, dict) else {}
+
+
+def cmd_emails(a):
+    header, rows = read_csv(a.people)
+    results = load_results(a.results)
+    tally, no_email, not_run = collections.Counter(), [], []
+    for r in rows:
+        rec = results.get(row_id(r, [a.id_col]))
+        e = email_record(rec) if rec and rec.get("status") == "complete" else {}
+        for col, key in EMAIL_COLS.items():
+            v = e.get(key)
+            r[col] = ("true" if v else "false") if isinstance(v, bool) else ("" if v is None else str(v))
+        if not e:
+            r["Email Source"] = "not run"
+            not_run.append(r)
+        elif not r["Contact Email"]:
+            no_email.append(r)
+        tally[r["Email Source"] or "none"] += 1
+        if r["Email Source"] not in ("supabase", "none", "not run", "") and r["Email Recorded"] != "true":
+            tally["found but NOT recorded in supabase"] += 1
+    out_header = header + [c for c in EMAIL_COLS if c not in header]
+    write_csv(a.out, out_header, rows)
+    write_csv(a.out[:-4] + " - no email.csv", out_header, no_email)
+    write_csv(a.out[:-4] + " - not run.csv", out_header, not_run)
+    for k, n in tally.most_common():
+        print(f"  {k:36} {n:6,}")
+    sendable = sum(1 for r in rows if r.get("Email Validation Status") == "valid")
+    print(f"{len(rows):,} people, {sendable:,} valid emails -> {a.out}  (+ no email / not run beside it)")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -250,10 +294,15 @@ def main():
     p.add_argument("--split", action="append", default=[])
     p.add_argument("--icp", required=True)
     p.add_argument("--out", required=True)
+    e = sub.add_parser("emails")
+    e.add_argument("--people", required=True, help="the approved people CSV that was bulk-run")
+    e.add_argument("--results", required=True)
+    e.add_argument("--id-col", default="LinkedIn URL")
+    e.add_argument("--out", required=True)
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     {"classified": cmd_classified, "people-feed": cmd_people_feed,
-     "capped": cmd_capped, "people": cmd_people}[a.cmd](a)
+     "capped": cmd_capped, "people": cmd_people, "emails": cmd_emails}[a.cmd](a)
 
 
 if __name__ == "__main__":

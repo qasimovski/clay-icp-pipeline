@@ -11,8 +11,10 @@
 Nothing here writes. The connection is opened read-only, and the script prints
 counts only — never rows — so no contact data lands in a chat transcript.
 
-Connection string: $SUPABASE_DB_URL, or --env-file pointing at a .env that sets
-it (Supabase -> Project Settings -> Database -> connection string).
+Two ways in (counts are identical, the matching is the same SQL-side identity logic):
+  * the team API (no database password needed):  --api, with SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY and the team
+    key (GTM_API_KEY, or --api-key-file pointing at clay-team.key) in the environment or --env-file;
+  * the direct database connection: $SUPABASE_DB_URL, or --env-file pointing at a .env that sets it.
 
     python supabase_lookup.py ping
     python supabase_lookup.py companies --in feed.csv --domain-col Domain --out feed_checked.csv
@@ -107,11 +109,35 @@ COMPANY_COLS = ["Known Company", "Known Since", "Known By"]
 PERSON_FIELDS = ["first_name", "last_name", "job_title", "city", "state", "country"]
 
 
+ENV_KEYS = ("SUPABASE_DB_URL", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "GTM_API_KEY")
+
+
 def load_env_file(path):
     for line in open(path, encoding="utf-8"):
         line = line.strip()
-        if line.startswith("SUPABASE_DB_URL=") and not os.environ.get("SUPABASE_DB_URL"):
-            os.environ["SUPABASE_DB_URL"] = line.split("=", 1)[1].strip().strip('"\'')
+        for k in ENV_KEYS:
+            if line.startswith(k + "=") and not os.environ.get(k):
+                os.environ[k] = line.split("=", 1)[1].strip().strip('"\'')
+
+
+# ---------------------------------------------------------------- team API (api.lookup_contacts / api.lookup_companies)
+def api_call(fn, payload):
+    import json
+    import urllib.error
+    import urllib.request
+
+    need = [k for k in ("SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "GTM_API_KEY") if not os.environ.get(k)]
+    if need:
+        raise SystemExit(f"--api needs {need} (env or --env-file; the team key via --api-key-file). Never paste keys into chat.")
+    req = urllib.request.Request(
+        os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/rpc/" + fn, data=json.dumps(payload).encode("utf-8"), method="POST",
+        headers={"apikey": os.environ["SUPABASE_PUBLISHABLE_KEY"], "x-gtm-key": os.environ["GTM_API_KEY"],
+                 "Content-Profile": "api", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise SystemExit(f"team API {fn}: HTTP {e.code} {e.read().decode('utf-8', 'replace')[:200]} — stop the paid step that needed it")
 
 
 def connect():
@@ -155,7 +181,11 @@ def need_col(header, col, flag):
         raise SystemExit(f"column {col!r} not in the CSV — pass {flag}. Columns: {header}")
 
 
-def cmd_ping(_args):
+def cmd_ping(args):
+    if args.api:
+        api_call("lookup_companies", {"domains": []})
+        print("team API reachable (key accepted)")
+        return
     conn = connect()
     for t in ("companies", "people", "emails", "paid_ledger"):
         n = query(conn, f"select count(*) from gtm.{t}", ())[0][0]
@@ -166,9 +196,17 @@ def cmd_companies(args):
     header, rows = read_csv(args.inp)
     need_col(header, args.domain_col, "--domain-col")
     doms = sorted({d for d in (norm_domain(r.get(args.domain_col)) for r in rows) if d})
-    conn = connect()
     known = {}
-    for i in range(0, len(doms), 1000):
+    targets = collections.defaultdict(set)
+    if args.api:
+        for i in range(0, len(doms), 5000):
+            for o in api_call("lookup_companies", {"domains": doms[i:i + 5000]}):
+                if o.get("known"):
+                    known[o["domain"]] = (o.get("known_since"), "")
+                for t in o.get("targeted_events") or []:
+                    targets[o["domain"]].add(t)
+    conn = None if args.api else connect()
+    for i in range(0, len(doms), 1000) if conn else ():
         for dom, seen, by in query(conn, "select domain, first_seen_at, first_seen_by "
                                          "from gtm.companies where domain = any(%s)",
                                    (doms[i:i + 1000],)):
@@ -176,8 +214,7 @@ def cmd_companies(args):
     # "Known" only means the team has seen the domain somewhere (107k rows, most
     # of them sourced, never worked). company_targets says which events it was
     # actually targeted for — the user decides which of the two is the gate.
-    targets = collections.defaultdict(set)
-    for i in range(0, len(doms), 1000):
+    for i in range(0, len(doms), 1000) if conn else ():
         for dom, ev, side in query(conn, "select domain, event_slug, side from "
                                          "gtm.company_targets where domain = any(%s)",
                                    (doms[i:i + 1000],)):
@@ -225,6 +262,8 @@ def cmd_companies(args):
 
 
 def cmd_contacts(args):
+    if args.api:
+        return cmd_contacts_api(args)
     header, rows = read_csv(args.inp)
     need_col(header, args.linkedin_col, "--linkedin-col")
     col = lambda name: name if name and name in header else None
@@ -343,10 +382,65 @@ def cmd_contacts(args):
               f"'searched before, no email' catches little; earlier misses outside it are invisible")
 
 
+API_STATUS = {"no identity": "no identity (no LinkedIn or name+domain)"}
+
+
+def cmd_contacts_api(args):
+    """Same statuses and output files as the database path, answered by api.lookup_contacts (1,000 people per call)."""
+    header, rows = read_csv(args.inp)
+    need_col(header, args.linkedin_col, "--linkedin-col")
+    col = lambda name: name if name and name in header else None   # noqa: E731
+    first_c, last_c, full_c, dom_c = col(args.first_col), col(args.last_col), col(args.name_col), col(args.domain_col)
+    ask = [i for i, r in enumerate(rows) if not r.get("Contact Email")]
+    answers = {}
+    for i in range(0, len(ask), 1000):
+        batch = ask[i:i + 1000]
+        people = [{"linkedin_url": rows[j].get(args.linkedin_col) or "", "first_name": rows[j].get(first_c) if first_c else "",
+                   "last_name": rows[j].get(last_c) if last_c else "", "full_name": rows[j].get(full_c) if full_c else "",
+                   "domain": rows[j].get(dom_c) if dom_c else ""} for j in batch]
+        for j, o in zip(batch, api_call("lookup_contacts", {"people": people})):
+            answers[j] = o
+    extra = CONTACT_COLS + (["Supabase " + f for f in PERSON_FIELDS] if args.with_person_fields else [])
+    tally, todo, decide = collections.Counter(), [], []
+    for j, r in enumerate(rows):
+        for c in CONTACT_COLS:
+            r.setdefault(c, "")
+        if j not in answers:
+            r["Supabase Status"] = "email already in input"
+        else:
+            o = answers[j]
+            st = API_STATUS.get(o["status"], o["status"])
+            if o.get("email"):
+                r.update({"Contact Email": o["email"], "Email Validation Status": o.get("email_validation_status") or "",
+                          "Email Sub Status": o.get("email_sub_status") or "", "MX Provider": o.get("mx_provider") or "",
+                          "Validated At": str(o.get("validated_at") or "")[:19]})
+            r["Supabase Status"] = st
+            if st in ("known, bad email", "known, no email"):
+                decide.append(r)
+            elif st in ("not in supabase", API_STATUS["no identity"]):
+                todo.append(r)
+            if args.with_person_fields:
+                for f in PERSON_FIELDS:
+                    r["Supabase " + f] = o.get(f) or ""
+        tally[r["Supabase Status"]] += 1
+    out_header = header + [c for c in extra if c not in header]
+    write_csv(args.out, out_header, rows)
+    todo_path, decide_path = args.out[:-4] + " - still to enrich.csv", args.out[:-4] + " - user to decide.csv"
+    write_csv(todo_path, out_header, todo)
+    write_csv(decide_path, out_header, decide)
+    print(f"people {len(rows):,}  asked the team API about {len(ask):,}")
+    for k_, n in tally.most_common():
+        print(f"  {k_:42} {n:>7,}")
+    print(f"-> {args.out}\n-> {todo_path}   ({len(todo):,} for the paid waterfall)")
+    print(f"-> {decide_path}   ({len(decide):,} known with a bad or no email — ASK: re-find or skip?)")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--env-file", help=".env file that sets SUPABASE_DB_URL")
+    ap.add_argument("--env-file", help=".env file that sets SUPABASE_DB_URL (or the --api variables)")
+    ap.add_argument("--api", action="store_true", help="use the team API instead of the database connection")
+    ap.add_argument("--api-key-file", help="file holding the team key (clay-team.key); sets GTM_API_KEY")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("ping", help="row counts only — proves the connection")
     c = sub.add_parser("companies")
@@ -370,6 +464,8 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if args.env_file:
         load_env_file(args.env_file)
+    if args.api_key_file and not os.environ.get("GTM_API_KEY"):
+        os.environ["GTM_API_KEY"] = open(args.api_key_file, encoding="utf-8").read().strip()
     if getattr(args, "skip", None) == "targeted-for-event" and not args.event_slug:
         raise SystemExit("--skip targeted-for-event needs --event-slug")
     {"ping": cmd_ping, "companies": cmd_companies, "contacts": cmd_contacts}[args.cmd](args)

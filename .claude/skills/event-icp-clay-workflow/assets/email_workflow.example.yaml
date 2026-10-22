@@ -1,0 +1,15 @@
+# Copy next to your run as email_workflow.yaml (keep it OUT of git) and fill in.
+# Account ids are not secrets: the API keys live only inside the Clay accounts.
+supabase_url: "https://<project-ref>.supabase.co"     # the team's Supabase project (London)
+
+accounts:
+  # HTTP API (Headers) account "Supabase GTM API" with headers:
+  #   apikey: <publishable key>   x-gtm-key: <team key>   Content-Profile: api
+  supabase: ""
+  # HTTP API (Headers) account "Blitz" with header  x-api-key: <Blitz key>
+  blitz: ""
+  # Connected accounts with the team's own keys (Clay -> Settings -> Connections)
+  leadmagic: ""
+  prospeo: ""
+  # Optional: own ZeroBounce key. Blank = Clay credits (1 per check).
+  zerobounce: ""
