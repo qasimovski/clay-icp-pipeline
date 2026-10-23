@@ -16,13 +16,19 @@ already had an email, 158 of them valid.
 
 ## Setup (once per machine)
 
-1. The connection string comes from Supabase → Project Settings → Database. It holds a
-   password, so it lives in a `.env` file as `SUPABASE_DB_URL=...` — ask the user where theirs is
-   (on Qasim's machine: `clay_to_claude/.env`). Never ask them to paste it into the chat, and never
-   echo it.
-2. Python with `psycopg` (v3) — `pip install "psycopg[binary]"` — or `psycopg2`.
-3. Prove the connection: `python scripts/supabase_lookup.py --env-file <path> ping` prints row
-   counts only.
+Two ways in; the answers are identical (verified on 300 people and their companies, 2026-10-22).
+
+**A. The team API — the default for everyone.** One shared team key, the same one the Clay email
+workflow uses; no database password on the machine.
+1. A `.env` with `SUPABASE_URL=https://<project-ref>.supabase.co` and `SUPABASE_PUBLISHABLE_KEY=...`
+   (Supabase → Project Settings → API Keys), plus the team key file `clay-team.key` — ask the user
+   where theirs are. Never ask for a key in the chat, and never echo one.
+2. Prove it: `python scripts/supabase_lookup.py --api --env-file <.env> --api-key-file <clay-team.key> ping`.
+3. Add `--api --api-key-file <clay-team.key>` to every command below.
+
+**B. The database connection** (Qasim's machine, the gtm pipeline): `SUPABASE_DB_URL` in a `.env`
+(it holds the master password — never paste or echo it), Python with `psycopg` (v3), and
+`python scripts/supabase_lookup.py --env-file <path> ping` prints row counts only.
 
 ## Contacts — reuse emails before the waterfall
 
@@ -50,8 +56,12 @@ Status`, `Email Sub Status`, `MX Provider`, `Validated At`, plus `Supabase Statu
 | `not in supabase` / `no identity` | unknown | `… - still to enrich.csv`, the paid worklist |
 
 **Ask the user about the "user to decide" file** — re-find them (pay again) or skip them. The gtm
-pipeline skips them by default; don't silently do either. Also say plainly that the team ledger
-is young (20 waterfall records in Oct 2026), so "searched before" protects against very little yet.
+pipeline skips them by default; don't silently do either. "Searched before" grows as the Clay email
+workflow writes every paid miss back (api.record_contacts); misses from before Oct 2026 are not in it.
+
+In the event-icp-clay-workflow pipeline this check also runs INSIDE the Clay email workflow, per
+person, right before the waterfall (and there every stored email is reused as stored, including bad
+ones). Running it here is for information: the marketing manager's review, or a list outside Clay.
 
 Add `--with-person-fields` to also copy Supabase's first/last name, title, city/state/country
 (prefixed `Supabase …`) when the user wants the stored row, not just the email. An email already
@@ -79,8 +89,8 @@ it also writes `<out> - gated.csv`, the feed that may be paid for.
   than one candidate (e.g. `LinkedIn URL` vs `Company LinkedIn URL`; `Domain` vs `Website`). A
   company LinkedIn URL never matches a person, so the wrong column silently returns zero hits.
 - Report counts, never rows. Contact data stays in files, not in the conversation.
-- This skill never writes. Recording new companies/people/emails back to Supabase is the
-  `gtm` pipeline's job (`clay_to_claude`: `gtm supabase import-lists <csv> --event <slug>`, dry run
+- This skill never writes. Clay's email workflow records its own paid answers through the team API
+  (api.record_contacts). Recording a whole delivered list is the `gtm` pipeline's job (`clay_to_claude`: `gtm supabase import-lists <csv> --event <slug>`, dry run
   by default) — offer it, explain what it writes, and run it only after the user says yes.
 - If the connection fails, say so plainly and stop the paid step that depended on it; don't fall
   back to "assume everything is new".

@@ -1,0 +1,13 @@
+# Copy next to your run as email_workflow.yaml (keep it OUT of git) and fill in.
+supabase_url: "https://<project-ref>.supabase.co"     # the team's Supabase project (London)
+
+# The Clay account NAME each kind of node must use (check-accounts compares them; Clay shows names, never ids).
+account_names:
+  supabase: "Supabase GTM API"      # HTTP API (Headers): apikey, x-gtm-key, Content-Profile: api
+  blitz: "Blitz"                    # HTTP API (Headers): x-api-key
+  leadmagic: ""                     # your connected native LeadMagic account, e.g. "Leadmagic - NEW API"
+  prospeo: ""                       # your connected native Prospeo account
+  zerobounce: ""                    # your connected native ZeroBounce account (blank = not checked)
+
+# Optional account ids, only if you have them; the build normally leaves accounts to the Clay UI.
+accounts: {}

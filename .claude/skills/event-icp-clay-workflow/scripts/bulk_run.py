@@ -10,7 +10,8 @@
     ... --retry-failed     # re-send only rows whose result was "failed"
 
 THE DEFAULT SPENDS. A bare run starts every pending chunk; --plan shows the plan
-and spends nothing. Say the count and the per-row cost to the user first.
+and spends nothing. The email workflow always runs with --approval approval.json:
+it refuses any feed that is not the exact list the marketing manager approved. Say the count and the per-row cost to the user first.
 
 Chunks are written ONCE into <work>/feeds and reused; recomputing them after a
 partial run would shift every boundary and make the state file lie. A chunk is
@@ -151,6 +152,8 @@ def main():
     ap.add_argument("--timeout", type=int, default=2400, help="seconds to wait per chunk")
     ap.add_argument("--plan", action="store_true", help="show the plan, spend nothing")
     ap.add_argument("--retry-failed", action="store_true")
+    ap.add_argument("--approval", help="approval.json from approval.py apply: REQUIRED for the email workflow; the feed must be "
+                                       "byte-identical to the list the marketing manager approved")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -160,6 +163,13 @@ def main():
     os.makedirs(results, exist_ok=True)
     state_path = os.path.join(args.work, "state.json")
     state = load_state(state_path)
+    if args.approval:                    # the marketing-manager gate: no approved list, no paid email search
+        from approval import verify
+        rec = verify(args.approval, args.feed)
+        if state.setdefault("_approved_sha256", rec["approved_sha256"]) != rec["approved_sha256"]:
+            raise SystemExit(f"{args.work} was started from a different approved list - use a new --work folder")
+        save_state(state_path, state)
+        print(f"approved by {rec['approved_by']} at {rec['approved_at']}: {rec['rows_approved']} people")
     chunks = build_chunks(args, feeds, state)
     pending = [c for c in chunks if (state.get(os.path.basename(c)) or {}).get("status") != "done"]
     rows = sum(sum(1 for _ in open(c, encoding="utf-8")) for c in pending)
