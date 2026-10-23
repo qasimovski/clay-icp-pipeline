@@ -1,0 +1,44 @@
+{
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "Side": {
+    "description": "Buy Side / Sell Side, from the Registrar",
+    "type": "string"
+   },
+   "Domain": {
+    "description": "Domain — the people-search key",
+    "type": "string"
+   },
+   "Company Name": {
+    "description": "Company name",
+    "type": "string"
+   },
+   "Classification": {
+    "description": "ICP category, from the Registrar",
+    "type": "string"
+   },
+   "Exhibitor/Sponsor": {
+    "description": "Provenance: which table",
+    "type": "string"
+   },
+   "Company Event Name": {
+    "description": "Provenance: which event",
+    "type": "string"
+   },
+   "Countries Override": {
+    "description": "Optional CSV of countries. Other Sources takes its geography from the source directory, not the ICP category; blank = use the ICP list",
+    "type": "string"
+   },
+   "Fit": {
+    "type": "string",
+    "description": "ICP fit-filter decision from scrapers_highways (KEEP / DROP). Blank = no decision = KEEP; only DROP skips the people search"
+   },
+   "Seniority Group": {
+    "type": "string",
+    "description": "Optional: A (founder..director) or B (head..mid-level) narrows the ICP seniority list for a split search; blank = the full list"
+   }
+  },
+  "required": []
+ }
+}

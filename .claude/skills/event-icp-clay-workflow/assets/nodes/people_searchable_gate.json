@@ -1,0 +1,53 @@
+{
+ "name": "Searchable?",
+ "description": "Persona and geography both resolved? Unmapped rows never search.",
+ "conditionalMode": "rules",
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "searchable": {
+    "type": "boolean",
+    "sourceNodeId": "<MAPPING_NODE_ID>",
+    "sourcePath": "$.searchable"
+   }
+  }
+ },
+ "rulesConditionalConfig": {
+  "rules": [
+   {
+    "id": "not_searchable",
+    "name": "No ICP mapping - stop",
+    "condition": {
+     "type": "GroupOp",
+     "combinationMode": "And",
+     "items": [
+      {
+       "type": "BinOp",
+       "dataPath": [
+        "searchable"
+       ],
+       "operator": "False"
+      }
+     ]
+    }
+   },
+   {
+    "id": "searchable",
+    "name": "Mapped - find people",
+    "condition": {
+     "type": "GroupOp",
+     "combinationMode": "And",
+     "items": [
+      {
+       "type": "BinOp",
+       "dataPath": [
+        "searchable"
+       ],
+       "operator": "True"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

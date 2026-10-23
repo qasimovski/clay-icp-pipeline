@@ -1,0 +1,46 @@
+{
+ "nodeType": "code",
+ "name": "Skipped - Fit Filter",
+ "description": "Terminal for companies the ICP fit filter dropped. No people call, no spend.",
+ "code": "def handler(context):\n    # Emitted rather than dropped so every company is accounted for.\n    def s(key):\n        v = context.get_input(key)\n        return \"\" if v is None else str(v).strip()\n\n    return {\"company_name\": s(\"company_name\"), \"domain\": s(\"domain\"),\n            \"people_found\": 0, \"skipped_reason\": \"dropped by ICP fit filter\"}\n",
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "company_name": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_NODE_ID>",
+    "sourcePath": "$.company_name"
+   },
+   "domain": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_NODE_ID>",
+    "sourcePath": "$.domain"
+   }
+  }
+ },
+ "outputSchema": {
+  "company_name": {
+   "type": "string",
+   "description": "Company name"
+  },
+  "domain": {
+   "type": "string",
+   "description": "Domain"
+  },
+  "people_found": {
+   "type": "number",
+   "description": "Always 0"
+  },
+  "skipped_reason": {
+   "type": "string",
+   "description": "Why no search ran"
+  }
+ },
+ "incomingEdges": [
+  {
+   "sourceNode": "<FIT_GATE_NODE_ID>",
+   "ruleId": "fit_drop",
+   "ruleName": "Dropped by fit filter - stop"
+  }
+ ]
+}

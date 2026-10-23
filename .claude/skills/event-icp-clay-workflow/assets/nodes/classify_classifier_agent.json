@@ -1,0 +1,46 @@
+{
+ "nodeType": "agent",
+ "name": "Classifier",
+ "description": "The Highways Registrar classification Claygent, verbatim from the user 2026-09-12. Outputs Side + Classification.",
+ "inputSchema": {
+  "type": "object",
+  "properties": {
+   "description": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_COMPANY_RECORD_NODE_ID>",
+    "sourcePath": "$.resolved_description"
+   },
+   "primary_offerings": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_COMPANY_RECORD_NODE_ID>",
+    "sourcePath": "$.primary_offerings"
+   },
+   "company_domain": {
+    "type": "string",
+    "sourceNodeId": "<BUILD_COMPANY_RECORD_NODE_ID>",
+    "sourcePath": "$.domain"
+   }
+  }
+ },
+ "outputSchema": {
+  "Side": {
+   "type": "string",
+   "description": "Exactly 'Buy Side' or 'Sell Side'"
+  },
+  "Classification": {
+   "type": "string",
+   "description": "Exact short label from the closed list on the chosen side"
+  }
+ },
+ "incomingEdges": [
+  {
+   "sourceNode": "<IS_NEW_NODE_ID>",
+   "ruleId": "is_new_company",
+   "ruleName": "Is new - classify"
+  }
+ ],
+ "agentModel": "gpt-4.1-mini",
+ "agentName": "Highways Registrar",
+ "agentVersion": "pinned",
+ "agentPrompt": "<FROM classifier_prompt.md — interpolate {{description}}, {{primary_offerings}}, {{company_domain}}>"
+}
