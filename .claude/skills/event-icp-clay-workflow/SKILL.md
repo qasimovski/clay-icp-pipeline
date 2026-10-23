@@ -191,6 +191,8 @@ the graph offline, draft-test on 2–3 approved rows, publish, then run on the A
 ```bash
 python scripts/email_workflow.py check --config email_workflow.yaml
 python scripts/email_workflow.py build --config email_workflow.yaml --workflow <wf> --state email_build_state.json
+# then in the Clay UI: Supabase GTM API on Supabase Lookup + the 4 Record nodes, Blitz on the Blitz node
+python scripts/email_workflow.py check-accounts --config email_workflow.yaml --state email_build_state.json
 python scripts/bulk_run.py --workflow <email wf> --feed "people - approved.csv" --approval approval.json \
     --work runs/emails --inputs "LinkedIn URL,First Name,Last Name,Person Name,Company Name,Domain,Job Title,Mailing Country" \
     --id-cols "LinkedIn URL" --plan

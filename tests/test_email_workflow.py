@@ -82,7 +82,17 @@ def test_zerobounce_never_sees_a_supabase_email():
     for k, (s, _) in nodes.items():
         if k.startswith("zb_"):
             src = s["inputSchema"]["properties"]["email"]["sourceNodeId"][1:-1]
-            assert src in ("read_blitz", "leadmagic", "prospeo")
+            assert src in ("read_blitz", "read_lm", "read_pr")
+
+
+def test_inputs_from_tool_nodes_start_at_result():
+    """Clay's graph validator: 'Enrichment output paths must start with $.result' (seen 2026-10-23)."""
+    nodes = ew.graph(CFG)
+    tools = {k for k, s_, _ in nodes if s_["nodeType"] == "tool"}
+    for k, s_, _ in nodes:
+        for name, prop in (s_.get("inputSchema") or {}).get("properties", {}).items():
+            if (prop.get("sourceNodeId") or "")[1:-1] in tools:
+                assert prop["sourcePath"].startswith("$.result"), f"{k}.{name} reads {prop['sourcePath']}"
 
 
 def test_accounts_land_on_tools_zero_bounce_optional():
@@ -91,6 +101,16 @@ def test_accounts_land_on_tools_zero_bounce_optional():
     assert by["blitz"]["tools"][0]["appAccountId"] == "a2"
     assert "appAccountId" not in by["zb_blitz"]["tools"][0]
     assert by["sb_lookup"]["tools"][0]["inputMappingConfig"]["url"]["value"] == "https://example.supabase.co/rest/v1/rpc/lookup_contacts"
+
+
+def test_check_accounts_catches_the_http_account_clay_preselects():
+    """Clay puts the newest HTTP account on every HTTP node (2026-10-23: 'Blitz' on Supabase Lookup + all Record nodes)."""
+    expected = {"supabase": "Supabase GTM API", "blitz": "Blitz", "leadmagic": "LM"}
+    names = {k: {"supabase": "Supabase GTM API", "blitz": "Blitz", "leadmagic": "LM"}.get(r) for k, r in ew.ROLE.items()}
+    assert ew.account_problems(names, expected) == []
+    names.update({"sb_lookup": "Blitz", "rec_miss": "Blitz"})
+    assert {k for k, _, _ in ew.account_problems(names, expected)} == {"sb_lookup", "rec_miss"}
+    assert set(ew.ROLE) == {k for k, s_, _ in ew.graph(CFG) if s_["nodeType"] == "tool"}      # every tool node has a role
 
 
 # ---------------------------------------------------------------- code nodes
@@ -131,10 +151,16 @@ def test_a_failed_lookup_never_spends(response):
     assert out["route_failed"] and not out["route_find"]
 
 
-@pytest.mark.parametrize("response,email", [({"found": True, "email": "a@b.com"}, "a@b.com"), ({"body": {"found": False, "email": None}}, ""),
-                                            (json.dumps({"found": True, "email": "c@d.com"}), "c@d.com"), (None, "")])
-def test_read_blitz(response, email):
-    out = run(ew.READ_BLITZ, response=response)
+@pytest.mark.parametrize("response,email", [
+    ({"found": True, "email": "a@b.com"}, "a@b.com"), ({"body": {"found": False, "email": None}}, ""),
+    (json.dumps({"found": True, "email": "c@d.com"}), "c@d.com"), (None, ""),
+    ({"result": {"found": False}, "success": True, "textPreview": "x"}, ""),                       # Blitz miss, as Clay returns it
+    ({"result": {}, "success": True, "textPreview": "No email found"}, ""),                        # LeadMagic / Prospeo miss
+    ({"result": {"email": "e@f.com", "status": "valid", "mx_provider": "google"}, "success": True}, "e@f.com"),   # LeadMagic hit
+    ({"result": {"first_name": "E", "email": "g@h.com", "domain": "h.com"}, "success": True}, "g@h.com"),         # Prospeo hit
+])
+def test_read_email_for_every_provider(response, email):
+    out = run(ew.READ_EMAIL, response=response)
     assert out["email"] == email and out["found"] is bool(email)
 
 
@@ -142,12 +168,25 @@ PERSON = {"linkedin_url": "https://www.linkedin.com/in/jane", "first_name": "Jan
           "domain": "acme.com", "company_name": "Acme", "job_title": "CTO", "country": "UK"}
 
 
+# Tool outputs exactly as the 2026-10-23 draft test returned them: {result: {...}, success, textPreview}
+ZB_OUT = {"result": {"address": "jane@acme.com", "status": "valid", "sub_status": "", "smtp_provider": "google", "free_email": False},
+          "success": True, "textPreview": "valid"}
+
+
 def test_record_body_for_a_hit_carries_the_zerobounce_answer():
-    out = run(ew.record_body_code("leadmagic"), **PERSON, email="jane@acme.com", zb_status="valid", zb_sub_status="", zb_smtp_provider="google")
+    out = run(ew.record_body_code("leadmagic"), **PERSON, email="jane@acme.com", zb=ZB_OUT, supabase_status="known, no email")
     body = json.loads(out["record_body"])["people"][0]
     assert body["email"] == "jane@acme.com" and body["email_validation_status"] == "valid" and body["mx_provider"] == "google"
     assert body["provider"] == "leadmagic" and body["linkedin_url"] == PERSON["linkedin_url"]
     assert out["email_source"] == "leadmagic" and out["sendable"] is True
+    assert out["supabase_status"] == "known, no email"                  # the real lookup status, not a constant
+
+
+def test_found_checks_read_the_read_nodes_not_the_raw_tool_output():
+    by = {k: s_ for k, s_, _ in ew.graph(CFG)}
+    for cond, reader in (("blitz_found", "read_blitz"), ("lm_found", "read_lm"), ("pr_found", "read_pr")):
+        prop = by[cond]["inputSchema"]["properties"]["found"]
+        assert prop["sourceNodeId"] == f"<{reader}>" and prop["sourcePath"] == "$.found"
 
 
 def test_record_body_for_a_miss_has_no_email_so_the_api_logs_a_miss():

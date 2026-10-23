@@ -89,7 +89,7 @@ written back). Read `references/email_workflow.md` for the accounts, the build a
    replacement), branch edges carry the conditional's `ruleId`.
 2. Draft test on 2–3 real rows, show the user the outputs, and only then
 3. `clay workflows publish <wf> --name "v1 - …"` (numbered version; snapshots are the undo), then
-4. `clay routines create workflow <wf>` once — until then `runs start` answers `not_found`.
+4. `clay routines create workflow <wf> --name "<name>"` once (`--name` is required) — until then `runs start` answers `not_found`.
 5. Bulk-run with `scripts/bulk_run.py` — `--plan`, then `--limit 1` (pilot), then the rest.
 
 ## Traps (each one cost real time or money once)

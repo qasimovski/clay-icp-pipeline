@@ -19,11 +19,19 @@ No branch ever merges back, so each tail is generated once per provider from one
     python email_workflow.py spec   --config email_workflow.yaml --out email_spec.json     # offline: nodes + edges
     python email_workflow.py check  --config email_workflow.yaml                           # offline: graph integrity
     python email_workflow.py accounts --workflow wf_...       # account ids already set on that workflow's tool nodes
-    python email_workflow.py build  --config email_workflow.yaml --workflow wf_... --state email_build_state.json
+    python email_workflow.py build  --config email_workflow.yaml --workflow wf_... --state email_build_state.json [--sync]
+    python email_workflow.py check-accounts --config email_workflow.yaml --state email_build_state.json
+        every tool node's account, by name, against `account_names` in the config (fails on a mismatch)
+
+Accounts are picked in the Clay UI, not here: the CLI only ever shows account NAMES (never ids), and Clay
+pre-selects accounts itself - your connected native account for LeadMagic / Prospeo / ZeroBounce (usually right),
+and the most recently created HTTP account on EVERY HTTP node (wrong for half of them). After `build`, set
+'Supabase GTM API' on Supabase Lookup + the four Record nodes and 'Blitz' on the Blitz node, then check-accounts.
 
 `build` needs an EMPTY workflow you created (`clay workflows create --name "<Series> - Emails"`). It is resumable:
-node ids are saved as they are created, so a re-run never creates a node twice. After it: graph validate, ONE draft
-test on 2-3 approved rows (`runs test`, read every node's output), publish, `routines create workflow`.
+node ids are saved as they are created, so a re-run never creates a node twice; `--sync` also pushes code/input/rule
+changes into existing nodes without touching their tools or accounts. After it: accounts in the UI, check-accounts,
+draft tests (`runs test`, read every node's output), publish, `routines create workflow <wf> --name "..."`.
 
 The config (gitignored, next to the run - see assets/email_workflow.example.yaml) holds the Supabase project URL and
 the Clay account ids. Account ids are not secrets; the keys themselves live only in the Clay accounts.
@@ -79,6 +87,29 @@ def first_list(obj, depth=0):
                 if got is not None:
                     return got
     return None
+
+def find_with(obj, key, depth=0):
+    """The first dict inside a node output that has `key` (Clay wraps tool outputs as {result, success, textPreview})."""
+    if depth > 5 or obj is None:
+        return {}
+    if isinstance(obj, str):
+        try:
+            return find_with(json.loads(obj), key, depth + 1)
+        except ValueError:
+            return {}
+    if isinstance(obj, dict):
+        if key in obj:
+            return obj
+        for v in obj.values():
+            got = find_with(v, key, depth + 1)
+            if got:
+                return got
+    if isinstance(obj, list):
+        for v in obj[:5]:
+            got = find_with(v, key, depth + 1)
+            if got:
+                return got
+    return {}
 
 def first_dict(obj, depth=0):
     if depth > 4 or obj is None:
@@ -137,12 +168,13 @@ def handler(context):
     return {**out, "route_find": True, "note": "not in supabase - waterfall"}
 '''
 
-READ_BLITZ = _HELPERS + '''
+READ_EMAIL = _HELPERS + '''
 def handler(context):
-    d = first_dict(context.get_input("response"))
-    email = (d.get("email") or "").strip() if d.get("found", bool(d.get("email"))) else ""
-    return {"email": email, "found": bool(email)}
+    d = find_with(context.get_input("response"), "email")
+    email = (d.get("email") or "").strip() if d and d.get("found", True) is not False else ""
+    return {"email": email, "found": "@" in email}
 '''
+READ_BLITZ = READ_EMAIL                                     # same reader for all three providers
 
 
 def record_body_code(provider):
@@ -152,7 +184,8 @@ def record_body_code(provider):
 def handler(context):
     import datetime
     email = s(context, "email") if {hit!r} else ""
-    status, sub, mx = (s(context, "zb_status"), s(context, "zb_sub_status"), s(context, "zb_smtp_provider")) if {hit!r} else ("", "", "")
+    zb = find_with(context.get_input("zb"), "status") if {hit!r} else {{}}
+    status, sub, mx = (str(zb.get("status") or ""), str(zb.get("sub_status") or ""), str(zb.get("smtp_provider") or ""))
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     person = {{k: s(context, k) for k in ("linkedin_url", "first_name", "last_name", "full_name", "domain", "company_name", "job_title", "country")}}
     rec = {{**person, "provider": {provider or "waterfall"!r}}}
@@ -161,7 +194,7 @@ def handler(context):
     return {{"record_body": json.dumps({{"people": [rec]}}), "linkedin_url": person["linkedin_url"], "contact_email": email,
              "email_validation_status": status, "email_sub_status": sub, "mx_provider": mx,
              "validated_at": now if email else "", "sendable": status == "valid",
-             "email_source": {provider or "none"!r}, "supabase_status": "not in supabase"}}
+             "email_source": {provider or "none"!r}, "supabase_status": s(context, "supabase_status") or "not in supabase"}}
 '''
 
 
@@ -208,7 +241,6 @@ def _http(name, desc, url, body_var, body_node, account):
     tool = {"toolType": "clay_action", "actionPackageId": HTTP[0], "actionKey": HTTP[1], "description": "HTTP API",
             "inputMappingConfig": {"url": {"type": "static", "value": url}, "method": {"type": "static", "value": "POST"},
                                    "body": {"type": "reference", "expression": "{{" + body_var + "}}"},
-                                   "headers": {"type": "static", "value": {"Content-Type": "application/json"}},
                                    "shouldRetry": {"type": "static", "value": True},
                                    "responseTimeout": {"type": "static", "value": 20000}}}
     if account:
@@ -258,7 +290,7 @@ def graph(cfg):
                            base + "lookup_contacts", "lookup_body", "build", acc.get("supabase")), ("build", None, None))
     add("read_sb", {"nodeType": "code", "name": "Read Supabase", "description": "Status + stored email fields; picks the route.",
                     "code": READ_SUPABASE,
-                    "inputSchema": _schema(response={"type": "object", "sourceNodeId": "<sb_lookup>", "sourcePath": "$"},
+                    "inputSchema": _schema(response={"type": "object", "sourceNodeId": "<sb_lookup>", "sourcePath": "$.result"},
                                            linkedin_url=_ref("build", "$.linkedin_url")),
                     "outputSchema": _out({"route_reuse": "", "route_skip": "", "route_failed": "", "route_no_linkedin": "", "route_find": "",
                                           **{k: v for k, v in UNIFIED.items() if k not in ("linkedin_url", "email_source", "recorded")}})},
@@ -284,10 +316,7 @@ def graph(cfg):
     blitz = _http("Blitz - Find Work Email", "BlitzAPI /v2/enrichment/email (Blitz account holds x-api-key). A miss uses no record.",
                   BLITZ_EMAIL_URL, "blitz_body", "build", acc.get("blitz"))
     add("blitz", blitz, ("route", "find", routes[4][1]))
-    add("read_blitz", {"nodeType": "code", "name": "Read Blitz", "description": "found + email from the Blitz reply.", "code": READ_BLITZ,
-                       "inputSchema": _schema(response={"type": "object", "sourceNodeId": "<blitz>", "sourcePath": "$"}),
-                       "outputSchema": _out({"email": "work email", "found": "Blitz found a verified email"})},
-        ("blitz", None, None))
+    add("read_blitz", _read_node("Read Blitz", "blitz"), ("blitz", None, None))
     add("blitz_found", _cond("Blitz Found?", "", "found", "read_blitz", "$.found", ("found", "Blitz hit - validate"), ("none", "No Blitz email - LeadMagic")),
         ("read_blitz", None, None))
     lm_tool = {"toolType": "clay_action", "actionPackageId": LEADMAGIC[0], "actionKey": LEADMAGIC[1], "description": "LeadMagic find work email",
@@ -298,8 +327,9 @@ def graph(cfg):
     add("leadmagic", {"nodeType": "tool", "name": "LeadMagic - Find Work Email", "description": "Own LeadMagic key (connected account).",
                       "tools": [lm_tool], "inputSchema": _schema(full_name=_ref("build", "$.full_name"), domain=_ref("build", "$.domain"))},
         ("blitz_found", "none", "No Blitz email - LeadMagic"))
-    add("lm_found", _not_empty_cond("LeadMagic Found?", "", "leadmagic", "$.email", ("found", "LeadMagic hit - validate"),
-                                    ("none", "No LeadMagic email - Prospeo")), ("leadmagic", None, None))
+    add("read_lm", _read_node("Read LeadMagic", "leadmagic"), ("leadmagic", None, None))
+    add("lm_found", _cond("LeadMagic Found?", "", "found", "read_lm", "$.found", ("found", "LeadMagic hit - validate"),
+                          ("none", "No LeadMagic email - Prospeo")), ("read_lm", None, None))
     pr_tool = {"toolType": "clay_action", "actionPackageId": PROSPEO[0], "actionKey": PROSPEO[1], "description": "Prospeo find work email",
                "inputMappingConfig": {"full_name": {"type": "reference", "expression": "{{full_name}}"},
                                       "company_domain": {"type": "reference", "expression": "{{domain}}"}}}
@@ -308,13 +338,14 @@ def graph(cfg):
     add("prospeo", {"nodeType": "tool", "name": "Prospeo - Find Work Email", "description": "Own Prospeo key (connected account).",
                     "tools": [pr_tool], "inputSchema": _schema(full_name=_ref("build", "$.full_name"), domain=_ref("build", "$.domain"))},
         ("lm_found", "none", "No LeadMagic email - Prospeo"))
-    add("pr_found", _not_empty_cond("Prospeo Found?", "", "prospeo", "$.email", ("found", "Prospeo hit - validate"),
-                                    ("none", "No email found - record the miss")), ("prospeo", None, None))
+    add("read_pr", _read_node("Read Prospeo", "prospeo"), ("prospeo", None, None))
+    add("pr_found", _cond("Prospeo Found?", "", "found", "read_pr", "$.found", ("found", "Prospeo hit - validate"),
+                          ("none", "No email found - record the miss")), ("read_pr", None, None))
 
     person_refs = {f: _ref("build", f"$.{f}") for f in PERSON_FIELDS}
     for prov, src, src_path, cond, rule in (("blitz", "read_blitz", "$.email", "blitz_found", "Blitz hit - validate"),
-                                            ("leadmagic", "leadmagic", "$.email", "lm_found", "LeadMagic hit - validate"),
-                                            ("prospeo", "prospeo", "$.email", "pr_found", "Prospeo hit - validate")):
+                                            ("leadmagic", "read_lm", "$.email", "lm_found", "LeadMagic hit - validate"),
+                                            ("prospeo", "read_pr", "$.email", "pr_found", "Prospeo hit - validate")):
         zb_tool = {"toolType": "clay_action", "actionPackageId": ZEROBOUNCE[0], "actionKey": ZEROBOUNCE[1], "description": "ZeroBounce verify email",
                    "inputMappingConfig": {"email": {"type": "reference", "expression": "{{email}}"}}}
         if acc.get("zerobounce"):
@@ -323,16 +354,15 @@ def graph(cfg):
                            "tools": [zb_tool], "inputSchema": _schema(email=_ref(src, src_path))}, (cond, "found", rule))
         add(f"body_{prov}", {"nodeType": "code", "name": f"Record Body ({prov})", "description": "record_contacts body: email + ZeroBounce answer.",
                              "code": record_body_code(prov),
-                             "inputSchema": _schema(**person_refs, email=_ref(src, src_path), zb_status=_ref(f"zb_{prov}", "$.status"),
-                                                    zb_sub_status=_ref(f"zb_{prov}", "$.sub_status"),
-                                                    zb_smtp_provider=_ref(f"zb_{prov}", "$.smtp_provider")),
+                             "inputSchema": _schema(**person_refs, email=_ref(src, src_path), supabase_status=_ref("read_sb", "$.supabase_status"),
+                                                    zb={"type": "object", "sourceNodeId": f"<zb_{prov}>", "sourcePath": "$.result"}),
                              "outputSchema": _out({"record_body": "", **{k: v for k, v in UNIFIED.items() if k not in ("recorded", "note")}})},
             (f"zb_{prov}", None, None))
         add(f"rec_{prov}", _http(f"Record ({prov})", "api.record_contacts: the team never pays for this person again.",
                                  base + "record_contacts", "record_body", f"body_{prov}", acc.get("supabase")), (f"body_{prov}", None, None))
         add(f"out_{prov}", _terminal_recorded(prov, f"body_{prov}", f"rec_{prov}"), (f"rec_{prov}", None, None))
     add("body_miss", {"nodeType": "code", "name": "Record Body (miss)", "description": "record_contacts body without an email = searched, none found.",
-                      "code": record_body_code(None), "inputSchema": _schema(**person_refs),
+                      "code": record_body_code(None), "inputSchema": _schema(**person_refs, supabase_status=_ref("read_sb", "$.supabase_status")),
                       "outputSchema": _out({"record_body": "", **{k: v for k, v in UNIFIED.items() if k not in ("recorded", "note")}})},
         ("pr_found", "none", "No email found - record the miss"))
     add("rec_miss", _http("Record (miss)", "api.record_contacts: searched with no result, so nobody pays for it again.",
@@ -341,13 +371,19 @@ def graph(cfg):
     return nodes
 
 
+def _read_node(name, tool_key):
+    return {"nodeType": "code", "name": name, "description": f"email + found from the {tool_key} output, whatever wrapper Clay uses.",
+            "code": READ_EMAIL, "inputSchema": _schema(response={"type": "object", "sourceNodeId": f"<{tool_key}>", "sourcePath": "$.result"}),
+            "outputSchema": _out({"email": "work email", "found": "an email was found"})}
+
+
 def _terminal_recorded(prov, body, rec):
     fields = ("linkedin_url", "contact_email", "email_validation_status", "email_sub_status", "mx_provider", "validated_at",
               "sendable", "email_source", "supabase_status")
     return {"nodeType": "code", "name": f"Out - {'No Email Found' if prov == 'miss' else 'Found by ' + prov}",
             "description": "Terminal: the unified email record.", "code": terminal_code("recorded"),
             "inputSchema": _schema(**{f: _ref(body, f"$.{f}") for f in fields},
-                                   record_response={"type": "object", "sourceNodeId": f"<{rec}>", "sourcePath": "$"}),
+                                   record_response={"type": "object", "sourceNodeId": f"<{rec}>", "sourcePath": "$.result"}),
             "outputSchema": _out(UNIFIED)}
 
 
@@ -406,17 +442,26 @@ def _subst(obj, ids):
     return obj
 
 
+def _input(obj, folder):
+    """Node/trigger specs go to the CLI as files: inline JSON through `wsl bash -lc` breaks on $['…'] paths."""
+    from _clay import to_cli_path
+
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, f"in_{len(os.listdir(folder)):04d}.json")
+    json.dump(obj, open(path, "w", encoding="utf-8"))
+    return to_cli_path(path)
+
+
 def cmd_build(a):
     from _clay import clay
+
+    tmp = os.path.join(os.path.dirname(os.path.abspath(a.state)), ".clay_inputs")
 
     cfg = load_cfg(a.config)
     nodes = graph(cfg)
     problems = check(nodes)
     if problems:
         raise SystemExit("graph problems:\n  " + "\n  ".join(problems))
-    missing = [k for k in ("supabase", "blitz", "leadmagic", "prospeo") if not (cfg.get("accounts") or {}).get(k)]
-    if missing:
-        raise SystemExit(f"accounts missing in {a.config}: {missing} (see `email_workflow.py accounts`)")
     state = json.load(open(a.state, encoding="utf-8")) if os.path.exists(a.state) else {}
     if state.get("workflow") not in (None, a.workflow):
         raise SystemExit(f"{a.state} belongs to {state['workflow']}, not {a.workflow}")
@@ -426,19 +471,23 @@ def cmd_build(a):
         g = clay(["workflows", "graph", "get", a.workflow])["summary"]
         trig = [n for n in g["nodes"] if n["nodeType"] == "trigger"]
         if not trig:
-            clay(["workflows", "triggers", "create", a.workflow, "--input", json.dumps({
-                "triggerType": "manual", "inputSchema": {"type": "object", "required": [],
-                                                         "properties": {c: {"type": "string", "description": c} for c in TRIGGER_INPUTS}}})])
+            clay(["workflows", "triggers", "create", a.workflow, "--input", _input({
+                "triggerType": "manual", "createTriggerNode": True, "inputSchema": {"type": "object", "required": [],
+                                                         "properties": {c: {"type": "string", "description": c} for c in TRIGGER_INPUTS}}}, tmp)])
             g = clay(["workflows", "graph", "get", a.workflow])["summary"]
             trig = [n for n in g["nodes"] if n["nodeType"] == "trigger"]
         if len(g["nodes"]) > len(trig):
             raise SystemExit(f"{a.workflow} already has nodes besides the trigger - build into an EMPTY workflow")
         ids["trigger"] = trig[0]["id"]
         json.dump(state, open(a.state, "w", encoding="utf-8"), indent=1)
-    for key, spec, _ in nodes:                                       # 1. create (no edges yet)
+    for key, spec, _ in nodes:                                       # 1. create (no edges yet) / sync
         if key in ids:
+            if a.sync:
+                upd = {k: v for k, v in _subst(spec, ids).items() if k not in ("tools", "nodeType")}
+                clay(["workflows", "nodes", "update", a.workflow, ids[key], "--input", _input(upd, tmp)])
+                print(f"synced {spec['name']}", flush=True)
             continue
-        out = clay(["workflows", "nodes", "create", a.workflow, "--input", json.dumps(_subst(spec, ids))])
+        out = clay(["workflows", "nodes", "create", a.workflow, "--input", _input(_subst(spec, ids), tmp)])
         ids[key] = out["nodeId"]
         json.dump(state, open(a.state, "w", encoding="utf-8"), indent=1)
         print(f"created {spec['name']}: {ids[key]}", flush=True)
@@ -449,9 +498,44 @@ def cmd_build(a):
             if rule:
                 e.update({"ruleId": rule, "ruleName": rname})
             edges.append(e)
-        clay(["workflows", "nodes", "update", a.workflow, ids[key], "--input", json.dumps({"incomingEdges": edges})])
+        clay(["workflows", "nodes", "update", a.workflow, ids[key], "--input", _input({"incomingEdges": edges}, tmp)])
     print(json.dumps(clay(["workflows", "graph", "validate", a.workflow], check=False), indent=1)[:2000])
     print(f"{len(nodes)} nodes. Next: draft test on 2-3 approved rows, read every node's output, then publish.")
+
+
+# which account (by role) every tool node must use; the names come from `account_names` in the config
+ROLE = {"sb_lookup": "supabase", "rec_blitz": "supabase", "rec_leadmagic": "supabase", "rec_prospeo": "supabase", "rec_miss": "supabase",
+        "blitz": "blitz", "leadmagic": "leadmagic", "prospeo": "prospeo",
+        "zb_blitz": "zerobounce", "zb_leadmagic": "zerobounce", "zb_prospeo": "zerobounce"}
+
+
+def account_problems(names_by_key, expected):
+    """[(node key, got, want)] for every tool node whose account name is not the expected one. Pure (tested)."""
+    out = []
+    for key, role in ROLE.items():
+        want = expected.get(role)
+        if want and names_by_key.get(key) != want:
+            out.append((key, names_by_key.get(key), want))
+    return out
+
+
+def cmd_check_accounts(a):
+    from _clay import clay
+
+    cfg = load_cfg(a.config)
+    expected = cfg.get("account_names") or {}
+    if not expected.get("supabase") or not expected.get("blitz"):
+        raise SystemExit(f"{a.config}: set account_names.supabase and account_names.blitz (the Clay account names)")
+    state = json.load(open(a.state, encoding="utf-8"))
+    ids = state["ids"]
+    full = {n["id"]: n for n in clay(["workflows", "graph", "get", state["workflow"], "--mode", "full"]).get("nodes") or []}
+    got = {k: ((full.get(ids[k]) or {}).get("tools") or [{}])[0].get("appAccountName") for k in ROLE if k in ids}
+    for k in ROLE:
+        print(f"{full[ids[k]]['name']:32} {got.get(k)}")
+    bad = account_problems(got, expected)
+    if bad:
+        raise SystemExit("wrong account on: " + "; ".join(f"{full[ids[k]]['name']} has {g!r}, needs {w!r}" for k, g, w in bad))
+    print("all accounts as expected")
 
 
 def cmd_accounts(a):
@@ -476,6 +560,10 @@ def main():
     b.add_argument("--config", required=True)
     b.add_argument("--workflow", required=True)
     b.add_argument("--state", default="email_build_state.json")
+    b.add_argument("--sync", action="store_true", help="also update nodes that already exist (code, inputs, rules) - never their tools/accounts")
+    x = sub.add_parser("check-accounts")
+    x.add_argument("--config", required=True)
+    x.add_argument("--state", default="email_build_state.json")
     n = sub.add_parser("accounts")
     n.add_argument("--workflow", required=True)
     a = ap.parse_args()
@@ -487,7 +575,7 @@ def main():
             print(f"{len(nodes)} nodes -> {a.out}")
         print("graph ok" if not problems else "PROBLEMS:\n  " + "\n  ".join(problems))
         sys.exit(1 if problems else 0)
-    {"build": cmd_build, "accounts": cmd_accounts}[a.cmd](a)
+    {"build": cmd_build, "accounts": cmd_accounts, "check-accounts": cmd_check_accounts}[a.cmd](a)
 
 
 if __name__ == "__main__":
