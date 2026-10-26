@@ -1,0 +1,432 @@
+# Highways — BUY SIDE company searches
+#
+# Source: the `BuySide ICP` sheet of `ICP - Highways new.xlsx`. One entry per
+# **Industry**; each becomes one Clay workbook named after the Industry, holding
+# one table named `Companies`, inside
+# `Highways [Qasim - 2026] -> BuySide P&S`.
+#
+# HOW THIS SHEET DIFFERS FROM Products_Services, and what that forced:
+#
+#   * There is no Sub level column. The Industry cell instead carries a prose
+#     description, example organisations and a bulleted "Search Keywords" list,
+#     split into MORE INFO FOR UK / KINGDOM SAUDIA ARABIA / AUSTRALIA blocks.
+#     The description lists below are built from those keyword bullets plus the
+#     example organisations' generic form — never the brand names themselves
+#     (searching "Balfour Beatty" returns one company; searching "tier 1
+#     contractor" returns the population the sheet is describing).
+#   * Every industry carries the SAME five countries, so they are set once at
+#     ICP level rather than per category.
+#   * The Job Titles / MATCH TYPE / SENIORITY columns are the PEOPLE layer, not
+#     the company layer. They are deliberately unused here and belong in a
+#     people.yaml when that pass is built.
+#
+# BUY SIDE. These are the organisations that commission, own, operate and
+# maintain the road network — the people the sell-side P&S companies want to
+# meet. The industry enums here are therefore the operator/authority ones that
+# the sell-side config deliberately excludes (Government Administration,
+# Highway/Street/Bridge Construction, Transportation Programs). That inversion
+# is the whole point; do not "fix" it by aligning the two configs.
+#
+# TWO SHEET ROWS ARE NOT INDUSTRIES AND ARE ABSENT:
+#   * `SPEX ALL PRODUCTS_SERVICES CATEGORIES` (row 238) is a pointer meaning the
+#     sell-side Products_Services categories are ALSO buy-side targets. It is a
+#     cross-reference, not a company population — those workbooks already exist
+#     under `Products & Services`.
+#   * `GH- make sure that its not in spex as well` (row 251) is an annotation.
+#
+# Rules from docs/CLAY_QUERY_SKILL.md as in the sell-side config: `industry` is
+# a closed enum, `products_and_services` caps at 3, `contains` is whole-word
+# token matching.
+#
+# THIS FILE HAS 8 CATEGORIES; THE REWRITTEN SHEET HAS 7. Checked 2026-09-13.
+# The drift is real, it is not an error, and it has now been rediscovered three
+# times — so it is recorded here rather than left to be found again.
+#
+#   * `Major Engineering Contractors / Tier 1 Contractor` — absent from the
+#     rewritten `BuySide ICP` sheet, but present in the CE Registrar's closed
+#     label list (ce_classification_prompt.py), carrying a 45-title persona in
+#     people.yaml and a built 3,863-company table. The classifier emits it, so
+#     it STAYS. Do not delete it to match the sheet.
+#   * `Finance, Investment, Legal` — absent from BOTH the sheet and the
+#     Registrar's closed list, so the CE classifier can never emit it. It is
+#     nonetheless live on the P&S route: it has a built 1,524-company table and
+#     a `People` table. Dead for classification, live for P&S.
+#
+# That second case is not academic. Its titles (`Legal`, `Counsel`,
+# `Consultant`) collide with the user's job-title exclusion list, and because
+# this one config feeds BOTH routes, those three terms had to be dropped from
+# the exclusion list (see the `exclude_titles` note in people.yaml). Reasoning
+# "the classifier never emits this category, so the collision is harmless" is
+# the specific mistake to avoid — it is harmless on the CE route only.
+
+countries:
+  - Australia
+  - New Zealand
+  - Saudi Arabia
+  - United Arab Emirates
+  - United Kingdom        # sheet reads "UK"
+
+# ANDed onto categories whose industry mapping would otherwise return every
+# public body or every contractor regardless of sector.
+anchors:
+  roads:
+    - highway
+    - highways
+    - road
+    - roads
+    - transport
+    - transportation
+    - motorway
+    - street works
+    - streetworks
+    - traffic
+    - infrastructure
+    - civil engineering
+
+categories:
+
+  # ---------------------------------------------------------------------
+  # Central transport departments, executive agencies and the national road
+  # operator. Anchored: Government Administration alone is every ministry,
+  # council and agency in five countries.
+  #
+  # Example organisations in the sheet are carried as their GENERIC form.
+  # Two exceptions kept as literal strings because they are the actual names
+  # of the buying institutions and have no generic equivalent: the Saudi giga
+  # projects (NEOM, Red Sea, Qiddiya, Diriyah) and Vision 2030, which is how
+  # Saudi transport bodies describe their remit.
+  - name: National (State) Government
+    anchor: roads
+    industry:
+      - Government Administration
+      - Public Policy Offices
+      - Executive Offices
+      - Legislative Offices
+      - Transportation Programs
+      - Economic Programs
+      - Public Policy
+      - Utilities Administration
+      - International Trade and Development
+      - Civic and Social Organizations
+    description:
+      - department for transport
+      - department of transport
+      - ministry of transport
+      - transport policy
+      - national transport
+      - strategic road network
+      - national highways
+      - executive agency
+      - road regulation
+      - infrastructure delivery
+      - major project sponsor
+      - roads general authority
+      - transport general authority
+      - public investment fund
+      - vision 2030
+      - national road programme
+      - giga project
+      - NEOM
+      - Red Sea Global
+      - Qiddiya
+      - Diriyah
+      - infrastructure australia
+      - national land transport network
+      - major road projects
+      - transport infrastructure funding
+    products_and_services:
+      - national transport policy and road network oversight
+      - government infrastructure programme funding
+      - strategic road network management
+
+  # ---------------------------------------------------------------------
+  # Combined authorities, state road authorities and emirate/regional bodies.
+  # Anchored for the same reason as National.
+  - name: Regional (Federal) Government
+    anchor: roads
+    industry:
+      - Government Administration
+      - Public Policy Offices
+      - Executive Offices
+      - Transportation Programs
+      - Economic Programs
+      - Community Development and Urban Planning
+      - Public Policy
+      - Utilities Administration
+      - Civic and Social Organizations
+    description:
+      - combined authority
+      - regional transport
+      - regional transport authority
+      - strategic transport plan
+      - transport strategy
+      - regional infrastructure
+      - devolution
+      - transport investment programme
+      - regional municipality
+      - emirate transport authority
+      - provincial development authority
+      - royal commission
+      - state government transport
+      - state road authority
+      - transport and main roads
+      - roads and maritime
+      - major transport infrastructure authority
+      - metropolitan transport
+    products_and_services:
+      - regional transport strategy and investment planning
+      - state and regional road authority operations
+      - metropolitan transport infrastructure programmes
+
+  # ---------------------------------------------------------------------
+  # Councils, unitary authorities and municipalities — the largest single
+  # buying population on this sheet.
+  #
+  # DELIBERATELY NOT ANCHORED, unlike the two government tiers above. Measured
+  # 2026-08-14: anchored 539, unanchored 1,189. The anchor was removing real
+  # buyers — Australia alone has ~537 councils and the UK ~330, and a council
+  # whose profile reads "the local authority for X, serving residents" never
+  # says "highway" even though it IS the highways authority for its area.
+  #
+  # The two government tiers keep their anchor because their description lists
+  # already name transport bodies specifically; this one's list is
+  # COUNCIL-shaped, so the anchor filters on a word the buyer has no reason to
+  # use. Precision here comes from the PEOPLE layer instead — the sheet's job
+  # titles (Head of Highways, Network Manager, Traffic and Transport) are what
+  # separate a highways team from a housing team, and a company-level anchor
+  # cannot do that job without permanently dropping the council.
+  #
+  # "municipality" is included on purpose: it is the Gulf equivalent of the
+  # UK council terms and the sheet's UK-centric keyword list has no word for
+  # the KSA/UAE buyers.
+  - name: Local Government
+    industry:
+      - Government Administration
+      - Executive Offices
+      - Public Policy Offices
+      - Transportation Programs
+      - Community Development and Urban Planning
+      - Housing and Community Development
+      - Utilities Administration
+      - Civic and Social Organizations
+    description:
+      - county council
+      - city council
+      - borough council
+      - district council
+      - unitary authority
+      - metropolitan borough
+      - local authority
+      - highways authority
+      - local highway authority
+      - local transport authority
+      - network manager
+      - street works
+      - highways maintenance
+      - term maintenance
+      - asset management highways
+      - municipality
+      - municipal council
+      - active travel
+      - resurfacing programme
+    products_and_services:
+      - local highway authority maintenance and improvement
+      - council roads and street works management
+      - municipal transport and active travel schemes
+
+  # ---------------------------------------------------------------------
+  # Tier 1 principal contractors. NOT anchored: "tier 1 contractor",
+  # "highways framework" and "major civils" already name the domain.
+  #
+  # NOTE the deliberate overlap with the SELL-side workbook `Major Contractors
+  # and Consultancies`. The same firms sponsor and exhibit AND commission
+  # subcontract packages, so the ICP places them on both sides. Two workbooks
+  # holding overlapping companies is intended here, not a mistake to dedupe.
+  - name: Major Engineering Contractors / Tier 1 Contractor
+    industry:
+      - Highway, Street, and Bridge Construction
+      - Civil Engineering
+      - Construction
+      - Building Construction
+      - Nonresidential Building Construction
+      - Utility System Construction
+      - Engineering Services
+      - Architecture and Planning
+    description:
+      - tier 1 contractor
+      - principal contractor
+      - highways framework
+      - design and build highways
+      - major civils
+      - civils contractor
+      - infrastructure delivery partner
+      - framework contractor
+      - major road upgrade
+      - major infrastructure projects
+      - highway construction
+      - road construction
+      - bridge construction
+      - joint venture infrastructure
+    products_and_services:
+      - tier 1 highways and infrastructure contracting
+      - design and build major road schemes
+      - long term highways maintenance frameworks
+
+  # ---------------------------------------------------------------------
+  # Specialist subcontractors delivering technical packages. NOT anchored:
+  # every keyword names a highways discipline.
+  - name: Sub-engineering contractors
+    industry:
+      - Specialty Trade Contractors
+      - Highway, Street, and Bridge Construction
+      - Civil Engineering
+      - Construction
+      - Building Structure and Exterior Contractors
+      - Building Equipment Contractors
+      - Building Finishing Contractors
+      - Utility System Construction
+      - Engineering Services
+    description:
+      - highway surfacing contractor
+      - surfacing contractor
+      - road surfacing
+      - traffic signals contractor
+      - ITS provider
+      - street lighting contractor
+      - road markings contractor
+      - road marking
+      - safety barriers
+      - vehicle restraint
+      - drainage contractor
+      - structures repair
+      - bridge repair
+      - specialist highways contractor
+      - highways subcontractor
+      - civils subcontractor
+      - kerbing
+      - fencing contractor
+    products_and_services:
+      - specialist highways subcontracting packages
+      - road surfacing and markings contracting
+      - highways structures and drainage repair
+
+  # ---------------------------------------------------------------------
+  # Toll roads, concessions and network operators. NOT anchored: every keyword
+  # is a roads term.
+  - name: Road / Bridge / Tunnel Operator
+    industry:
+      - Highway, Street, and Bridge Construction
+      - Civil Engineering
+      - Transportation Programs
+      - Government Administration
+      - Transportation, Logistics, Supply Chain and Storage
+      - Facilities Services
+      - Engineering Services
+      - Utilities
+      - Repair and Maintenance
+      - Investment Management
+    description:
+      - toll road operator
+      - toll road
+      - road network operator
+      - motorway operator
+      - bridge operator
+      - tunnel operator
+      - highway concessionaire
+      - road concession
+      - infrastructure concessionaire
+      - PPP road
+      - public private partnership infrastructure
+      - tolling operator
+      - road infrastructure operator
+      - network performance
+      - concession agreement
+      - road operations and maintenance
+    products_and_services:
+      - toll road and motorway network operation
+      - bridge and tunnel operations and maintenance
+      - road infrastructure concessions and PPP
+
+  # ---------------------------------------------------------------------
+  # On- and off-street parking operators. NOT anchored: parking terms are
+  # specific enough, and anchoring on road words would drop pure car park
+  # operators who never write "highway".
+  - name: Parking Operations
+    industry:
+      - Facilities Services
+      - Real Estate
+      - Commercial Real Estate
+      - Consumer Services
+      - Ground Passenger Transportation
+      - Transportation, Logistics, Supply Chain and Storage
+      - Government Administration
+      - Security Guards and Patrol Services
+      - Leasing Non-residential Real Estate
+    description:
+      - parking operator
+      - car park operator
+      - car park management
+      - parking management company
+      - parking enforcement
+      - parking services
+      - on-street parking
+      - off-street parking
+      - parking facilities
+      - multi storey car park
+      - parking provider
+      - kerbside parking
+    products_and_services:
+      - car park operations and parking management
+      - on-street and off-street parking enforcement
+      - parking facilities operation for local authorities
+
+  # ---------------------------------------------------------------------
+  # INFERRED CATEGORY — read the note before changing it.
+  #
+  # The sheet's `Finance, Investment, Legal` row (242) gives EIGHT JOB TITLES
+  # and nothing else: no descriptive text, no search keywords, no example
+  # organisations and — uniquely on this sheet — NO COUNTRIES. There is not
+  # enough there to draft a company query directly, and the literal reading
+  # ("every investment manager and law firm in five countries") would be a
+  # six-figure list of companies with no connection to roads.
+  #
+  # So this entry is my inference, not the sheet's: the finance and legal
+  # organisations that fund, invest in and advise on ROAD infrastructure —
+  # infrastructure funds, PPP investors, project-finance banks and the
+  # transactional advisers around them. Countries default to the ICP's five.
+  # Anchored, because without it the industry enums are the entire financial
+  # sector.
+  - name: Finance, Investment, Legal
+    anchor: roads
+    industry:
+      - Investment Management
+      - Venture Capital and Private Equity Principals
+      - Investment Banking
+      - Investment Advice
+      - Banking
+      - Financial Services
+      - Capital Markets
+      - Law Practice
+      - Legal Services
+      - Business Consulting and Services
+      - Funds and Trusts
+    description:
+      - infrastructure fund
+      - infrastructure investment
+      - infrastructure investor
+      - project finance
+      - public private partnership
+      - PPP
+      - concession finance
+      - transport infrastructure investment
+      - infrastructure debt
+      - construction law
+      - infrastructure legal
+      - procurement law
+      - transaction advisory
+      - infrastructure advisory
+      - asset finance
+    products_and_services:
+      - infrastructure investment and project finance
+      - public private partnership advisory
+      - construction and infrastructure legal services

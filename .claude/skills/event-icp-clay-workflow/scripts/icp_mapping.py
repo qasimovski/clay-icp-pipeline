@@ -4,6 +4,9 @@ The YAML is the source of truth; the node is generated. Never hand-edit the node
 in Clay — edit icp.yaml and re-run this, then `clay workflows nodes update`.
 
     python icp_mapping.py check   icp.yaml                       # validate + summary
+    python icp_mapping.py check   icp.yaml --rules post_filter.yaml --scope scope.yaml
+                                  # + the ICP's other two files must name only what icp.yaml defines,
+                                  #   and no YAML trap (unquoted Yes:, a comma label split in two)
     python icp_mapping.py payload icp.yaml --build-node-id wfn_… --out mapping_update.json
 
 icp.yaml (see assets/icp.example.yaml):
@@ -14,15 +17,32 @@ icp.yaml (see assets/icp.example.yaml):
     buy:   {default_countries: [...], seniority?: [...],
             categories: {<Buy Side label>: {titles: [...], countries?: [...]}}}
 
+Optional, for an ICP whose sides want different exclusions or that lists "must match exactly"
+titles (Mining, Oct 2026); an icp.yaml without them generates the same node as before:
+    sell.exclude_titles / buy.exclude_titles / buy.categories.<label>.exclude_titles
+                       added to exclude_titles for that side / category only (the buy side
+                       excluding "Sales Manager" must not stop the sell side searching for it)
+    sell.exact_titles / buy.exact_titles
+                       searched with job_title_mode "exact" when the row's Title Mode is
+                       "exact" (a second, separate search); blank Title Mode = `titles`, contain
+
 Category keys must be EXACTLY the labels the classifier prompt emits.
 """
 
 import argparse
 import json
+import os
 import re
 import sys
 
 import yaml
+
+# Clay's location_countries_include options (`clay workflows actions schema --include-options
+# e251a70e-46d7-4f3a-b3ef-a211ad3d8bd2 cpj-find-lists-of-people-v2`, Oct 2026). A country the
+# action doesn't know matches nobody, so `check` refuses it ("Côte d’Ivoire" with a curly
+# apostrophe is not "Côte d'Ivoire").
+COUNTRIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets",
+                              "clay_countries.json")
 
 # Clay's job_title_seniority_levels_v2 enum. An unknown value is dropped SILENTLY
 # by the action, taking the filter's meaning with it — so it is checked here.
@@ -44,20 +64,22 @@ def handler(context):
     side = s("side")
     cat = s("classification")
     group = s("seniority_group").upper()
+    # Optional: "exact" searches the side's exact_titles in exact mode; blank = titles, contain.
+    exact = s("title_mode").lower() == "exact"
     # Optional per-row geography (e.g. a directory's own country), CSV of names.
     override = [c.strip() for c in s("countries_override").split(",") if c.strip()]
 
     titles, seniority, exclude, countries = [], [], [], []
     if side == "Sell Side" and cat in ICP["sell"]["categories"]:
-        titles = ICP["sell"]["titles"]
+        titles = ICP["sell"]["exact_titles"] if exact else ICP["sell"]["titles"]
         seniority = ICP["sell"]["seniority"]
-        exclude = ICP["exclude"]
+        exclude = ICP["sell"]["exclude"]
         countries = override or ICP["sell"]["categories"][cat]
     elif side == "Buy Side" and cat in ICP["buy"]["categories"]:
         c = ICP["buy"]["categories"][cat]
-        titles = c["titles"]
+        titles = ICP["buy"]["exact_titles"] if exact else c["titles"]
         seniority = ICP["buy"]["seniority"]
-        exclude = ICP["exclude"]
+        exclude = c["exclude"]
         countries = override or c["countries"]
 
     # An unknown group stops the row: a typo must not turn a half-search into a whole one.
@@ -74,12 +96,15 @@ def handler(context):
             reason = "not classified"
         elif side not in ("Sell Side", "Buy Side"):
             reason = "unrecognised side"
+        elif exact and not titles:
+            reason = "no exact titles for this side"
         else:
             reason = "no ICP mapping for '" + cat + "'"
 
     return {
         "searchable": searchable,
         "unmapped_reason": reason,
+        "job_title_mode": "exact" if exact else "contain",
         "job_title_keywords": ", ".join(titles) if searchable else "",
         "job_title_exclude_keywords": ", ".join(exclude) if searchable else "",
         "seniority_levels": ", ".join(seniority) if searchable else "",
@@ -93,6 +118,7 @@ def handler(context):
 OUTPUT_SCHEMA = {
     "searchable": {"type": "boolean", "description": "persona AND geography resolved"},
     "unmapped_reason": {"type": "string", "description": "why not searchable"},
+    "job_title_mode": {"type": "string", "description": "contain / exact"},
     "job_title_keywords": {"type": "string", "description": "CSV of titles"},
     "job_title_exclude_keywords": {"type": "string", "description": "CSV of exclusions"},
     "seniority_levels": {"type": "string", "description": "CSV of Clay seniority slugs"},
@@ -140,11 +166,15 @@ def build(cfg):
             problems.append(f"seniority_groups leave out {sorted(missing)} — A + B must cover `seniority`")
 
     sell_titles = dedupe(sell.get("titles"))
+    sell_exact = dedupe(sell.get("exact_titles"))
+    sell_excl = dedupe(exclude + (sell.get("exclude_titles") or []))
     sell_cats = {k: dedupe(v) for k, v in (sell.get("categories") or {}).items()}
     for k, v in sell_cats.items():
         if not v:
             problems.append(f"sell category {k!r} has no countries — it would never be searched")
     default_c = dedupe(buy.get("default_countries"))
+    buy_exact = dedupe(buy.get("exact_titles"))
+    buy_excl = dedupe(exclude + (buy.get("exclude_titles") or []))
     buy_cats = {}
     for k, v in (buy.get("categories") or {}).items():
         v = v or {}
@@ -154,30 +184,104 @@ def build(cfg):
             problems.append(f"buy category {k!r} has no titles")
         if not c:
             problems.append(f"buy category {k!r} has no countries (and no default_countries)")
-        buy_cats[k] = {"titles": t, "countries": c}
+        buy_cats[k] = {"titles": t, "countries": c,
+                       "exclude": dedupe(buy_excl + (v.get("exclude_titles") or []))}
 
     # Asking for a title and excluding the same term returns nobody for it: a
     # blocking problem. A partial overlap ("Finance" inside "Project Finance") is
     # only a warning — Clay's exclusion is soft and the export rescues exact
     # titles — but the user should see it and decide.
     warnings = []
-    for side, titles in [("sell", sell_titles)] + [(f"buy:{k}", v["titles"]) for k, v in buy_cats.items()]:
-        for t in titles:
-            for e in exclude:
+    searches = [("sell", sell_titles + sell_exact, sell_excl)] + [
+        (f"buy:{k}", v["titles"] + buy_exact, v["exclude"]) for k, v in buy_cats.items()]
+    for side, titles, excl in searches:
+        for t in dedupe(titles):
+            for e in excl:
                 if t.lower() == e.lower():
                     problems.append(f"{side}: title {t!r} is also an exclusion")
                 elif word_hit(e, t):
                     warnings.append(f"{side}: title {t!r} contains exclusion {e!r}")
     cfg["_warnings"] = warnings
 
+    if os.path.exists(COUNTRIES_FILE):
+        known = set(json.load(open(COUNTRIES_FILE, encoding="utf-8")))
+        used = {c for v in sell_cats.values() for c in v} | {
+            c for v in buy_cats.values() for c in v["countries"]}
+        bad = sorted(used - known)
+        if bad:
+            problems.append(f"countries not in Clay's list (they would match nobody): {bad}")
+
     icp = {
-        "exclude": exclude,
         "seniority_groups": groups,
-        "sell": {"titles": sell_titles, "seniority": dedupe(sell.get("seniority")) or base_sen,
-                 "categories": sell_cats},
-        "buy": {"seniority": dedupe(buy.get("seniority")) or base_sen, "categories": buy_cats},
+        "sell": {"titles": sell_titles, "exact_titles": sell_exact, "exclude": sell_excl,
+                 "seniority": dedupe(sell.get("seniority")) or base_sen, "categories": sell_cats},
+        "buy": {"seniority": dedupe(buy.get("seniority")) or base_sen, "exact_titles": buy_exact,
+                "categories": buy_cats},
     }
     return icp, problems
+
+
+def yaml_traps(obj, where, out):
+    """YAML turns an unquoted `Yes:` / `No:` key or list item into a boolean (Mining's "Yes" geo tier
+    did). A label with a comma in an unquoted flow list splits in two, which shows up later as an
+    unknown label."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(k, bool) or k is None:
+                out.append(f"{where}: key {k!r} is a YAML boolean/null - quote it (\"Yes\":)")
+            yaml_traps(v, f"{where}.{k}", out)
+    elif isinstance(obj, list):
+        for x in obj:
+            if isinstance(x, bool) or x is None:
+                out.append(f"{where}: item {x!r} is a YAML boolean/null - quote it")
+            yaml_traps(x, where, out)
+
+
+def cross_check(icp, rules, scope):
+    """post_filter.yaml and scope.yaml must name only what icp.yaml defines."""
+    problems = []
+    sell_labels, buy_labels = set(icp["sell"]["categories"]), set(icp["buy"]["categories"])
+    sell_c = {c for v in icp["sell"]["categories"].values() for c in v}
+    buy_c = {c for v in icp["buy"]["categories"].values() for c in v["countries"]}
+    if rules is not None:
+        yaml_traps(rules, "post_filter", problems)
+        rb, rs = rules.get("buy") or {}, rules.get("sell") or {}
+        te = rb.get("team_evidence") or rb.get("mining_team_evidence") or {}
+        refs = list((rb.get("contains_too") or {}).keys()) + list(te.get("categories") or []) + \
+            [c for v in (rb.get("exclude_allowed") or {}).values() for c in v] + list(rb.get("partner_allowed") or [])
+        for c in refs:
+            if c not in buy_labels:
+                problems.append(f"post_filter: buy category {c!r} is not in icp.yaml (comma label unquoted?)")
+        for side, sec, countries in (("sell", rs, sell_c), ("buy", rb, buy_c)):
+            for tier, cs in (sec.get("geo_tier") or {}).items():
+                for c in cs or []:
+                    if c not in countries:
+                        problems.append(f"post_filter: {side}.geo_tier {tier!r} country {c!r} is not searched on that side")
+        for c in rules.get("linkedin_only_countries") or []:
+            if c not in sell_c | buy_c:
+                problems.append(f"post_filter: LinkedIn-only country {c!r} is never searched (not in icp.yaml)")
+        for name, p in (rs.get("personas") or {}).items():
+            if not (p or {}).get("exact") and not (p or {}).get("contains"):
+                problems.append(f"post_filter: persona {name!r} has no titles")
+    if scope is not None:
+        yaml_traps(scope, "scope", problems)
+        labels = {("Sell Side", x) for x in sell_labels} | {("Buy Side", x) for x in buy_labels}
+        for t, v in (scope.get("type_map") or {}).items():
+            if tuple(v or ()) not in labels:
+                problems.append(f"scope: type_map {t} -> {v} is not an icp.yaml side + category")
+        sets = {k: set(v) for k, v in (scope.get("label_sets") or {}).items()}
+        for k, v in sets.items():
+            for x in v - sell_labels - buy_labels:
+                problems.append(f"scope: label_sets.{k} has {x!r}, not an icp.yaml category")
+        for ev, e in (scope.get("events") or {}).items():
+            named = list((e or {}).get("keep") or []) + list(((e or {}).get("region") or {}).get("labels") or [])
+            for x in named:
+                if x not in sets and x not in sell_labels | buy_labels:
+                    problems.append(f"scope: event {ev!r} names {x!r}, not a category or label set")
+            reg = ((e or {}).get("region") or {}).get("region")
+            if reg and reg not in (scope.get("regions") or {}):
+                problems.append(f"scope: event {ev!r} uses region {reg!r}, not defined in regions")
+    return problems
 
 
 def main():
@@ -185,21 +289,32 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["check", "payload"])
     ap.add_argument("icp_yaml")
+    ap.add_argument("--rules", help="post_filter.yaml: cross-check it against icp.yaml")
+    ap.add_argument("--scope", help="scope.yaml: cross-check it against icp.yaml")
     ap.add_argument("--build-node-id", help="the people workflow's Build Company Record node")
     ap.add_argument("--out", default="mapping_update.json")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     cfg = yaml.safe_load(open(args.icp_yaml, encoding="utf-8")) or {}
+    traps = []
+    yaml_traps(cfg, "icp", traps)
     icp, problems = build(cfg)
-    print(f"sell: {len(icp['sell']['titles'])} titles, {len(icp['sell']['categories'])} categories, "
-          f"seniority {icp['sell']['seniority']}")
-    for k, v in icp["sell"]["categories"].items():
+    problems = traps + problems + cross_check(
+        icp, yaml.safe_load(open(args.rules, encoding="utf-8")) or {} if args.rules else None,
+        yaml.safe_load(open(args.scope, encoding="utf-8")) or {} if args.scope else None)
+    sell, buy = icp["sell"], icp["buy"]
+    print(f"sell: {len(sell['titles'])} titles (contain) + {len(sell['exact_titles'])} exact, "
+          f"{len(sell['exclude'])} exclusions, {len(sell['categories'])} categories, "
+          f"seniority {sell['seniority']}")
+    for k, v in sell["categories"].items():
         print(f"   S  {k[:50]:52} countries {len(v)}")
-    print(f"buy:  {len(icp['buy']['categories'])} categories, seniority {icp['buy']['seniority']}")
-    for k, v in icp["buy"]["categories"].items():
-        print(f"   B  {k[:50]:52} titles {len(v['titles']):3}  countries {len(v['countries'])}")
-    print(f"exclusions: {len(icp['exclude'])}   seniority groups: "
+    print(f"buy:  {len(buy['categories'])} categories, {len(buy['exact_titles'])} exact titles, "
+          f"seniority {buy['seniority']}")
+    for k, v in buy["categories"].items():
+        print(f"   B  {k[:50]:52} titles {len(v['titles']):3}  exclusions {len(v['exclude']):3}  "
+              f"countries {len(v['countries'])}")
+    print("seniority groups: "
           + (", ".join(f"{g}={v}" for g, v in icp["seniority_groups"].items()) or "none"))
     if cfg.get("_warnings"):
         print(f"\nwarnings ({len(cfg['_warnings'])}) — show the user:")
@@ -215,11 +330,16 @@ def main():
         raise SystemExit("refusing to write a payload while icp.yaml has problems")
     if not args.build_node_id:
         raise SystemExit("--build-node-id is required for payload")
+    inputs = ["side", "classification", "countries_override", "seniority_group"]
+    if icp["sell"]["exact_titles"] or icp["buy"]["exact_titles"]:
+        # Only then: the Build node must output title_mode, and Find People must take
+        # job_title_mode from this node instead of the template's static "contain".
+        inputs.append("title_mode")
     payload = {
         "code": MAPPING_CODE % json.dumps(icp, ensure_ascii=False),
         "inputSchema": {"type": "object", "properties": {
             k: {"type": "string", "sourceNodeId": args.build_node_id, "sourcePath": f"$.{k}"}
-            for k in ("side", "classification", "countries_override", "seniority_group")}},
+            for k in inputs}},
         "outputSchema": OUTPUT_SCHEMA,
     }
     json.dump(payload, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)

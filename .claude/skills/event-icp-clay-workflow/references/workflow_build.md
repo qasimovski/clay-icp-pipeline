@@ -13,6 +13,27 @@ classifier for every company, and a non-deterministic model may disagree with th
 So: **classify once**, save the CSV, then feed `Side` + `Classification` into a separate people
 workflow as trigger inputs.
 
+## What each action really costs (measured, Oct 2026)
+
+Clay bills two things:
+- **actions**: the search/enrichment allowance;
+- **data credits**: the `credits balance`.
+
+The catalog's "1 credit" label was wrong for several of these, so read `dataCreditsUsed` off a
+draft test before quoting any price. Never quote from the catalog.
+
+| Action | Measured | Note |
+|---|---|---|
+| Find People v2 (`cpj-find-lists-of-people-v2`) | 1 action, 0 data credits per search | the user's rule: "it just consumes actions and must not consume any credits" |
+| Enrich Person (`cpj-enrich-person`, by LinkedIn URL) | 1 action, 0 data credits | |
+| Enrich Company (`cpj-enrich-company-v2`) | 1 action, 0 data credits | by domain, or by `clay_company_id` |
+| Claygent agent, `gpt-6-luna`, web search on | 1 action + 0.1 data credit per row | the API key is registered in Clay |
+| Classifier agent (`gpt-4.1-mini`) | read it from the draft test | |
+| Email waterfall + ZeroBounce | per provider plan | `references/email_workflow.md` |
+
+Mining's full people run made 5,250 searches, all actions; the data-credit balance didn't move.
+Every split adds one search per capped company per group.
+
 ## Workflow 1 — classify (costs credits per row)
 
 ```
@@ -28,11 +49,13 @@ Manual trigger (inputs = feed columns)
   returns `Side`, `Classification` and every enrichment field the Salesforce file needs (Size,
   Type, Industry, Founded, Description, Annual Revenue, Company LinkedIn URL…). Without it the
   firmographics are computed, paid for and thrown away.
-- **Enrich company v2 does not return** Specialities, Sub-Industry, Primary Offerings, Business
-  Stage or Funding range (outputs verified 2026-10-21: clay_company_id, url, name, size, slug,
-  type, domain, country, founded, website, industry, locality, locations, description,
-  employee_count, follower_count, annual_revenue). If the user needs those columns, ask where
-  they should come from (another enrichment, an AI column, or blank) and price it before adding.
+- **Enrich company v2 returns Sub-Industry, Primary Offerings and Business Stage only when looked
+  up by DOMAIN** (`company_identifier_type: company_domain`). They sit under `derived_datapoints`
+  (`subindustry[]`, `primary_offerings[]`, `business_stage`, plus `business_type`, `revenue_streams`,
+  `pattern_tags`). A `clay_company_id` lookup omits that block, and the catalog schema doesn't list
+  it (measured on Metso, 2026-10-25). `specialties[]` and `total_funding_amount_range_usd` come back
+  either way. Cost measured: 1 action, 0 data credits. About 1 company in 4 has no derived data
+  (e.g. Alcoa and BHP).
 - **The company "is it new?" gate is NOT in the workflow.** It runs locally before the feed is
   sent (`supabase-known-lookup` skill, `companies` mode): a company that should not be paid for
   is simply absent from the feed, so no later mistake can reach it.
@@ -104,3 +127,8 @@ written back). Read `references/email_workflow.md` for the accounts, the build a
 | ~1% of bulk rows `failed / Unknown error` | transient; `bulk_run.py --retry-failed` |
 | Shared/hosted domains (`www.gov.uk`, `x.wixsite.com`) | `build_feed.py` flags them; fix the domain before the people run |
 | Clay CLI on Windows | unsupported — `_clay.py` goes through WSL automatically |
+| `ERROR_INVALID_INPUT` on a people row | a malformed domain (`.example.com`, `http:example.com`). Fix it, or drop it if it is a whole national government (`gob.pe`, `gouv.ci`) |
+| Bulk row id over 64 characters | rejected by Clay; use a short stable id (`Row ID` = sha1[:16]). `bulk_run.py` refuses them |
+| The local `bulk_run.py` died | Clay still runs every chunk already submitted, and bills them. Check `state.json` and the run before saying it stopped |
+| A group came back full again (10) | split the group (B → B1 + B2) after asking; `collect.py capped --groups`, then `merge-splits` |
+| A label with a comma in an unquoted YAML flow list | splits in two; `icp_mapping.py check --rules --scope` catches it |

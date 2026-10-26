@@ -1,0 +1,237 @@
+# EVCharge Live — BUY SIDE people searches
+#
+# Source: the `BuySide ICP` sheet. One entry per Top level, matching the
+# Companies workbooks in `Buyside P&S`.
+#
+# Query shape (docs/PEOPLE_PASSES.md):
+#   select from people
+#   where experiences.count(
+#       is_current = true
+#       and seniority in (<seniority>)
+#       and job_title contains (<the category's titles + senior_titles>)
+#       and not job_title contains (<exclude_titles>)
+#       and company.locations.count(country_name in (<countries>)) >= 1
+#     ) >= 1
+#     and <the clay.filter_to_companies(...) Clay prefills>
+#   limit 13 by clay_company_id
+#
+# The WHOLE persona sits in ONE experiences.count(...) predicate. Split across
+# two, a person who is a Director at company A and holds any role at company B
+# with an in-region office would pass while no single role qualifies.
+#
+# MATCH TYPE is `contains` for every category, per the user (2026-08-09) — the
+# sheet marks Real Estate as "Match Exactly", but the user asked for contains
+# throughout, which also lets the senior_titles below apply uniformly.
+
+per_company_limit: 13
+
+# Sheet: "All except Intern/Trainee, Assistant, Entry, Freelance". Clay's
+# experience enum has no Assistant or Freelance value, so those are satisfied by
+# absence. `Unknown` is left out: it is a parse-failure bucket, not a level.
+seniority:
+  - Founder
+  - Owner
+  - Board Member
+  - Partner
+  - C-suite
+  - VP
+  - Director
+  - Head
+  - Manager
+  - Senior
+  - Mid-level
+
+# Added on the user's instruction to include C-suite and Director-and-above.
+# Broad generic titles ("Head of", "Director of") are safe HERE in a way they
+# would not be in a standalone search: the people query is already scoped to one
+# workbook's companies by clay.filter_to_companies, so these widen seniority
+# coverage inside a bounded set rather than opening the search up.
+senior_titles:
+  - Chief Executive Officer
+  - CEO
+  - Chief Operating Officer
+  - COO
+  - Chief Financial Officer
+  - CFO
+  - Chief Technology Officer
+  - CTO
+  - Chief Sustainability Officer
+  - Chief Commercial Officer
+  - Chief Investment Officer
+  - Chief Infrastructure Officer
+  - Managing Director
+  - General Manager
+  - President
+  - Vice President
+  - Head of
+  - Director of
+  - Founder
+  - Owner
+
+# The user's exclusion list, verbatim with ONE removal: `Facilities`. It was in
+# both the exclusions and the target titles for Real Estate and Health/Campuses,
+# and the user chose to keep it as a target — Head of Facilities owns the car
+# parks and depots where workplace and campus charging lands. The junior
+# facilities roles the exclusion was aimed at are already removed by `seniority`.
+exclude_titles:
+  - HR
+  - Human Resources
+  - Talent
+  - People
+  - Recruitment
+  - Recruiter
+  - Hiring
+  - Administrative
+  - Admin
+  - Secretary
+  - Receptionist
+  - Coordinator
+  - Office Manager
+  - Finance
+  - Accounting
+  - Accountant
+  - Controller
+  - Legal
+  - Lawyer
+  - Attorney
+  - Counsel
+  - Compliance
+  - Risk
+  - Audit
+  - Brand
+  - Communications
+  - Social Media
+  - Content
+  - Copywriter
+  - Designer
+  - Graphic
+  - UX
+  - UI
+  - Developer
+  - Software
+  - DevOps
+  - Data Analyst
+  - Data
+  - Customer Success
+  - Help Desk
+  - Maintenance
+  - Security
+  - Janitorial
+  - Intern
+  - Trainee
+  - Consultant
+  - Contractor
+  - Freelance
+  - Temp
+  - Vendor
+  - Third Party
+  - Investor
+  - QA
+  - Quality
+  - Platform
+  - Product
+  - cook
+  - driver
+  - warehouse
+
+categories:
+
+  - name: All Industries (exclude Aviation & Aerospace)
+    titles:
+      - Autonomous Vehicle
+      - Electric Vehicle
+      - Electrification
+      - Fleet
+      - Infrastructure
+      - Mobility
+      - Transport
+
+  - name: Transport, Mobility & Logistics
+    titles:
+      - Depot
+      - Engineering
+      - Electrification
+      - Energy
+      - Fleet
+      - Logistics
+      - Mobility
+      - Net Zero
+      - Operations
+      - Sustainability
+      - Transport
+
+  - name: Government, Public Sector & Authorities
+    titles:
+      - Capital Projects
+      - Climate Change
+      - Energy
+      - Highways
+      - Infrastructure
+      - Innovation
+      - Net Zero
+      - Parking
+      - Smart City
+      - Sustainability
+      - Traffic
+      - Transport
+
+  - name: Energy, Utilities & Infrastructure Owners
+    titles:
+      - Asset
+      - Electrification
+      - Energy
+      - Flexibility
+      - Grid
+      - Infrastructure
+      - Net Zero
+      - Operations Director
+      - Power
+      - Sustainability
+
+  - name: Real Estate, Property & Facilities
+    titles:
+      - Asset Management
+      - Asset Manager
+      - Development Director
+      - Energy Manager
+      - ESG Director
+      - Estate Manager
+      - Facilities
+      - Head of Development
+      - Head of Facilities
+      - Net Zero Manager
+      - Property Director
+      - Real Estate Director
+      - Sustainability Director
+
+  - name: Construction Clients & Infrastructure Owners
+    titles:
+      - Asset
+      - Infrastructure
+      - Programme
+      - Program
+      - Engineering
+      - Project
+      - Portfolio
+      - Technical
+
+  - name: Retail, Food & Destination Sites
+    titles:
+      - Capital Project
+      - Energy
+      - Estate
+      - Forecourt
+      - Fuel
+      - Network Development
+      - Property
+      - Sustainability
+
+  - name: Health, Education & Large Campuses
+    titles:
+      - Campus Operations
+      - Estates
+      - Facilities
+      - Infrastructure
+      - Operations Director
+      - Property
+      - Site Operations

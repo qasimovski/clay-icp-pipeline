@@ -2,15 +2,21 @@
 
     classified   classify results + feed      -> classified.csv (Side, Classification, enrichment)
     people-feed  classified.csv               -> people_feed.csv (one row per searchable Domain)
-    capped       people_feed + people results -> people_feed - sen A.csv / - sen B.csv
+    capped       people_feed + people results -> people_feed - sen <group>.csv per seniority group
+    merge-splits every seniority-split result dir -> one dir, each company's people unioned
     people       classified + people results  -> people.csv (+ excluded.csv, duplicates.csv)
     emails       approved people + email results -> people - emails.csv (+ no email / not run beside it)
 
     python collect.py classified  --feed feed.csv --results runs/classify/results --id-cols "Event,Entity,Domain" --out classified.csv
     python collect.py people-feed --classified classified.csv --out people_feed.csv [--countries-col "Countries Override"]
-    python collect.py capped      --feed people_feed.csv --results runs/people/results --out-prefix people_feed
+    python collect.py capped      --feed people_feed.csv --results runs/people/results --out-prefix people_feed \
+                                  [--icp icp.yaml | --groups A,B]
+    python collect.py capped      --feed "people_feed - sen B.csv" --results runs/sen_b/results \
+                                  --out-prefix people_feed --groups B1,B2      # a group that was full again
+    python collect.py merge-splits --out runs/split_merged runs/sen_a/results runs/sen_b/results \
+                                  runs/sen_b1/results runs/sen_b2/results
     python collect.py people      --classified classified.csv --results runs/people/results \
-                                  [--split runs/sen_a/results --split runs/sen_b/results] --icp icp.yaml --out people.csv
+                                  [--split runs/split_merged] --icp icp.yaml --out people.csv
     python collect.py emails      --people "people - approved.csv" --results runs/emails/results --out "people - emails.csv"
 
 Nothing is dropped silently: every removed person is written out with the reason,
@@ -127,14 +133,60 @@ def cmd_people_feed(a):
 
 # ------------------------------------------------------------------ capped
 def cmd_capped(a):
+    """Companies whose search came back full (10) are searched again once per seniority group.
+
+    The groups are icp.yaml's `seniority_groups` (or --groups). A group that comes back full again
+    can itself be split (Mining, Oct 2026: B = head..mid-level was full at 724 of 804 companies, so
+    icp.yaml replaced B with B1 = head, manager and B2 = senior, mid-level, and only those 724 ran
+    again): pass that group's feed and results with --groups B1,B2.
+    """
     header, rows = read_csv(a.feed)
     res = load_results(a.results)
     capped = [r for r in rows if res.get(r["Domain"], {}).get("status") == "complete"
               and len(people_of(res[r["Domain"]])[0]) >= CAP]
-    for g in ("A", "B"):
+    if a.groups:
+        groups = [g.strip() for g in a.groups.split(",") if g.strip()]
+    elif a.icp:
+        import yaml
+        groups = list((yaml.safe_load(open(a.icp, encoding="utf-8")) or {}).get("seniority_groups") or {})
+    else:
+        groups = ["A", "B"]
+    if not groups:
+        raise SystemExit("no seniority groups: add seniority_groups to icp.yaml or pass --groups")
+    print(f"{len(capped):,} of {len(rows):,} companies returned the cap ({CAP})")
+    for g in groups:
         p = f"{a.out_prefix} - sen {g}.csv"
         write_csv(p, header, [{**r, "Seniority Group": g} for r in capped])
         print(f"group {g}: {len(capped):,} companies -> {p}")
+
+
+# ------------------------------------------------------------------ merge-splits
+def cmd_merge_splits(a):
+    """One result per company: the union of every split search it had, deduped on the profile URL.
+
+    `people --split` needs each split dir to cover the same companies. Once a group is split again
+    (B -> B1 + B2 on only the companies where B was full) they don't, so merge them first.
+    """
+    runs = [load_results(d) for d in a.dirs]
+    bad = [(d, k) for d, r in zip(a.dirs, runs) for k, v in r.items() if v.get("status") != "complete"]
+    if bad:
+        raise SystemExit(f"{len(bad)} split searches not complete (e.g. {bad[:3]}) - retry them first")
+    os.makedirs(a.out, exist_ok=True)
+    domains = sorted(set().union(*runs))
+    n_people = 0
+    with open(os.path.join(a.out, "merged.jsonl"), "w", encoding="utf-8") as fh:
+        for dom in domains:
+            seen, people = set(), []
+            for r in runs:
+                for p in people_of(r.get(dom))[0]:
+                    key = p.get("url") or json.dumps(p, sort_keys=True)
+                    if key not in seen:
+                        seen.add(key)
+                        people.append(p)
+            n_people += len(people)
+            fh.write(json.dumps({"id": dom, "status": "complete", "result": {"people": people}},
+                                ensure_ascii=False) + "\n")
+    print(f"{len(domains):,} companies, {n_people:,} distinct people -> {a.out}")
 
 
 # ------------------------------------------------------------------ people
@@ -142,9 +194,22 @@ def word_re(term):
     return re.compile(r"(?<![A-Za-z0-9])" + re.escape(term) + r"(?![A-Za-z0-9])", re.I)
 
 
-def person_cells(p):
+def iso_names(people):
+    """{ISO2: country name} from the people whose structured_location has both."""
+    out = {}
+    for p in people:
+        loc = p.get("structured_location") or {}
+        if loc.get("country_iso") and loc.get("country"):
+            out.setdefault(loc["country_iso"].upper(), loc["country"])
+    return out
+
+
+def person_cells(p, iso=None):
     loc = p.get("structured_location") or {}
-    country = loc.get("country") or ""
+    # A location written in Arabic or Chinese ("القاهرة مصر") comes back with an EMPTY
+    # structured_location and only the top-level ISO2 `country` (Mining, Oct 2026: 60 of
+    # ~560 people). Without this the person has no country for the geo check or Salesforce.
+    country = loc.get("country") or (iso or {}).get(str(p.get("country") or "").upper(), "")
     city, state = ((v if v != country else "") for v in (loc.get("city") or "", loc.get("state") or ""))
     return [p.get("name", ""), p.get("first_name") or "", p.get("last_name") or "",
             p.get("title", "") or "", p.get("url", ""), city, state, country]
@@ -169,7 +234,8 @@ def cmd_people(a):
         halves = [load_results(d) for d in a.split]
         doms = set(halves[0])
         if any(set(h) != doms for h in halves[1:]):
-            raise SystemExit("split result dirs cover different Domains")
+            raise SystemExit("split result dirs cover different Domains - run `collect.py merge-splits` "
+                             "into one dir and pass that as the only --split")
         bad = [d for d in doms if any(h[d].get("status") != "complete" for h in halves)]
         if bad:
             raise SystemExit(f"{len(bad)} split searches incomplete (e.g. {bad[:3]}) — retry them first")
@@ -181,6 +247,7 @@ def cmd_people(a):
         raise SystemExit(f"{len(failed - set(by_domain))} people searches failed — "
                          f"bulk_run.py --retry-failed before exporting")
 
+    iso = iso_names(p for ppl, _ in by_domain.values() for p in ppl)
     comp_cols = [c for c in header if c not in ("Outcome",)]
     out_header = comp_cols + PERSON_COLS + ["Outcome"]
     kept_rows, excluded, dupes = [], [], []
@@ -201,15 +268,15 @@ def cmd_people(a):
             title = p.get("title", "") or ""
             hit = next((t for t, rx in excl if rx.search(title)), None)
             if hit and not any(rx.search(title) for rx in rescue):
-                excluded.append(base + person_cells(p) + [f"excluded: {hit}"])
+                excluded.append(base + person_cells(p, iso) + [f"excluded: {hit}"])
                 continue
             s = slug(p.get("url"))
             if s and s in seen:
-                dupes.append(base + person_cells(p) + [f"duplicate of {seen[s]}"])
+                dupes.append(base + person_cells(p, iso) + [f"duplicate of {seen[s]}"])
                 continue
             if s:
                 seen[s] = d
-            kept_rows.append(base + person_cells(p) + ["found"])
+            kept_rows.append(base + person_cells(p, iso) + ["found"])
             n_kept += 1
         tally["found" if n_kept else "all people excluded or duplicate"] += 1
 
@@ -288,6 +355,11 @@ def main():
     k.add_argument("--feed", required=True)
     k.add_argument("--results", required=True)
     k.add_argument("--out-prefix", required=True)
+    k.add_argument("--icp", help="read the groups from icp.yaml seniority_groups")
+    k.add_argument("--groups", help="comma list, e.g. B1,B2 (overrides --icp)")
+    m = sub.add_parser("merge-splits")
+    m.add_argument("dirs", nargs="+")
+    m.add_argument("--out", required=True)
     p = sub.add_parser("people")
     p.add_argument("--classified", required=True)
     p.add_argument("--results", required=True)
@@ -302,7 +374,7 @@ def main():
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     {"classified": cmd_classified, "people-feed": cmd_people_feed,
-     "capped": cmd_capped, "people": cmd_people, "emails": cmd_emails}[a.cmd](a)
+     "capped": cmd_capped, "merge-splits": cmd_merge_splits, "people": cmd_people, "emails": cmd_emails}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -67,6 +67,12 @@ def build_chunks(args, feeds, state):
             continue                      # one search per id
         seen.add(rid)
         recs.append({"id": rid, "inputs": {c: r.get(c, "") for c in cols}})
+    long_ids = [x["id"] for x in recs if len(x["id"]) > 64]
+    if long_ids:
+        # Clay rejects a bulk row id over 64 characters (Mining speakers, Oct 2026). Give the feed a
+        # short stable id column (speakers.py writes `Row ID` = sha1[:16]) and pass --id-cols "Row ID".
+        raise SystemExit(f"{len(long_ids)} row ids are over 64 characters (e.g. {long_ids[0][:80]!r}) — "
+                         f"use a short stable id column")
     if args.retry_failed:
         failed = failed_ids(os.path.join(args.work, "results"))
         recs = [x for x in recs if x["id"] in failed]

@@ -1,0 +1,523 @@
+# EXAMPLE: the real Mining V2 icp.yaml (config/icps/mining/icp.yaml, Oct 2026). Compared with
+# icp.example.yaml (Highways) it shows: per-side exclusions, exact_titles, three seniority groups
+# (A / B1 / B2), Clay country spellings, and comments recording each decision. Every value is a variable.
+#
+# Mining ICP: The Mining Show (Dubai, 16-17 Nov 2026; then 16-17 Oct 2027).
+# Read by .claude/skills/event-icp-clay-workflow/scripts/icp_mapping.py (the people workflow's
+# ICP Mapping node). Source: "Mining Playbook ICP.xlsx", V2 tabs only (V2 always beats V1):
+#   Seller JTs v2, BuySide ICP v2, Geo_Scope v2.
+# Rules the Clay search can't express (exact match, per-keyword exclusions, persona, geo tier,
+# the Germany split) are in post_filter.yaml beside this file and are applied to the results.
+#
+# Decisions behind this file (user, 25 Oct 2026):
+# - Person location only. The countries below filter where the PERSON is, not the company HQ.
+# - Sell side: Bookers and Stand staff in ONE contain search (the lists share 25 keywords, so
+#   two searches would pay twice for the same people); post_filter.yaml tags the persona.
+# - Exact titles that are safe in contain mode (CEO, Managing Director...) are in `titles`;
+#   their extra hits ("CEO & Founder") are judged by post_filter.yaml. Exact titles that
+#   contain mode would flood ("Vice President" hits every VP; bare Manager / Director / Sales)
+#   are in `exact_titles`, searched only by a separate exact-mode pass if approved after the
+#   draft test.
+# - Germany is searched (sell side) but never emailed: post_filter.yaml sends it to a
+#   LinkedIn-only file. Parked countries (Sudan, Iran, Russia, Belarus) are not searched.
+#
+# Seniority, both tabs: "All except Intern/Trainee, Assistant, Entry, Freelance"
+# -> every Clay slug except entry and intern, plus the title exclusions below.
+seniority:
+- founder
+- owner
+- board-member
+- partner
+- c-suite
+- vp
+- director
+- head
+- manager
+- senior
+- mid-level
+seniority_groups:
+  A:
+  - founder
+  - owner
+  - board-member
+  - partner
+  - c-suite
+  - vp
+  - director
+  # B1 + B2 replaced B (head..mid-level) on 25 Oct 2026, after B came back full (10) at 724 of
+  # 804 split companies. The first run's B searches are kept and merged with B1 + B2.
+  B1:
+  - head
+  - manager
+  B2:
+  - senior
+  - mid-level
+
+# Both sides. Kept short on purpose: collect.py also applies this list at export to every
+# person, and the buy side's EXCLUDE row (Sales Manager, Marketing...) must not touch sellers.
+exclude_titles:
+- Intern
+- Trainee
+- Assistant
+- Freelance
+
+sell:
+  # Clay-side exclusions only where no sell keyword ever wants the word. The Marketing-only
+  # exclusions (Digital, Performance, Content, Email, Growth) and the Bookers' "Aftersales"
+  # (wanted by Stand staff) are applied per keyword in post_filter.yaml instead.
+  exclude_titles:
+  - Presales
+  - Pre-Sales
+  - SEO
+  - Social Media
+  - Influencer
+  - Affiliate
+  - Brand Ambassador
+  titles:
+  # Exact on the sheet, safe in contain mode
+  - CEO
+  - Chief Executive Officer
+  - MD
+  - Managing Director
+  - General Manager
+  - GM
+  - Deputy General Manager
+  - Founder
+  - Co-Founder
+  - Chairman
+  - COO
+  - Chief Operating Officer
+  - CTO
+  - Chief Technical Officer
+  - CMO
+  - Chief Commercial Officer
+  - Regional Director
+  - Expo Manager
+  - Sale Manager
+  # Contains, Bookers
+  - Sales Manager
+  - Sales Director
+  - Sales Engineer
+  - Head of Sales
+  - Marketing
+  - Business Development
+  - Regional Manager
+  - Area Manager
+  - Export Manager
+  - Regional Sales
+  - Area Sales
+  - Key Account
+  - Technical Director
+  - Operations Director
+  - Global Sales
+  - International Sales
+  - Brand
+  - Communication
+  - Trade Show
+  - VP of Sales
+  - Regional Representative
+  # Contains, Stand staff only
+  - Sales Executive
+  - Sales Representative
+  - Sales Coordinator
+  - Territory Manager
+  - Account Manager
+  - Account Executive
+  - Application Engineer
+  - Service Engineer
+  - Product Manager
+  - Project Manager
+  - Export
+  - Aftersales
+  - Sales Support
+  - Service Manager
+  - Sales Area
+  # Spelling variants. Clay matches whole words; the sheet's notes assume substring hits
+  # ("Export hits Exporter"; "Communication" excludes "Telecommunication").
+  - Exporter
+  - Communications
+  # Exact-mode pass only (see header). Bare Manager / Director / Sales: "run only on companies
+  # that pass Products_Services v2" (Nic, 23 Oct); every company in this feed does.
+  exact_titles:
+  - President
+  - Vice President
+  - Manager
+  - Director
+  - Sales
+  # Geo_Scope v2 SELL SIDE: Core, Yes, Secondary and Exhibitor sourcing (Germany). Blank and
+  # Parked are left out. One list for every category: the sheet doesn't vary it by category.
+  categories:
+    Heavy Equipment: &sell_countries
+    - United Arab Emirates
+    - China
+    - India
+    - Turkey
+    - Saudi Arabia
+    - United Kingdom
+    - Italy
+    - Germany
+    - United States
+    - Ireland
+    - Austria
+    - Belgium
+    - France
+    - Netherlands
+    - Switzerland
+    - Denmark
+    - Finland
+    - Norway
+    - Sweden
+    - Greece
+    - Portugal
+    - Spain
+    - Bulgaria
+    - Czech Republic
+    - Hungary
+    - Lithuania
+    - Poland
+    - Bahrain
+    - Egypt
+    - Jordan
+    - Kuwait
+    - Oman
+    - Qatar
+    - Morocco
+    - South Africa
+    - Bangladesh
+    - Hong Kong
+    - Indonesia
+    - Kazakhstan
+    - Laos
+    - Malaysia
+    - Pakistan
+    - Philippines
+    - Singapore
+    - Sri Lanka
+    - Taiwan
+    - Thailand
+    - Vietnam
+    - Australia
+    - New Zealand
+    Processing Technology: *sell_countries
+    Production & Material Handling Solutions: *sell_countries
+    Mining & Technical Consulting: *sell_countries
+    Automation & Digital Technologies: *sell_countries
+    Water & Waste Management: *sell_countries
+    Power Solutions: *sell_countries
+    Distributors & Dealers: *sell_countries
+
+buy:
+  # BuySide ICP v2 EXCLUDE row, minus "Partner" (excluded per category below, except
+  # Investors) and minus Intern / Trainee / Assistant / Freelance (in exclude_titles).
+  exclude_titles:
+  - Entry
+  - Student
+  - Junior
+  - Sales Manager
+  - Sales Executive
+  - Sales Engineer
+  - Sales Director
+  - Business Development
+  - Marketing
+  - Recruitment
+  - Growth
+  # Cross-cutting titles that contain mode would flood (any "Vice President ..." at a major).
+  exact_titles:
+  - President
+  - Vice President
+  - Owner
+  # Geo_Scope v2 "BUY: The Mining Show 2026": Core, Yes and Secondary. Blank and Parked
+  # (Sudan, Iran, Russia, Belarus) are left out; Zimbabwe, Mali, Burkina Faso and Guinea are in.
+  default_countries:
+  - United Arab Emirates
+  - Egypt
+  - Oman
+  - Saudi Arabia
+  - Turkey
+  - South Africa
+  - China
+  - India
+  - Pakistan
+  - Canada
+  - United States
+  - Argentina
+  - Bolivia
+  - Brazil
+  - Chile
+  - Colombia
+  - Ecuador
+  - Mexico
+  - Panama
+  - Peru
+  - United Kingdom
+  - Austria
+  - France
+  - Finland
+  - Sweden
+  - Italy
+  - Spain
+  - Czech Republic
+  - Poland
+  - Jordan
+  - Botswana
+  - Burkina Faso
+  - Côte d'Ivoire
+  - Democratic Republic of the Congo
+  - Ghana
+  - Guinea
+  - Madagascar
+  - Mali
+  - Morocco
+  - Mozambique
+  - Namibia
+  - Senegal
+  - Tanzania
+  - Zambia
+  - Zimbabwe
+  - Indonesia
+  - Japan
+  - Kazakhstan
+  - Mongolia
+  - Philippines
+  - South Korea
+  - Uzbekistan
+  - Australia
+  - Papua New Guinea
+  # Each group = its segment keywords (column F; identical across a group's sub-segments)
+  # + the cross-cutting titles (rows 17-38) that are safe in contain mode.
+  categories:
+    Mining & Minerals Operators:
+      exclude_titles: [Partner]
+      titles:
+      - Mine Manager
+      - Mining Manager
+      - Mining Director
+      - Head of Mining
+      - Mine Operations
+      - Mining Operations
+      - Mine Planning
+      - Mining Engineer
+      - Geologist
+      - Geology
+      - Exploration Manager
+      - Mineral Processing
+      - Metallurgist
+      - Metallurgical
+      - Plant Manager
+      - Maintenance Manager
+      - Head of Maintenance
+      - Reliability Engineer
+      - Procurement
+      - Purchasing
+      - Supply Chain
+      - Operations Manager
+      - Operations Director
+      - Technical Director
+      - Project Director
+      - Projects Director
+      - Project Manager
+      - Head of Projects
+      - Capital Projects
+      - Geotechnical
+      - Tailings
+      - Sustainability
+      - HSE Manager
+      - Digital Transformation
+      - Asset Management
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - General Manager
+      - GM
+      - Chairman
+      - Founder
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technical Officer
+      - CFO
+      - Chief Financial Officer
+      - Regional Director
+      - Executive Director
+    Government & Regulators:
+      exclude_titles: [Partner]
+      titles:
+      - Minister
+      - Director General
+      - Geological Survey
+      - Mineral Resources
+      - Head of Mining
+      - Mining Director
+      - Investment Promotion
+      - Secretary General
+      - Undersecretary
+      - Under Secretary
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - General Manager
+      - GM
+      - Chairman
+      - Founder
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technical Officer
+      - CFO
+      - Chief Financial Officer
+      - Regional Director
+      - Executive Director
+      - Technical Director
+      - Mine Manager
+      - Plant Manager
+    Quarrying, Aggregates & Cement:
+      exclude_titles: [Partner]
+      titles:
+      - Quarry Manager
+      - Plant Manager
+      - Production Manager
+      - Operations Manager
+      - Operations Director
+      - Technical Director
+      - Procurement
+      - Purchasing
+      - Supply Chain
+      - Maintenance Manager
+      - Head of Maintenance
+      - Project Manager
+      - Projects Director
+      - Geologist
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - General Manager
+      - GM
+      - Chairman
+      - Founder
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technical Officer
+      - CFO
+      - Chief Financial Officer
+      - Regional Director
+      - Executive Director
+      - Mine Manager
+    EPC Contractors & Engineering Services:
+      exclude_titles: [Partner]
+      titles:
+      - Mining Engineer
+      - Mining Director
+      - Mining Manager
+      - Project Director
+      - Projects Director
+      - Project Manager
+      - Head of Projects
+      - Procurement
+      - Purchasing
+      - Supply Chain
+      - Technical Director
+      - Engineering Manager
+      - Head of Engineering
+      - Chief Engineer
+      - Process Engineer
+      - Metallurgist
+      - Metallurgical
+      - Capital Projects
+      - Contracts Manager
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - General Manager
+      - GM
+      - Chairman
+      - Founder
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technical Officer
+      - CFO
+      - Chief Financial Officer
+      - Regional Director
+      - Executive Director
+      - Mine Manager
+      - Plant Manager
+    # "Partner" is allowed here (decision 25 Oct): an investment partner is a buyer.
+    Investors & Financial Institutions:
+      titles:
+      - Mining Analyst
+      - Investment Manager
+      - Portfolio Manager
+      - Fund Manager
+      - Investor Relations
+      - Mining Investment
+      - Commodities
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - General Manager
+      - GM
+      - Chairman
+      - Founder
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technical Officer
+      - CFO
+      - Chief Financial Officer
+      - Regional Director
+      - Executive Director
+      - Technical Director
+      - Mine Manager
+      - Plant Manager
+    Processing, Refining & Smelting:
+      exclude_titles: [Partner]
+      titles:
+      - Plant Manager
+      - Process Engineer
+      - Metallurgist
+      - Metallurgical
+      - Mineral Processing
+      - Production Manager
+      - Production Director
+      - Operations Manager
+      - Operations Director
+      - Technical Director
+      - Maintenance Manager
+      - Head of Maintenance
+      - Reliability Engineer
+      - Procurement
+      - Purchasing
+      - Supply Chain
+      - Project Manager
+      - Projects Director
+      - Sustainability
+      - HSE Manager
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - General Manager
+      - GM
+      - Chairman
+      - Founder
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technical Officer
+      - CFO
+      - Chief Financial Officer
+      - Regional Director
+      - Executive Director
+      - Mine Manager
+
+# Empty on purpose. collect.py rescues a title that hits an exclusion if it contains one of
+# these, and Mining's only export exclusions are Intern / Trainee / Assistant / Freelance, so
+# a rescue list would bring back "Assistant General Manager" and "Executive Assistant to the
+# CEO". Exact-title judgement is post_filter.yaml's job.
+rescue_titles: []

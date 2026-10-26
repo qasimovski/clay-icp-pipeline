@@ -1,0 +1,1236 @@
+# Highways — Products & Services company searches
+#
+# Source of truth: the `Products_Services` sheet of `ICP - Highways new.xlsx`
+# (gitignored — see docs/SENSITIVE_DATA.md). One entry per **Top level** value;
+# each becomes one Clay workbook named after the Top level, holding one table
+# named `Companies`, inside `Highways [Qasim - 2026] -> Products & Services`,
+# populated by Find companies -> Build with filters -> Query mode.
+#
+# The sheet has 23 real Top levels plus a `GH - bit of repetition` annotation
+# row, which is not a category and is deliberately absent here.
+#
+# COUNTRIES ARE PER CATEGORY, unlike the EVCharge config's single ICP-wide list:
+# the sheet sets COUNTRIES per Top level (6 for Certification and Training, 13
+# for the construction categories, 10 for the digital ones). ps_query_config
+# takes a category's own `countries` in preference to any ICP-level list.
+#
+# Two spellings are corrected on the way in, per the user: the sheet writes
+# "UK" (-> United Kingdom, the Clay enum value) and "Saudia Arabia" (-> Saudi
+# Arabia). Both are silently dropped by Clay if left as written, which just
+# narrows the result set with no error.
+#
+# Rendered by automation/cleanup/ps_query_config.py as:
+#
+#   select from companies
+#   where locations.any(country_name in (<countries>))
+#     and industry in (<industry>)
+#     and (description contains (<description>)
+#          or products_and_services is_similar_to (<products_and_services>))
+#
+# SELLER SIDE. Products_Services is the seller half of the ICP, so every
+# category must describe a company that *makes, sells, supplies or delivers*
+# into roads and highways — never a company that merely builds or operates
+# roads. For Highways the buy side is the contractors, local authorities and
+# national road agencies, so the industry lists here deliberately exclude
+# Construction, Civil Engineering, Highway/Street/Bridge Construction and
+# Specialty Trade Contractors on the service categories. See the note on
+# Certification and Training for what that costs.
+#
+# Rules from docs/CLAY_QUERY_SKILL.md that constrain what may be edited here:
+#   - `industry` is a closed enum: every value must match the field list exactly.
+#   - `products_and_services` is capped at **3 values per query**.
+#   - description/products for the SAME concept are OR'd (never AND'd), for recall.
+#   - `contains` is whole-word token matching, case-insensitive. Values whose
+#     tokens do not survive tokenisation are omitted on purpose — the sheet's
+#     "Traffic management training (T1–T7)" is carried as the phrase, never the
+#     en-dashed range, and bare ambiguous acronyms are spelled out.
+
+# ANDed onto categories whose industry mapping is horizontal — every training
+# provider, every consultancy, every software house — and which would otherwise
+# return the whole sector rather than its roads-and-highways slice. Same device
+# as the EVCharge config's ev_anchor, selected per category with `anchor: roads`.
+#
+# Measured on Certification and Training (2026-08-14): without it the category
+# previews 6,388 companies across 6 countries, which is every first-aid and
+# manual-handling trainer in those markets, not the highways training market.
+anchors:
+  roads:
+    - highway
+    - highways
+    - road
+    - roads
+    - street works
+    - streetworks
+    - traffic management
+    - roadworks
+    - road works
+    - civil engineering
+    - construction
+    - infrastructure
+
+categories:
+
+  # ---------------------------------------------------------------------
+  # Sheet row 1. 12 sub levels, all UK-qualification shaped (LANTRA, CSCS,
+  # NRSWA, CPCS/NPORS, SSSTS/SMSTS, CDM) plus generic workplace safety
+  # courses (HSE, first aid, manual handling).
+  #
+  # ADDED BEYOND THE SHEET (the user asked for related sub levels to be
+  # inferred): the awarding/levy bodies and the qualifications that sit
+  # alongside the listed ones in every UK highways training prospectus —
+  # CITB, NEBOSH, IOSH, NVQ — and the operative-level courses the sheet
+  # implies but does not name: temporary traffic management, Chapter 8
+  # signing, streetworks operative/supervisor, working at height, confined
+  # space, abrasive wheels, slinger/signaller, banksman/traffic marshal,
+  # plant operator training and road safety training.
+  #
+  # WHY THE INDUSTRY LIST EXCLUDES CONSTRUCTION AND CIVIL ENGINEERING:
+  # this category's description keywords include genuinely generic phrases
+  # ("health and safety training", "first aid", "manual handling") that
+  # appear in the profile of almost every contractor. Admitting the
+  # construction enums would AND-match those and flood the table with
+  # contractors — i.e. the buy side — which is exactly the seller-side trap
+  # documented for the EVCharge build. The cost is real and accepted: a
+  # contractor that genuinely sells NRSWA training as a side business is
+  # missed. Awarding bodies and associations ARE included, because LANTRA,
+  # CITB and NPORS themselves classify that way.
+  - name: Certification and Training
+    anchor: roads
+    countries:
+      - Australia
+      - Indonesia
+      - New Zealand
+      - Saudi Arabia          # sheet reads "Saudia Arabia"
+      - United Kingdom        # sheet reads "UK"
+      - United Arab Emirates
+    industry:
+      - Professional Training and Coaching
+      - Technical and Vocational Training
+      - E-Learning Providers
+      - E-Learning
+      - Education Management
+      - Education Administration Programs
+      - Higher Education
+      - Public Safety
+      - Business Consulting and Services
+      - Professional Services
+      - Human Resources Services
+      - Industry Associations
+      - Professional Organizations
+      - Non-profit Organizations
+    description:
+      # -- named in the sheet
+      - LANTRA
+      - CSCS
+      - NRSWA
+      - street works
+      - streetworks
+      - highway safety
+      - highways safety
+      - traffic management training
+      - CPCS
+      - NPORS
+      - plant training
+      - health and safety training
+      - HSE training
+      - first aid at work
+      - first aid training
+      - manual handling
+      - SSSTS
+      - site supervisor training
+      - SMSTS
+      - site manager training
+      - CDM regulations
+      # -- inferred: awarding, levy and qualification bodies
+      - CITB
+      - NEBOSH
+      - IOSH
+      - NVQ
+      - construction skills training
+      - construction training
+      - vocational training
+      - accredited training provider
+      # -- inferred: the operative-level courses that sit alongside the above
+      - temporary traffic management
+      - traffic marshal
+      - banksman
+      - slinger signaller
+      - working at height
+      - confined space training
+      - abrasive wheels
+      - plant operator training
+      - road safety training
+      - highway maintenance training
+    products_and_services:
+      - construction health and safety training
+      - street works and traffic management training
+      - plant operator certification and accreditation
+
+  # ---------------------------------------------------------------------
+  # PPE and site kit. Horizontal by nature (every glove maker on earth), so
+  # anchored. "construction" is in the anchor list, which is what keeps the
+  # PPE manufacturers who serve sites and drops the ones who serve kitchens.
+  - name: Construction Equipment
+    anchor: roads
+    countries: &construction_13
+      - Australia
+      - China
+      - France
+      - India
+      - Indonesia
+      - Ireland
+      - Italy
+      - Netherlands
+      - New Zealand
+      - Saudi Arabia
+      - Turkey
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Industrial Machinery Manufacturing
+      - Machinery Manufacturing
+      - Fabricated Metal Products
+      - Architectural and Structural Metal Manufacturing
+      - Apparel Manufacturing
+      - Textile Manufacturing
+      - Footwear Manufacturing
+      - Plastics Manufacturing
+      - Rubber Products Manufacturing
+      - Electric Lighting Equipment Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Construction Hardware Manufacturing
+      - Building Materials
+      - Wholesale Building Materials
+      - Wholesale Hardware, Plumbing, Heating Equipment
+      - Commercial and Industrial Equipment Rental
+      - Equipment Rental Services
+      - Business Supplies and Equipment
+    description:
+      - hard hats
+      - safety helmets
+      - safety glasses
+      - safety goggles
+      - eye protection
+      - ear protection
+      - hearing protection
+      - safety gloves
+      - safety boots
+      - safety footwear
+      - hi-vis
+      - high visibility clothing
+      - reflective clothing
+      - personal protective equipment
+      - PPE
+      - smart helmets
+      - ground protection mats
+      - power tools
+      - site tools
+      - portable cabins
+      - site cabins
+      - scaffolding
+      - temporary lighting
+      - mobile lighting
+      - lighting towers
+      - safety barriers
+      - temporary fencing
+      - site fencing
+      - safety flooring
+      - site telecommunications
+      - site safety equipment
+    products_and_services:
+      - construction site safety equipment and PPE
+      - temporary site fencing barriers and lighting
+      - portable site accommodation and welfare cabins
+
+  # ---------------------------------------------------------------------
+  # Bulk inputs to road building. Anchored: a steel mill or a salt producer is
+  # only in scope when it sells into roads/construction.
+  - name: Construction Materials
+    anchor: roads
+    countries: *construction_13
+    industry:
+      - Building Materials
+      - Glass, Ceramics and Concrete Manufacturing
+      - Primary Metal Manufacturing
+      - Architectural and Structural Metal Manufacturing
+      - Fabricated Metal Products
+      - Chemical Manufacturing
+      - Chemical Raw Materials Manufacturing
+      - Plastics Manufacturing
+      - Textile Manufacturing
+      - Mining
+      - Nonmetallic Mineral Mining
+      - Wholesale Building Materials
+      - Wholesale Metals and Minerals
+      - Paper and Forest Product Manufacturing
+    description:
+      - construction steel
+      - reinforcing steel
+      - rebar
+      - structural steel
+      - piling
+      - sheet piling
+      - piling poles
+      - road salt
+      - gritting salt
+      - de-icing salt
+      - aggregates
+      - asphalt
+      - bitumen
+      - road surfacing materials
+      - subsoil
+      - topsoil
+      - geomembranes
+      - geotextiles
+      - geosynthetics
+      - geogrid
+      - concrete
+      - ready-mix concrete
+      - cement
+    products_and_services:
+      - road construction materials and aggregates
+      - geosynthetics and ground stabilisation products
+      - de-icing and winter maintenance materials
+
+  # ---------------------------------------------------------------------
+  # Plant and heavy vehicles. Anchored — the machinery enums are shared with
+  # agriculture and mining.
+  - name: Construction Vehicle
+    anchor: roads
+    countries: *construction_13
+    industry:
+      - Agriculture, Construction, Mining Machinery Manufacturing
+      - Industrial Machinery Manufacturing
+      - Machinery Manufacturing
+      - Motor Vehicle Manufacturing
+      - Transportation Equipment Manufacturing
+      - Automation Machinery Manufacturing
+      - Wholesale Machinery
+      - Wholesale Motor Vehicles and Parts
+      - Commercial and Industrial Equipment Rental
+      - Equipment Rental Services
+      - Commercial and Industrial Machinery Maintenance
+    description:
+      - gritters
+      - gritting vehicles
+      - snow ploughs
+      - earth moving
+      - excavators
+      - construction machinery
+      - construction plant
+      - dump trucks
+      - tipper trucks
+      - front loaders
+      - wheel loaders
+      - backhoe loaders
+      - cranes
+      - compactors
+      - plate compactors
+      - drum rollers
+      - road rollers
+      - pavers
+      - asphalt pavers
+      - feller bunchers
+      - industrial trucks
+      - telehandlers
+      - access platforms
+      - cherry pickers
+      - bowsers
+      - autonomous plant
+      - salt spreaders
+    products_and_services:
+      - construction plant and earthmoving machinery
+      - road paving and compaction equipment
+      - plant hire and heavy equipment rental
+
+  # ---------------------------------------------------------------------
+  # Vehicles that work the live carriageway. Anchored: fleet/van hire is a
+  # horizontal enum that otherwise returns every rental firm.
+  - name: Commercial and Traffic Management Vehicles
+    anchor: roads
+    countries: *construction_13
+    industry:
+      - Motor Vehicle Manufacturing
+      - Motor Vehicle Parts Manufacturing
+      - Transportation Equipment Manufacturing
+      - Truck Transportation
+      - Commercial and Industrial Equipment Rental
+      - Equipment Rental Services
+      - Vehicle Repair and Maintenance
+      - Wholesale Motor Vehicles and Parts
+      - Machinery Manufacturing
+    description:
+      - fleet hire
+      - van rental
+      - vehicle hire
+      - commercial vehicle rental
+      - impact protection vehicle
+      - truck mounted attenuator
+      - crash cushion vehicle
+      - maintenance vehicles
+      - mobile lane closure
+      - lane closure vehicle
+      - traffic management vehicles
+      - traffic management fleet
+      - highway maintenance vehicles
+      - welfare vans
+      - tipper hire
+    products_and_services:
+      - traffic management and lane closure vehicles
+      - commercial fleet and van rental
+      - highway maintenance vehicle fleets
+
+  # ---------------------------------------------------------------------
+  # The sheet gives this Top level TWO country lists — one row (Digital twin)
+  # carries Ireland+Italy, the other seven carry Austria+Belgium. Taken as the
+  # UNION, so no market named anywhere on the category is dropped. Flagged
+  # rather than silently picking the majority list.
+  - name: Digital, Data and AI Solutions
+    anchor: roads
+    countries:
+      - Australia
+      - Austria
+      - Belgium
+      - France
+      - Indonesia
+      - Ireland
+      - Italy
+      - Netherlands
+      - New Zealand
+      - Saudi Arabia
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Software Development
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - Business Intelligence Platforms
+      - Technology, Information and Internet
+      - Desktop Computing Software Products
+      - Embedded Software Products
+      - IT System Design Services
+      - IT System Data Services
+      - Research Services
+      - Engineering Services
+      - Measuring and Control Instrument Manufacturing
+      - Communications Equipment Manufacturing
+    description:
+      - digital twin
+      - digital twins
+      - traffic data
+      - traffic data platform
+      - transport analytics
+      - transport modelling
+      - predictive maintenance
+      - infrastructure data
+      - asset data platform
+      - IoT sensors
+      - connected road
+      - roadside sensors
+      - simulation platform
+      - data analytics platform
+      - machine learning
+      - artificial intelligence
+      - computer vision
+      - remote monitoring
+      - telemetry
+    products_and_services:
+      - transport and traffic data analytics platforms
+      - digital twin and infrastructure simulation software
+      - predictive maintenance and IoT monitoring for infrastructure
+
+  # ---------------------------------------------------------------------
+  # Software for delivering and running the works. Horizontal enums, anchored.
+  - name: Digital Construction Solutions
+    anchor: roads
+    countries: &digital_10
+      - Australia
+      - France
+      - Indonesia
+      - Ireland
+      - Italy
+      - Netherlands
+      - New Zealand
+      - Saudi Arabia
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Software Development
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - Technology, Information and Internet
+      - Computer and Network Security
+      - Data Security Software Products
+      - IT System Custom Software Development
+      - IT System Design Services
+      - Engineering Services
+      - Business Intelligence Platforms
+    description:
+      - asset management software
+      - asset management platform
+      - engineering software
+      - infrastructure software
+      - BIM
+      - building information modelling
+      - field service management
+      - field operations software
+      - construction project management
+      - project management software
+      - construction software
+      - workforce management
+      - site management software
+      - cyber security
+      - document management for construction
+      - CDE
+      - common data environment
+    products_and_services:
+      - construction project and asset management software
+      - field workforce and site operations software
+      - BIM and engineering design platforms
+
+  # ---------------------------------------------------------------------
+  # Ground investigation and survey. Anchored — surveying and drone enums are
+  # shared with agriculture, mining and film.
+  - name: Geotechnical and Surveying
+    anchor: roads
+    countries:
+      - Australia
+      - France
+      - Indonesia
+      - Netherlands
+      - New Zealand
+      - Saudi Arabia
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Surveying and Mapping Services
+      - Engineering Services
+      - Civil Engineering
+      - Measuring and Control Instrument Manufacturing
+      - Industrial Machinery Manufacturing
+      - Machinery Manufacturing
+      - Research Services
+      - Software Development
+      - IT Services and IT Consulting
+      - Environmental Services
+      - Mining
+    description:
+      - geotechnical
+      - geotechnical investigation
+      - site investigation
+      - drilling rigs
+      - borehole drilling
+      - soil sampling
+      - groundwater monitoring
+      - geotechnical sensors
+      - instrumentation and monitoring
+      - data logging
+      - 3D laser scanning
+      - laser scanners
+      - LiDAR
+      - mobile mapping
+      - ground penetrating radar
+      - GPR
+      - GIS
+      - geospatial
+      - geospatial mapping
+      - topographic survey
+      - land survey
+      - archaeological survey
+      - drone survey
+      - UAV survey
+      - photogrammetry
+    products_and_services:
+      - geotechnical site investigation and ground engineering
+      - LiDAR laser scanning and mobile mapping survey
+      - geospatial GIS data and topographic surveying
+
+  # ---------------------------------------------------------------------
+  # Ecology, remediation and environmental monitoring around the network.
+  # Anchored: the environmental enums are otherwise the whole sector.
+  - name: Green Infrastructure
+    anchor: roads
+    countries:
+      - Australia
+      - France
+      - Indonesia
+      - Ireland
+      - Netherlands
+      - New Zealand
+      - Saudi Arabia
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Environmental Services
+      - Environmental Quality Programs
+      - Conservation Programs
+      - Landscaping Services
+      - Engineering Services
+      - Civil Engineering
+      - Business Consulting and Services
+      - Research Services
+      - Horticulture
+      - Waste Treatment and Disposal
+    description:
+      - biodiversity
+      - biodiversity net gain
+      - ecology consultancy
+      - ecological consultancy
+      - wildlife conservation
+      - habitat creation
+      - habitat preservation
+      - land remediation
+      - brownfield remediation
+      - contaminated land
+      - soil contamination
+      - noise monitoring
+      - air quality monitoring
+      - air pollution monitoring
+      - landscaping
+      - soft landscaping
+      - vegetation management
+      - environmental impact assessment
+      - carbon reduction
+    products_and_services:
+      - ecology and biodiversity consultancy
+      - land remediation and contaminated land services
+      - environmental noise and air quality monitoring
+
+  # ---------------------------------------------------------------------
+  # NOT anchored: ANPR, V2X and stopped-vehicle detection name the roads
+  # domain themselves. Anchoring would only cost recall on vendors who write
+  # "ITS" and never "road".
+  - name: Intelligent Transport Systems (ITS) & Traffic Technology
+    countries: *digital_10
+    industry:
+      - Software Development
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - Technology, Information and Internet
+      - Communications Equipment Manufacturing
+      - Measuring and Control Instrument Manufacturing
+      - Computers and Electronics Manufacturing
+      - Automation Machinery Manufacturing
+      - Electrical Equipment Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Engineering Services
+      - Telecommunications
+      - Security Systems Services
+      - Wireless Services
+    description:
+      - ANPR
+      - automatic number plate recognition
+      - licence plate recognition
+      - speed cameras
+      - enforcement cameras
+      - connected vehicle
+      - stopped vehicle detection
+      - incident detection
+      - kerbside management
+      - curbside management
+      - traffic data analytics
+      - traffic monitoring
+      - traffic detection
+      - vehicle detection
+      - roadside units
+      - V2X
+      - vehicle-to-everything
+      - vehicle to infrastructure
+      - intelligent transport systems
+      - intelligent transportation systems
+      - traffic technology
+      - fleet management
+      - telematics
+      - variable speed limits
+      - smart motorway
+    products_and_services:
+      - intelligent transport systems and traffic technology
+      - ANPR enforcement and vehicle detection systems
+      - connected vehicle and V2X roadside infrastructure
+
+  # ---------------------------------------------------------------------
+  # The most horizontal category in the sheet — every consultancy and every
+  # recruiter. Anchored hard; without it this is the whole professional
+  # services sector in six markets.
+  - name: Professional Services
+    anchor: roads
+    countries: &anz_mena_6
+      - Australia
+      - Indonesia
+      - New Zealand
+      - Saudi Arabia
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Business Consulting and Services
+      - Engineering Services
+      - Civil Engineering
+      - Architecture and Planning
+      - Design Services
+      - Professional Services
+      - Strategic Management Services
+      - Operations Consulting
+      - Staffing and Recruiting
+      - Human Resources Services
+      - Executive Search Services
+      - Research Services
+      - Environmental Services
+    description:
+      - management consultancy
+      - strategy consultancy
+      - design and engineering consultancy
+      - engineering consultancy
+      - highways recruitment
+      - infrastructure recruitment
+      - construction recruitment
+      - project management consultancy
+      - programme management
+      - cost consultancy
+      - quantity surveying
+      - highways planning
+      - transport planning
+      - infrastructure consulting
+      - infrastructure advisory
+      - professional engineering services
+      - feasibility studies
+      - technical due diligence
+    # products_and_services intentionally ABSENT. With it, this category
+    # previewed 13,801 companies: `is_similar_to` expands loosely and, OR'd
+    # against the description, readmitted the entire construction and
+    # consulting adjacency the keywords had just excluded. Same tuning
+    # lesson as the EVCharge Charging Software category (19K -> 793).
+
+  # ---------------------------------------------------------------------
+  # NOT anchored: thermoplastic markings, road studs and VMS are roads-only
+  # terms already. The sheet lists "Solar powered signage" and
+  # "Solar-powered signage" as two sub levels; they are one concept, carried
+  # once — matching is case-insensitive and the validator rejects a repeat.
+  - name: Road Marking and Signage
+    countries: *construction_13
+    industry:
+      - Paint, Coating, and Adhesive Manufacturing
+      - Chemical Manufacturing
+      - Plastics Manufacturing
+      - Glass Product Manufacturing
+      - Glass, Ceramics and Concrete Manufacturing
+      - Fabricated Metal Products
+      - Architectural and Structural Metal Manufacturing
+      - Electric Lighting Equipment Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Industrial Machinery Manufacturing
+      - Building Materials
+      - Wholesale Building Materials
+      - Printing Services
+      - Specialty Trade Contractors
+    description:
+      - road marking
+      - road markings
+      - line marking
+      - thermoplastic markings
+      - thermoplastic road marking
+      - cold applied plastic
+      - road marking paint
+      - water-based road paint
+      - glass beads
+      - reflective glass beads
+      - anti-skid surfacing
+      - high friction surfacing
+      - coloured surfacing
+      - road studs
+      - reflective road studs
+      - traffic signs
+      - road signs
+      - temporary signs
+      - solar powered signage
+      - variable message signs
+      - sign gantries
+      - delineators
+    products_and_services:
+      - road marking materials and line marking services
+      - traffic signs and variable message signage
+      - anti-skid and high friction road surfacing
+
+  # ---------------------------------------------------------------------
+  # Street lighting, furniture and the urban traffic software beside it.
+  # Anchored: the lighting and furniture enums are otherwise the whole market.
+  - name: Street and City Infrastructure
+    anchor: roads
+    countries: *digital_10
+    industry:
+      - Electric Lighting Equipment Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Electrical Equipment Manufacturing
+      - Fabricated Metal Products
+      - Architectural and Structural Metal Manufacturing
+      - Furniture and Home Furnishings Manufacturing
+      - Glass, Ceramics and Concrete Manufacturing
+      - Building Materials
+      - Industrial Machinery Manufacturing
+      - Software Development
+      - IT Services and IT Consulting
+      - Architecture and Planning
+      - Community Development and Urban Planning
+      - Design Services
+      - Engineering Services
+      - Telecommunications
+    description:
+      - street lighting
+      - smart streetlights
+      - street lights
+      - lamp columns
+      - lighting columns
+      - active travel
+      - cycle lanes
+      - bollards
+      - pedestrian crossings
+      - crossing systems
+      - street furniture
+      - bus shelters
+      - cycle stands
+      - cycle parking
+      - electric vehicle charging
+      - EV charging points
+      - urban planning
+      - urban design
+      - telecoms cabinets
+      - street cabinets
+      - traffic modelling
+      - transport simulation
+      - network optimisation
+      - mobility planning
+    products_and_services:
+      - street lighting and lighting column systems
+      - street furniture and active travel infrastructure
+      - traffic modelling and transport simulation software
+
+  # ---------------------------------------------------------------------
+  # NOT anchored: traffic signals, cones and barriers are roads terms already.
+  - name: Traffic Management & Control
+    countries:
+      - Australia
+      - Indonesia
+      - Ireland
+      - Netherlands
+      - New Zealand
+      - Saudi Arabia
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Automation Machinery Manufacturing
+      - Electrical Equipment Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Industrial Machinery Manufacturing
+      - Fabricated Metal Products
+      - Plastics Manufacturing
+      - Software Development
+      - IT Services and IT Consulting
+      - Engineering Services
+      - Specialty Trade Contractors
+      - Facilities Services
+      - Events Services
+      - Security Systems Services
+      - Measuring and Control Instrument Manufacturing
+    description:
+      - traffic signals
+      - traffic signal control
+      - traffic lights
+      - signal controllers
+      - traffic cones
+      - temporary traffic management
+      - traffic management services
+      - event traffic management
+      - automatic barriers
+      - road barriers
+      - crash barriers
+      - vehicle restraint systems
+      - road safety infrastructure
+      - variable message signs
+      - traffic management systems
+      - urban traffic control
+      - lane closures
+    products_and_services:
+      - traffic signal control systems and signal equipment
+      - temporary traffic management and lane closure services
+      - road safety barriers and vehicle restraint systems
+
+  # ---------------------------------------------------------------------
+  # Anchored: the water/waste enums are an entire utilities sector otherwise.
+  - name: Water & drainage management
+    anchor: roads
+    countries: &euro_10
+      - Australia
+      - Austria
+      - Belgium
+      - France
+      - Indonesia
+      - Netherlands
+      - New Zealand
+      - Saudi Arabia
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Water Supply and Irrigation Systems
+      - Water, Waste, Steam, and Air Conditioning Services
+      - Environmental Services
+      - Utilities
+      - Utility System Construction
+      - Engineering Services
+      - Civil Engineering
+      - Industrial Machinery Manufacturing
+      - Plastics Manufacturing
+      - Glass, Ceramics and Concrete Manufacturing
+      - Building Materials
+      - Waste Collection
+      - Waste Treatment and Disposal
+      - Specialty Trade Contractors
+    description:
+      - flood prevention
+      - flood defence
+      - flood risk management
+      - storm water
+      - stormwater management
+      - surface water
+      - road runoff
+      - highway drainage
+      - drainage systems
+      - drainage inspection
+      - CCTV drainage survey
+      - gully cleansing
+      - culverts
+      - attenuation tanks
+      - SuDS
+      - sustainable drainage
+      - water treatment
+      - irrigation
+      - construction waste management
+      - silt management
+    products_and_services:
+      - highway drainage and surface water management
+      - flood prevention and sustainable drainage systems
+      - drainage inspection and maintenance services
+
+  # ---------------------------------------------------------------------
+  # Anchored: portable toilets and canteen units are a horizontal hire market.
+  - name: Welfare & Site Facilities
+    anchor: roads
+    countries: &anz_ie_7
+      - Australia
+      - Indonesia
+      - Ireland
+      - New Zealand
+      - Saudi Arabia
+      - United Kingdom
+      - United Arab Emirates
+    industry:
+      - Commercial and Industrial Equipment Rental
+      - Equipment Rental Services
+      - Facilities Services
+      - Building Materials
+      - Industrial Machinery Manufacturing
+      - Machinery Manufacturing
+      - Fabricated Metal Products
+      - Architectural and Structural Metal Manufacturing
+      - Security Guards and Patrol Services
+      - Security Systems Services
+      - Travel Arrangements
+      - Accommodation Services
+      - Electric Lighting Equipment Manufacturing
+    description:
+      - mobile welfare units
+      - welfare units
+      - welfare cabins
+      - site offices
+      - site accommodation
+      - canteen units
+      - portable toilets
+      - portable sanitation
+      - shower blocks
+      - site security
+      - site surveillance
+      - CCTV towers
+      - travel management
+      - contractor accommodation
+      - site fencing
+      - hoarding
+      - temporary lighting towers
+      - lighting towers
+      - generators
+    products_and_services:
+      - mobile welfare units and site accommodation
+      - portable sanitation and canteen facilities
+      - site security fencing hoarding and lighting towers
+
+  # ---------------------------------------------------------------------
+  # NOT anchored: "highways contractor", "bridge construction" and "civil
+  # engineering contractor" already name the domain.
+  #
+  # These are the biggest exhibitors and sponsors at a Highways event, so the
+  # sheet places them on the sell side even though they also BUY heavily. This
+  # is the one category where the construction enums are deliberately included.
+  - name: Major Contractors and Consultancies
+    countries: *anz_ie_7
+    industry:
+      - Highway, Street, and Bridge Construction
+      - Civil Engineering
+      - Construction
+      - Building Construction
+      - Nonresidential Building Construction
+      - Utility System Construction
+      - Specialty Trade Contractors
+      - Engineering Services
+      - Architecture and Planning
+      - Business Consulting and Services
+    description:
+      - highways contractor
+      - highway maintenance contractor
+      - road construction
+      - road building
+      - bridge construction
+      - bridge engineering
+      - civil engineering contractor
+      - civils contractor
+      - infrastructure contractor
+      - tier 1 contractor
+      - major projects
+      - design and build
+      - highways framework
+      - term maintenance contract
+    # products_and_services intentionally ABSENT. With it, this category
+    # previewed 39,607 companies: `is_similar_to` expands loosely and, OR'd
+    # against the description, readmitted the entire construction and
+    # consulting adjacency the keywords had just excluded. Same tuning
+    # lesson as the EVCharge Charging Software category (19K -> 793).
+
+  # ---------------------------------------------------------------------
+  # NOT anchored: parking terms are specific enough on their own.
+  # The sheet repeats "Parking payment systems"; carried once.
+  - name: Parking Technology
+    countries: *euro_10
+    industry:
+      - Software Development
+      - IT Services and IT Consulting
+      - Technology, Information and Internet
+      - Data Infrastructure and Analytics
+      - Automation Machinery Manufacturing
+      - Measuring and Control Instrument Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Electrical Equipment Manufacturing
+      - Financial Services
+      - Security Systems Services
+      - Engineering Services
+    description:
+      - parking management
+      - parking management software
+      - parking payment
+      - cashless parking
+      - parking app
+      - smart parking
+      - parking guidance
+      - parking occupancy
+      - parking sensors
+      - parking enforcement
+      - permit management
+      - kerbside parking
+      - car park management
+      - barrier control
+    products_and_services:
+      - parking management and enforcement software
+      - cashless parking payment systems
+      - smart parking sensors and guidance systems
+
+  # ---------------------------------------------------------------------
+  # NOT anchored: the sub levels are contractor tiers, so the description
+  # already names roads and civils.
+  - name: Road Construction & Civil
+    countries: *euro_10
+    industry:
+      - Highway, Street, and Bridge Construction
+      - Civil Engineering
+      - Construction
+      - Nonresidential Building Construction
+      - Utility System Construction
+      - Specialty Trade Contractors
+      - Building Structure and Exterior Contractors
+      - Engineering Services
+    description:
+      - road construction
+      - road building
+      - highway construction
+      - highways maintenance
+      - resurfacing
+      - surfacing contractor
+      - asphalt laying
+      - civil engineering contractor
+      - civils subcontractor
+      - specialist subcontractor
+      - tier 1 contractor
+      - tier 2 contractor
+      - groundworks
+      - earthworks
+      - kerbing
+      - footway construction
+    # products_and_services intentionally ABSENT. With it, this category
+    # previewed 19,740 companies: `is_similar_to` expands loosely and, OR'd
+    # against the description, readmitted the entire construction and
+    # consulting adjacency the keywords had just excluded. Same tuning
+    # lesson as the EVCharge Charging Software category (19K -> 793).
+
+  # ---------------------------------------------------------------------
+  # Anchored: "asset management" and "predictive maintenance" without a roads
+  # word return financial asset managers and factory maintenance vendors.
+  - name: Asset Management & Maintenance
+    anchor: roads
+    countries: *euro_10
+    industry:
+      - Software Development
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - Business Intelligence Platforms
+      - Technology, Information and Internet
+      - Engineering Services
+      - Civil Engineering
+      - Measuring and Control Instrument Manufacturing
+      - Industrial Machinery Manufacturing
+      - Repair and Maintenance
+      - Commercial and Industrial Machinery Maintenance
+      - Specialty Trade Contractors
+      - Surveying and Mapping Services
+    description:
+      - pavement management
+      - pavement maintenance
+      - road asset management
+      - asset lifecycle management
+      - bridge asset management
+      - tunnel asset management
+      - asset inspection
+      - infrastructure inspection
+      - digital asset register
+      - road condition monitoring
+      - condition survey
+      - pavement condition
+      - predictive maintenance
+      - bridge inspection
+      - structural monitoring
+      - road resurfacing
+      - pothole repair
+      - maintenance fleet
+      - winter maintenance
+    products_and_services:
+      - road and pavement asset management systems
+      - infrastructure condition monitoring and inspection
+      - highway maintenance and resurfacing technology
+
+  # ---------------------------------------------------------------------
+  # NOT anchored: tolling and road user charging are roads-only by definition.
+  - name: Tolling & Road User Charging
+    countries: *euro_10
+    industry:
+      - Software Development
+      - IT Services and IT Consulting
+      - Technology, Information and Internet
+      - Data Infrastructure and Analytics
+      - Financial Services
+      - Measuring and Control Instrument Manufacturing
+      - Automation Machinery Manufacturing
+      - Communications Equipment Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Engineering Services
+      - Security Systems Services
+    description:
+      - electronic toll collection
+      - toll collection
+      - tolling systems
+      - free flow tolling
+      - ANPR tolling
+      - road user charging
+      - distance based charging
+      - congestion charging
+      - congestion pricing
+      - clean air zone
+      - low emission zone
+      - toll back office
+      - back office systems
+      - transponder
+      - RFID tolling
+      - violation enforcement
+    products_and_services:
+      - electronic toll collection and free flow tolling
+      - road user charging and congestion pricing platforms
+      - tolling back office and violation enforcement systems
+
+  # ---------------------------------------------------------------------
+  # Anchored: utility detection and trenching enums overlap the whole
+  # utilities contracting market.
+  - name: Utilities & Underground Infrastructure
+    anchor: roads
+    countries: *euro_10
+    industry:
+      - Utility System Construction
+      - Utilities
+      - Civil Engineering
+      - Engineering Services
+      - Surveying and Mapping Services
+      - Specialty Trade Contractors
+      - Measuring and Control Instrument Manufacturing
+      - Industrial Machinery Manufacturing
+      - Software Development
+      - IT Services and IT Consulting
+      - Machinery Manufacturing
+    description:
+      - utility detection
+      - utility mapping
+      - utility survey
+      - underground asset mapping
+      - buried services
+      - subsurface scanning
+      - ground penetrating radar
+      - cable avoidance
+      - trenching
+      - trenchless technology
+      - directional drilling
+      - excavation
+      - vacuum excavation
+      - street works
+      - reinstatement
+      - duct installation
+    products_and_services:
+      - underground utility detection and mapping
+      - trenchless and vacuum excavation technology
+      - buried asset survey and cable avoidance tools
+
+  # ---------------------------------------------------------------------
+  # The sheet's own "GH - bit of repetition" note sits next to this one: its
+  # three sub levels (tolling, parking, fleet) each already have their own Top
+  # level. Kept as its own workbook because the sheet lists it, but anchored
+  # and scoped to the OPERATOR-facing systems language so it is not a third
+  # copy of Tolling and Parking Technology.
+  - name: Transport Operations & Systems
+    anchor: roads
+    countries: *euro_10
+    industry:
+      - Software Development
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - Technology, Information and Internet
+      - Business Intelligence Platforms
+      - Engineering Services
+      - Measuring and Control Instrument Manufacturing
+      - Telecommunications
+      - Transportation, Logistics, Supply Chain and Storage
+    description:
+      - transport operations
+      - traffic operations centre
+      - network management systems
+      - control room systems
+      - operations management platform
+      - heavy vehicle systems
+      - weigh in motion
+      - fleet systems
+      - freight management
+      - abnormal loads
+      - journey time systems
+      - incident management systems
+    products_and_services:
+      - traffic control room and network management systems
+      - heavy vehicle and weigh in motion systems
+      - transport operations and incident management platforms
