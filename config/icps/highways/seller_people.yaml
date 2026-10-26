@@ -1,0 +1,305 @@
+# Highways — seller-side people searches over the Products & Services
+# `Companies` tables.
+#
+# Source of truth: the `Seller JTs` sheet of `ICP - Highways new.xlsx`.
+# Column A = JOB TITLES, B = MATCH TYPE, C = SENIORITY, D = "JOB TITLES - to
+# find at non sector specific companies" (Road, Highways, Transport).
+#
+# Rendered by automation/cleanup/ps_people_config.py into, per workbook:
+#
+#   select from people
+#   where experiences.count(
+#       is_current = true
+#       and seniority in (<seniority>)
+#       and ((job_title in (<titles_exact>)
+#             and description contains (<exact_relevance>))
+#            or job_title contains (<titles_contains>)
+#            or (job_title contains (<titles_contains_senior_only>)
+#                and seniority in (<senior_only_seniority>)))
+#       and company.locations.count(country_name in (<countries>)) >= 1
+#     ) >= 1
+#     and <the clay.filter_to_companies(...) clause Clay prefilled>
+#   limit <per_company_limit> by clay_company_id
+#
+# Correctness rules this shape encodes (docs/PEOPLE_PASSES.md):
+#   - The WHOLE persona lives in ONE experiences.count(...) predicate. Split
+#     across two, a person who is a CEO at company A and holds any role at
+#     company B with an in-region office would pass while no single role
+#     qualifies.
+#   - Company office location, not person location.
+#   - Always cap per company (`limit N by clay_company_id`).
+#   - The clay.filter_to_companies(...) clause is read off Clay's own prefill at
+#     run time and never stored here — it names live ids (SENSITIVE_DATA.md).
+#
+# COUNTRIES ARE PER CATEGORY and are NOT set here. They come from the matching
+# Top level in config/icps/highways/products_services.yaml, so the people search
+# and the company search can never drift apart on geography.
+
+# 10 people per company, confirmed by the user 2026-09-12 after a brief move to
+# 15. 10 is also the documented ceiling of Clay's `cpj-find-lists-of-people`
+# action ("Defaults to 10. Maximum 10"), so the two routes agree — note that the
+# v1 workflow set that action's limit to 15, silently over the max.
+#
+# Set in the QUERY via `limit N by clay_company_id`, NOT in the panel's "People
+# per company" box. docs/PEOPLE_PASSES.md: without the cap one large employer
+# returns unbounded people and the cost lands on the enrichment columns
+# downstream — and these sets include National Highways and tier-1 contractors.
+per_company_limit: 10
+
+# Sheet column C: "All except Intern/Trainee, Assistant, Entry, Freelance".
+# Clay's experience seniority enum has no Assistant or Freelance value, so those
+# are satisfied by absence. `Unknown` is left out: it is a parse-failure bucket,
+# not a level, and including it readmits the junior profiles the exclusion is
+# there to remove.
+seniority:
+  - Founder
+  - Owner
+  - Board Member
+  - Partner
+  - C-suite
+  - VP
+  - Director
+  - Head
+  - Manager
+  - Senior
+  - Mid-level
+
+# Sheet column B = "Job Title Must Match Exactly" -> `job_title in (...)`,
+# whole-value matching. Rows 2-19 of the sheet.
+#
+# Added beyond the sheet (the user invited highly relevant additions): the
+# C-titles the sheet's own list implies but omits — CTO/CFO/CSO/CCO/CMO already
+# appear spelled out, so their acronyms are added; plus President and Chief
+# Development Officer, which are how several Tier 1 contractors title the same
+# role.
+titles_exact:
+  - CEO
+  - Chief Executive Officer
+  - COO
+  - Chief Operating Officer
+  - CTO
+  - Chief Technology Officer
+  - CFO
+  - Chief Financial Officer
+  - CSO
+  - Chief Sustainability Officer
+  - CCO
+  - Chief Commercial Officer
+  - CMO
+  - Chief Marketing Officer
+  - CPO
+  - Chief Procurement Officer
+  - Chief Development Officer
+  - Managing Director
+  - MD
+  - President
+  - Partner
+  - Founder
+  - Co-Founder
+  - Owner
+  - VP
+  - Vice President
+  - General Manager
+
+# ANDed onto the EXACT-title branch only, per the user (2026-08-14): a bare
+# "MD" / "COO" / "Managing Director" says nothing about sector, so the role's
+# own experience description must carry Highways language for it to count.
+#
+# `description` here is the EXPERIENCE description (docs/CLAY_QUERY_SKILL.md,
+# "Experience fields"), not the company's. Whole-word token matching.
+#
+# Deliberately NOT applied to the `contains` branch — those titles (Highways,
+# Infrastructure, Construction, Transport, Mobility ...) already carry the
+# sector in the title itself, and the user asked to skip the extra condition
+# there.
+exact_relevance:
+  - road
+  - roads
+  - roadworks
+  - highway
+  - highways
+  - motorway
+  - motorways
+  - carriageway
+  - street works
+  - streetworks
+  - traffic
+  - transport
+  - transportation
+  - infrastructure
+  - civil engineering
+  - civils
+  - construction
+  - rail
+  - bridge
+  - bridges
+  - tunnel
+  - tunnels
+  - asphalt
+  - surfacing
+  - paving
+  - pavement
+  - drainage
+  - mobility
+
+# Sheet column B = "Job Title Must Contain Exact Keyword" -> `job_title
+# contains (...)`, whole-word token matching, case-insensitive. Rows 20-53,
+# minus Operations (see titles_contains_senior_only) and minus the duplicate
+# "Regional Director" the sheet lists twice.
+#
+# Added beyond the sheet: Procurement, Bid, Tender, Estimating and Asset —
+# the functions that actually buy exhibition space and specify suppliers at a
+# highways contractor, and which the sheet's marketing-weighted list misses.
+titles_contains:
+  - Account Manager
+  - Regional Director
+  - Brand
+  - Business Development
+  - Commercial
+  - Communications
+  - Construction
+  - Country Manager
+  - Event
+  - Executive Director
+  - Growth
+  - Highways
+  - Infrastructure
+  - Innovation
+  - Lead Generation
+  - Marketing
+  - Mobility
+  - National
+  - Partnerships
+  - Portfolio Manager
+  - Product
+  - Project
+  - Public Relations
+  # Sheet: "Public Relations (PR)". Added 2026-10-12. Clay's contains match is
+  # word-level: a test search on balfourbeatty.com with only "PR" returned three
+  # "Media & PR" titles and no Project / Procurement / Product ones.
+  - PR
+  - Revenue
+  - Sales
+  - Sponsorship
+  - Strategic
+  - Strategy
+  - Technical
+  - Trade Fair
+  - Transport
+  - Transportation
+  - Procurement
+  - Bid
+  - Tender
+  - Estimating
+  - Asset
+
+# Sheet row 38: "Operations | Contains | Seniority = Senior level only" — the
+# ONE title with its own seniority rule. Kept as a separate branch so the rule
+# is enforced rather than flattened into the permissive list above, which would
+# have admitted every Operations Coordinator and Mid-level Operations Analyst.
+titles_contains_senior_only:
+  - Operations
+senior_only_seniority:
+  - Founder
+  - Owner
+  - Board Member
+  - Partner
+  - C-suite
+  - VP
+  - Director
+  - Head
+
+# Sheet column D, "JOB TITLES - to find at non sector specific companies".
+# Appended to the contains list only when a category is run with --non-sector.
+titles_contains_non_sector:
+  - Road
+
+# Exclusion list supplied by the user 2026-09-12, applied to EVERY query on
+# both sides. Excluded if the job title CONTAINS the term.
+#
+# EIGHT TERMS THE USER GAVE WERE REMOVED because they collide with titles the
+# ICP sheets explicitly search for — asking for a title and rejecting it in the
+# same predicate returns nobody for that term, which is the self-cancelling
+# failure ps_buyside_people_config.validate() exists to catch:
+#     Brand, Communications, Product   (Seller JTs rows 22, 25, 41)
+#     Maintenance                      (BuySide ICP, National (State) Government)
+#     Data                             (BuySide ICP, five industries)
+#     Legal, Counsel, Consultant       (BuySide ICP, Finance, Investment, Legal)
+#
+# The last three were nearly kept on the grounds that `Finance, Investment,
+# Legal` is absent from the Registrar's closed list, so the CE classifier can
+# never emit it. That is true but not sufficient: this file also feeds
+# build_ps_people.py, and the category IS live in products_services.yaml. One
+# config, two routes — the collision is real on the P&S route.
+#
+# `Finance` itself stays: that category's title is "Project Finance" and the
+# clash test is whole-value. `Data Analyst` stays for the same reason — it is
+# the specific role meant and does not swallow `Data`.
+#
+# VERIFIED LIVE 2026-09-12 on tarmac.com through the v2 workflow's Find People
+# node: the same query returned a 419-person pool without the list and 383 with
+# it. Note what it does NOT catch — "PA to Chief Operating Officer" survives,
+# because the title spells the role `PA` and the list carries `Assistant`. `PA`
+# is not added here: it is not in either sheet, and whether the action's exclude
+# matching is whole-token or substring is undocumented (substring would take
+# `Partner`, `Partnerships` and `Paving` with it).
+#
+# Five terms were ADDED back from the buy-side list this replaces — Apprentice,
+# Assistant, Graduate, Student, Volunteer. They come from the sheets' own
+# seniority rule ("All except Intern/Trainee, Assistant, Entry, Freelance"),
+# Clay's seniority enum cannot express them, and none of them collide.
+exclude_titles:
+  - HR
+  - Human Resources
+  - Talent
+  - People
+  - Recruitment
+  - Recruiter
+  - Hiring
+  - Administrative
+  - Admin
+  - Secretary
+  - Receptionist
+  - Coordinator
+  - Office Manager
+  - Finance
+  - Accounting
+  - Accountant
+  - Controller
+  - Lawyer
+  - Attorney
+  - Compliance
+  - Risk
+  - Audit
+  - Social Media
+  - Content
+  - Copywriter
+  - Designer
+  - Graphic
+  - UX
+  - UI
+  - Developer
+  - Software
+  - DevOps
+  - Data Analyst
+  - Customer Success
+  - Help Desk
+  - Facilities
+  - Security
+  - Janitorial
+  - Intern
+  - Trainee
+  - Contractor
+  - Freelance
+  - Temp
+  - Vendor
+  - Third Party
+  - Investor
+  - QA
+  - Quality
+  - Platform
+  - Apprentice
+  - Assistant
+  - Graduate
+  - Student
+  - Volunteer

@@ -1,0 +1,715 @@
+# EVCharge Live — Products & Services company searches
+#
+# Source of truth: the `Products_Services` sheet of the EVCharge ICP workbook.
+# One entry per **Top level** value; each becomes one Clay workbook + one table
+# of the same name inside `10. EVCharge [2026 - Qasim] -> Products & Services`,
+# populated by Find companies -> Build with filters -> Query mode.
+#
+# The sheet's 16th Top level (Real Estate & Destination Infrastructure) is
+# annotated "GH remove" on every sub level and is deliberately absent here.
+# `Installation, Construction & Maintenance Service` keeps the sheet's singular
+# "Service" — these strings become live Clay workbook/table names.
+#
+# Rendered into a query by automation/cleanup/ps_query_config.py as:
+#
+#   select from companies
+#   where locations.any(country_name in (<countries>))
+#     and industry in (<industry>)
+#     and (description contains (<description>)
+#          or products_and_services is_similar_to (<products_and_services>))
+#     and description contains (<ev_anchor>)      # only when ev_anchor: true
+#
+# SELLER SIDE. Products_Services is the seller half of the ICP (the Side column
+# in the Labs build), so every category here must describe a company that
+# *makes, sells or supplies* into EV charging — never one that merely operates a
+# fleet, runs a transit network or buys chargers. The keyword lists are written
+# as offerings, which is seller-shaped by construction; the trap is the
+# `industry` list, where operator enums (Truck Transportation, Ground Passenger
+# Transportation, Urban Transit Services, Government Administration, Equipment
+# Rental Services) pull in pure buyers. They are deliberately absent below —
+# do not add them back without moving the category to the buy side.
+#
+# Rules from docs/CLAY_QUERY_SKILL.md that constrain what may be edited here:
+#   - `industry` is a closed enum: every value must match the field list exactly.
+#   - `products_and_services` is capped at **3 values per query**, workspace-wide
+#     rule, not a style preference. Concepts beyond 3 belong in `description`.
+#   - description/products for the SAME concept are OR'd (never AND'd) for recall.
+#   - `contains` is whole-word token matching, case-insensitive. Bare ambiguous
+#     acronyms are omitted on purpose: CCS (also carbon capture & storage), ITS,
+#     MaaS, GB/T (the slash does not tokenise). The spelled-out phrase is used.
+#   - No `limit` clause: result caps belong in the search panel, and per the user
+#     (2026-08-07) no cap is applied on this first pass.
+
+countries:
+  - Australia
+  - China
+  - Canada
+  - France
+  - India
+  - Israel
+  - Italy
+  - Japan
+  - Malaysia
+  - Netherlands
+  - New Zealand
+  - Portugal          # sheet reads "Portugla"
+  - Saudi Arabia      # sheet reads "Saudi"
+  - South Korea
+  - Singapore
+  - Spain
+  - Sweden
+  - Taiwan
+  - Thailand
+  - United Kingdom    # sheet reads "UK"
+  - United Arab Emirates   # sheet reads "UAE"
+  - United States
+
+# ANDed onto the categories whose industry mapping is horizontal (every VC, every
+# electrical contractor, every consultancy) and would otherwise drown the list.
+# Per the user (2026-08-07). `ev_anchor: true` on a category selects this list.
+ev_anchor:
+  - EV
+  - electric vehicle
+  - electric vehicles
+  - EV charging
+  - charging infrastructure
+  - e-mobility
+  - electrification
+
+# `ev_anchor: adjacent` selects this wider list instead.
+#
+# The strict EV anchor starved three categories (Traffic 85, Civil Engineering
+# 220, Asset Management 220 rows). Those sellers are real EVCharge exhibitors —
+# an ANPR vendor serving kerbside charging bays, a BIM platform used to design
+# charging hubs, a condition-monitoring provider watching charger uptime — but
+# they describe themselves in the language of kerbside, parking, decarbonisation
+# and net zero, not "EV". Dropping the anchor entirely is the wrong fix: it
+# would readmit every construction and traffic firm on earth. Widening it keeps
+# a relevance gate while matching how these companies actually write.
+adjacent_anchor:
+  - EV
+  - electric vehicle
+  - electric vehicles
+  - EV charging
+  - charging infrastructure
+  - charging station
+  - charging stations
+  - charge point
+  - charge points
+  - e-mobility
+  - electrification
+  - electric fleet
+  - kerbside
+  - curbside
+  - decarbonisation
+  - decarbonization
+  - energy transition
+  - net zero
+  - zero emission
+
+categories:
+
+  - name: EV Charging Hardware & Physical Infrastructure
+    ev_anchor: false
+    industry:
+      - Renewable Energy Equipment Manufacturing
+      - Electrical Equipment Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Motor Vehicle Parts Manufacturing
+      - Industrial Machinery Manufacturing
+      - Machinery Manufacturing
+      - Automation Machinery Manufacturing
+      - Electric Power Transmission, Control, and Distribution
+      - Computers and Electronics Manufacturing
+      - Climate Technology Product Manufacturing
+      - Automotive
+    description:
+      - EV charger
+      - EV chargers
+      - electric vehicle charger
+      - electric vehicle chargers
+      - EV charging
+      - EVSE
+      - charging station
+      - charging stations
+      - charge point
+      - charge points
+      - charging point
+      - charging points
+      - AC charger
+      - DC fast charger
+      - DC fast charging
+      - rapid charger
+      - rapid charging
+      - ultra-rapid charging
+      - high power charging
+      - wallbox
+      - wall box
+      - charging cable
+      - charging cables
+      - charging connector
+      - charging connectors
+      - CHAdeMO
+      - NACS
+      - vehicle-to-grid
+      - V2G
+      - bidirectional charging
+      - inductive charging
+      - wireless charging
+      - lamppost charging
+      - kerbside charging
+      - curbside charging
+      - charging infrastructure
+      - power electronics
+    products_and_services:
+      - EV charging hardware
+      - DC fast chargers
+      - charging connectors
+
+  - name: Charging Software, Platforms & Data
+    ev_anchor: false
+    industry:
+      - Software Development
+      - Technology, Information and Internet
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - Business Intelligence Platforms
+      - Embedded Software Products
+      - Mobile Computing Software Products
+    # 20,319 on the first pass. The charging-specific terms were fine; the
+    # generic SaaS words added around them ("load balancing", "roaming",
+    # "usage analytics", "driver app", "demand response", "booking platform",
+    # "ESG reporting") matched any software company and swamped them. The
+    # sub-levels are all *charging* software, so every keyword now names
+    # charging explicitly or is a charging-only protocol/acronym.
+    description:
+      - EV charging software
+      - EV charging
+      - electric vehicle charging
+      - charge point management
+      - charge point
+      - CPMS
+      - charging management
+      - charging platform
+      - charging network software
+      - charging network management
+      - smart charging
+      - managed charging
+      - OCPP
+      - OCPI
+      - charging roaming
+      - charging analytics
+      - charging optimisation
+      - charging optimization
+      - charger firmware
+      - charger diagnostics
+      - depot charging software
+      - fleet charging software
+    # Dropped on purpose. Tightening the keywords only moved this category
+    # 20,319 -> 18,588, so the volume was never coming from them: it was the
+    # semantic clause. `is_similar_to` expands loosely, and OR'd against the
+    # description it readmitted the whole energy/IoT software adjacency that the
+    # keyword edit had just excluded. The keyword list above is already
+    # exhaustive and charging-specific, so it carries this category alone.
+    products_and_services: []
+
+  - name: End-to-End Charging Solution Providers
+    ev_anchor: false
+    industry:
+      - Services for Renewable Energy
+      - Renewable Energy Power Generation
+      - Electric Power Generation
+      - Utilities
+      - Renewables & Environment
+      - Engineering Services
+      - Business Consulting and Services
+      - Automotive
+      - Environmental Services
+    description:
+      - charge point operator
+      - charge point operators
+      - charging network
+      - charging networks
+      - public charging
+      - destination charging
+      - depot charging
+      - fleet charging
+      - workplace charging
+      - EV charging
+      - EV charging solutions
+      - turnkey charging
+      - managed charging
+      - charging as a service
+      - charging infrastructure
+      - charge point installation
+      - e-mobility service provider
+      - interoperability
+      - roaming
+    products_and_services:
+      - EV charging networks
+      - turnkey EV charging
+      - charging as a service
+
+  - name: Installation, Construction & Maintenance Service
+    ev_anchor: true
+    industry:
+      - Building Equipment Contractors
+      - Specialty Trade Contractors
+      - Utility System Construction
+      - Building Construction
+      - Construction
+      - Civil Engineering
+      - Engineering Services
+      - Repair and Maintenance
+      - Commercial and Industrial Machinery Maintenance
+      - Electronic and Precision Equipment Maintenance
+    description:
+      - installation
+      - installations
+      - installer
+      - installers
+      - electrical contractor
+      - electrical contracting
+      - electrical installation
+      - high voltage
+      - cabling
+      - groundworks
+      - civil works
+      - substation
+      - substations
+      - grid connection
+      - transformer
+      - transformers
+      - preventative maintenance
+      - planned maintenance
+      - emergency repairs
+      - commissioning
+      - retrofit
+      - retrofits
+      - accreditation
+    products_and_services:
+      - EV charger installation
+      - electrical contracting
+      - charger maintenance
+
+  - name: Energy, Power & Grid Solutions
+    ev_anchor: false
+    industry:
+      - Utilities
+      - Electric Power Generation
+      - Electric Power Transmission, Control, and Distribution
+      - Renewable Energy Power Generation
+      - Solar Electric Power Generation
+      - Renewable Energy Equipment Manufacturing
+      - Services for Renewable Energy
+      - Renewables & Environment
+    description:
+      - battery storage
+      - energy storage
+      - BESS
+      - solar PV
+      - solar power
+      - photovoltaic
+      - microgrid
+      - microgrids
+      - grid connection
+      - grid services
+      - smart grid
+      - substation
+      - transformer
+      - capacity upgrade
+      - peak shaving
+      - load forecasting
+      - energy optimisation
+      - energy optimization
+      - flexibility services
+      - demand response
+      - electricity supply
+      - energy retailer
+      - distributed energy
+      - EV charging
+    products_and_services:
+      - battery energy storage
+      - solar PV systems
+      - grid connection services
+
+  - name: Payments, Access & Commercial Services
+    ev_anchor: true
+    industry:
+      - Financial Services
+      - Credit Intermediation
+      - Software Development
+      - Technology, Information and Internet
+      - IT Services and IT Consulting
+      - Internet Marketplace Platforms
+    description:
+      - payment gateway
+      - payment gateways
+      - payment processing
+      - card payment
+      - card payments
+      - contactless payment
+      - mobile payments
+      - subscription billing
+      - billing platform
+      - fleet billing
+      - fuel card
+      - fuel cards
+      - RFID
+      - access control
+      - authentication
+      - pricing engine
+      - revenue management
+      - settlement
+      - roaming
+    products_and_services:
+      - EV charging payments
+      - billing platforms
+      - access control systems
+
+  # 50,003 matches on the first pass — Clay's per-table ceiling, i.e. the query
+  # was not discriminating at all. Two causes, one fix: the industry list
+  # carried fleet OPERATORS (Truck Transportation, Ground Passenger
+  # Transportation, Transportation/Logistics, Equipment Rental Services), who
+  # are buyers of charging, not sellers; and the keywords were generic trade
+  # words ("dealership", "fleet management", "vehicle leasing", "mobility
+  # services", "commercial vehicles") that every transport company uses.
+  # Narrowed to manufacturers, suppliers and distributors — the seller half.
+  - name: Automotive & Mobility Providers
+    ev_anchor: false
+    industry:
+      - Motor Vehicle Manufacturing
+      - Motor Vehicle Parts Manufacturing
+      - Automotive
+      - Retail Motor Vehicles
+      - Wholesale Motor Vehicles and Parts
+      - Renewable Energy Equipment Manufacturing
+    description:
+      - electric vehicle manufacturer
+      - electric vehicle manufacturing
+      - EV manufacturer
+      - electric vehicle OEM
+      - electric bus
+      - electric buses
+      - electric truck
+      - electric trucks
+      - electric powertrain
+      - electric drivetrain
+      - EV components
+      - EV platform
+      - battery manufacturer
+      - battery manufacturing
+      - battery pack
+      - battery packs
+      - battery swapping
+      - second-life battery
+      - battery recycling
+      - EV dealership
+      - EV distributor
+      - fleet electrification
+      - EV charging
+    products_and_services:
+      - electric vehicles
+      - EV batteries
+      - battery swapping
+
+  - name: Professional & Advisory Services
+    ev_anchor: true
+    industry:
+      - Business Consulting and Services
+      - Strategic Management Services
+      - Professional Services
+      - Legal Services
+      - Law Practice
+      - Insurance
+      - Insurance Agencies and Brokerages
+      - Research Services
+      - Engineering Services
+      - Computer and Network Security
+    description:
+      - strategy consulting
+      - management consulting
+      - consultancy
+      - consulting
+      - advisory
+      - infrastructure planning
+      - feasibility
+      - legal services
+      - planning
+      - permitting
+      - compliance
+      - insurance
+      - risk management
+      - cybersecurity
+      - certification
+      - standards
+      - testing
+      - inspection
+      - safety audit
+      - type approval
+    products_and_services:
+      - fleet electrification advisory
+      - charger certification
+      - electrical testing
+
+  - name: Finance, Investment & Funding
+    ev_anchor: true
+    industry:
+      - Venture Capital and Private Equity Principals
+      - Investment Management
+      - Investment Banking
+      - Capital Markets
+      - Financial Services
+      - Banking
+      - Funds and Trusts
+      - International Trade and Development
+      - Government Administration
+    description:
+      - infrastructure investment
+      - infrastructure fund
+      - venture capital
+      - private equity
+      - project finance
+      - debt finance
+      - asset finance
+      - leasing
+      - grant funding
+      - public grants
+      - development finance
+      - energy transition
+      - climate finance
+      - green finance
+      - clean energy investment
+      - funding
+    products_and_services:
+      - infrastructure investment
+      - project finance
+      - asset finance
+
+  - name: Urban Mobility, Transport & Smart City Infrastructure
+    ev_anchor: false
+    # Urban Transit Services / Ground Passenger Transportation / Government
+    # Administration are the transit operators and city authorities who BUY
+    # this technology — buy side, so they are out. What stays are the vendors
+    # and consultancies that sell smart-mobility systems to them.
+    industry:
+      - Software Development
+      - Technology, Information and Internet
+      - IT Services and IT Consulting
+      - Transportation, Logistics, Supply Chain and Storage
+      - Civil Engineering
+      - Architecture and Planning
+      - Engineering Services
+    description:
+      - mobility as a service
+      - shared mobility
+      - micromobility
+      - intelligent transport
+      - intelligent transportation
+      - traffic management
+      - smart parking
+      - parking management
+      - parking infrastructure
+      - kerbside management
+      - curbside management
+      - tolling
+      - road user charging
+      - congestion charging
+      - urban logistics
+      - freight electrification
+      - public transport electrification
+      - bus electrification
+      - smart city
+      - city operations
+      - transport planning
+      - EV charging
+    products_and_services:
+      - mobility as a service
+      - smart parking systems
+      - intelligent transport systems
+
+  - name: Traffic, Road Safety & Enforcement Systems
+    ev_anchor: adjacent
+    industry:
+      - Software Development
+      - Technology, Information and Internet
+      - Measuring and Control Instrument Manufacturing
+      - Computers and Electronics Manufacturing
+      - Communications Equipment Manufacturing
+      - Security Systems Services
+      - Public Safety
+      - Civil Engineering
+    description:
+      - traffic monitoring
+      - traffic control
+      - traffic management
+      - automatic number plate recognition
+      - number plate recognition
+      - licence plate recognition
+      - license plate recognition
+      - ANPR
+      - enforcement camera
+      - enforcement cameras
+      - traffic enforcement
+      - speed enforcement
+      - road safety
+      - accident prevention
+      - line marking
+      - road signage
+      - variable message signs
+      - driver behaviour
+      - driver behavior
+      - telematics
+    products_and_services:
+      - traffic management systems
+      - enforcement cameras
+      - road safety systems
+
+  - name: Connected, Autonomous & Data Infrastructure
+    ev_anchor: false
+    industry:
+      - Software Development
+      - Technology, Information and Internet
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - Telecommunications
+      - Wireless Services
+      - Computer Networking
+      - Communications Equipment Manufacturing
+      - Robotics Engineering
+    # 21,127 rows on the first build. The sub-levels are all vehicle/transport
+    # infrastructure, but the keywords were platform-generic ("IoT platform",
+    # "internet of things", "edge computing", "5G", "predictive analytics",
+    # bare "telematics") and matched any tech company. Every term is now bound
+    # to a vehicle, a road or a transport network.
+    description:
+      - autonomous vehicle
+      - autonomous vehicles
+      - autonomous driving
+      - self-driving
+      - vehicle-to-everything
+      - V2X
+      - C-V2X
+      - vehicle-to-grid
+      - connected vehicle
+      - connected vehicles
+      - connected car
+      - connected cars
+      - vehicle telematics
+      - fleet telematics
+      - automotive IoT
+      - roadside units
+      - vehicle connectivity
+      - mobility data
+      - transport data
+      - traffic prediction
+      - EV charging
+    products_and_services:
+      - vehicle to everything communication
+      - connected vehicle platforms
+      - fleet telematics
+
+  - name: Civil Engineering & Construction Technology
+    ev_anchor: adjacent
+    industry:
+      - Civil Engineering
+      - Construction
+      - Building Construction
+      - Architecture and Planning
+      - Design Services
+      - Software Development
+      - Surveying and Mapping Services
+      - Building Materials
+      - Agriculture, Construction, Mining Machinery Manufacturing
+      - Engineering Services
+    description:
+      - digital construction
+      - construction technology
+      - construction software
+      - BIM
+      - building information modelling
+      - building information modeling
+      - digital twin
+      - digital twins
+      - geospatial
+      - mapping
+      - surveying
+      - augmented reality
+      - virtual reality
+      - construction safety
+      - concrete
+      - asphalt
+      - construction equipment
+      - excavator
+      - excavators
+    products_and_services:
+      - digital construction platforms
+      - digital twins
+      - geospatial mapping
+
+  - name: Infrastructure Asset Management & Operations
+    ev_anchor: adjacent
+    industry:
+      - Software Development
+      - Technology, Information and Internet
+      - IT Services and IT Consulting
+      - Facilities Services
+      - Repair and Maintenance
+      - Commercial and Industrial Machinery Maintenance
+      - Engineering Services
+      - Business Consulting and Services
+    description:
+      - asset management
+      - asset performance
+      - lifecycle management
+      - condition monitoring
+      - remote inspection
+      - remote inspections
+      - drone inspection
+      - predictive maintenance
+      - operations and maintenance
+      - maintenance software
+      - field service
+      - uptime
+      - performance analytics
+    products_and_services:
+      - asset management software
+      - predictive maintenance
+      - remote inspection
+
+  - name: Alternative Fuels & Future Energy Infrastructure
+    ev_anchor: false
+    industry:
+      - Renewable Energy Power Generation
+      - Renewable Energy Equipment Manufacturing
+      - Services for Renewable Energy
+      - Renewables & Environment
+      - Chemical Manufacturing
+      - Utilities
+      - Oil and Gas
+      - Electrical Equipment Manufacturing
+      - Industrial Machinery Manufacturing
+    description:
+      - hydrogen refuelling
+      - hydrogen refueling
+      - hydrogen station
+      - hydrogen stations
+      - hydrogen infrastructure
+      - green hydrogen
+      - hydrogen fuel
+      - fuel cell
+      - fuel cells
+      - multi-fuel
+      - alternative fuels
+      - renewable fuels
+      - biomethane
+      - energy storage
+      - sodium-ion
+      - solid-state battery
+      - flow battery
+      - lithium iron phosphate
+      - EV charging
+    products_and_services:
+      - hydrogen refuelling stations
+      - fuel cell systems
+      - sodium ion batteries

@@ -39,14 +39,18 @@ SHARED_EXACT = {
 HOSTING = {
     "wixsite.com", "wordpress.com", "squarespace.com", "github.io", "sites.google.com",
     "linktr.ee", "bit.ly", "medium.com", "eventbrite.com", "webflow.io", "carrd.co",
+    # Marketplace storefronts (Mining, Oct 2026: `hdsieve.en.alibaba.com` resolves to Alibaba).
+    "alibaba.com", "1688.com", "made-in-china.com", "about.me",
 }
 
 
 def norm_domain(url):
     s = str(url or "").strip().lower()
+    s = re.sub(r"(?<=[:/.])\s+|\s+(?=[/.])", "", s)        # "https:// westermo.com/" (Mining scrape)
     if not s or " " in s:
         return ""
-    s = re.sub(r"^[a-z]+://", "", s).split("/")[0].split("?")[0].split("#")[0]
+    # "http:en.example.com" (slashes lost in the scrape) is a URL too.
+    s = re.sub(r"^[a-z]+:/*", "", s).split("/")[0].split("?")[0].split("#")[0]
     s = re.sub(r"^www\d*\.", "", s).strip(".")
     return s if "." in s else ""
 

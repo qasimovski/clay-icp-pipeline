@@ -1,0 +1,134 @@
+# Mining ICP: rules applied to the people Clay returns (plan step 5), because the Clay search
+# can't express them. Clay's search (icp.yaml) is deliberately the wider net; this file is the
+# sheet's exact wording. Source: "Mining Playbook ICP.xlsx" V2 tabs, decisions of 25 Oct 2026.
+#
+# Matching: `exact` = the whole title, or one part of a compound title split on & / | , ; @ and
+# " - " ("CEO & Founder" passes CEO; not on "and"). `contains` = the keyword appears as whole
+# words. A person passes when any keyword matches and none of that keyword's `exclude` words
+# appear in the title.
+#
+# Kept but FLAGGED in "Title Check" for the marketing manager (user, 25 Oct 2026), never dropped:
+#   near-exact  a senior exact title plus a qualifier: "Group CEO", "Managing Director: Africa",
+#               but also "GM HR". Bare Manager / Director / Sales / President / Vice President /
+#               Owner never count.
+#   non-English a title with no Latin letters (副总经理, مدير عام) that the rules can't read.
+# Latin-script foreign titles ("Direttore tecnico") still drop as "title not on" the list.
+
+sell:
+  # Seller JTs v2. A person matching both lists is tagged Booker (Booker wins).
+  personas:
+    Booker:
+      exact: [CEO, Chief Executive Officer, MD, Managing Director, General Manager, GM, President,
+              Founder, Co-Founder, Chairman, COO, Chief Operating Officer, CTO,
+              Chief Technical Officer, CMO, Chief Commercial Officer, Vice President,
+              Regional Director, Deputy General Manager, Expo Manager, Manager, Director, Sales]
+      contains:
+        Sales Manager: {exclude: [Aftersales, After Sales, Presales, Pre-Sales]}
+        Sales Director: {exclude: [Aftersales, After Sales, Presales, Pre-Sales]}
+        Sales Engineer: {exclude: [Aftersales, After Sales, Presales, Pre-Sales]}
+        Head of Sales: {}
+        Marketing: {exclude: &marketing_noise [SEO, Digital, Performance, Content, Social Media,
+                                               Email, Affiliate, Growth, Influencer]}
+        Business Development: {}
+        Regional Manager: {}
+        Area Manager: {}
+        Export Manager: {}
+        Regional Sales: {}
+        Area Sales: {}
+        Key Account: {}
+        Technical Director: {}
+        Operations Director: {}
+        Global Sales: {}
+        International Sales: {}
+        Brand: {exclude: [Brand Ambassador]}
+        Communication: {exclude: [Telecommunication, Telecommunications]}
+        Communications: {exclude: [Telecommunication, Telecommunications]}
+        Trade Show: {}
+        VP of Sales: {}
+        Regional Representative: {}
+    Stand staff:
+      exact: [CEO, Chief Executive Officer, MD, Managing Director, General Manager, GM, President,
+              Founder, Chairman, COO, CTO, Vice President, Regional Director, Sale Manager,
+              Manager, Director, Sales]
+      contains:
+        # Aftersales is wanted on the stand, so only Presales is excluded here.
+        Sales Manager: {exclude: [Presales, Pre-Sales]}
+        Sales Director: {exclude: [Presales, Pre-Sales]}
+        Sales Engineer: {exclude: [Presales, Pre-Sales]}
+        Sales Executive: {}
+        Sales Representative: {}
+        Sales Coordinator: {}
+        Area Sales: {}
+        Regional Sales: {}
+        Territory Manager: {}
+        Business Development: {}
+        Key Account: {}
+        Account Manager: {}
+        Account Executive: {}
+        Application Engineer: {}
+        Service Engineer: {}
+        Product Manager: {}
+        Project Manager: {}
+        Marketing: {exclude: *marketing_noise}
+        Export: {}
+        Exporter: {}
+        Regional Manager: {}
+        Aftersales: {exclude: [Aftersales Assistant]}
+        Sales Support: {}
+        Service Manager: {}
+        Technical Director: {}
+        Brand: {exclude: [Brand Ambassador]}
+        Communication: {exclude: [Telecommunication, Telecommunications]}
+        Communications: {exclude: [Telecommunication, Telecommunications]}
+        Head of Sales: {}
+        Sales Area: {}
+        Area Manager: {}
+        Operations Director: {}
+  # Geo_Scope v2 SELL SIDE. A person in a country not listed here is dropped (collect.py
+  # doesn't re-check country). Every other listed country is Secondary.
+  geo_tier:
+    Core: [United Arab Emirates, China, India, Turkey]
+    "Yes": [Saudi Arabia, United Kingdom, Italy]
+    Exhibitor sourcing: [Germany]
+
+buy:
+  # BuySide ICP v2: each category's titles in icp.yaml are `contains`, except these cross-cutting
+  # titles, which are `exact`.
+  exact: [CEO, Chief Executive Officer, MD, Managing Director, General Manager, GM, President,
+          Vice President, Chairman, Founder, COO, Chief Operating Officer, CTO,
+          Chief Technical Officer, CFO, Chief Financial Officer, Owner, Regional Director,
+          Executive Director, Technical Director, Mine Manager, Plant Manager]
+  # Cross-cutting exact titles that a group ALSO lists as its own Contains keyword (column F):
+  # for that group they match as contains ("Underground Mine Manager" is a Mine Manager).
+  contains_too:
+    Mining & Minerals Operators: [Mine Manager, Plant Manager, Technical Director]
+    "Quarrying, Aggregates & Cement": [Plant Manager, Technical Director]
+    EPC Contractors & Engineering Services: [Technical Director]
+    "Processing, Refining & Smelting": [Plant Manager, Technical Director]
+  # The EXCLUDE row, applied to every buy title. Partner is allowed for Investors only.
+  exclude: [Intern, Trainee, Assistant, Entry, Freelance, Student, Junior, Sales Manager,
+            Sales Executive, Sales Engineer, Sales Director, Business Development, Marketing,
+            Recruitment, Growth, Partner]
+  partner_allowed: [Investors & Financial Institutions]
+  # "Contacts MUST work in the mining team": flag (not drop) when neither the title nor the
+  # headline mentions one of these words. The approver decides on flagged people.
+  mining_team_evidence:
+    # Quoted: a comma inside an unquoted flow list splits the label in two.
+    categories: [EPC Contractors & Engineering Services, Investors & Financial Institutions,
+                 "Processing, Refining & Smelting"]
+    words: [Mining, Mine, Mines, Minerals, Mineral, Metals, Metal, Commodities, Commodity,
+            Metallurgy, Metallurgical, Smelter, Smelting, Refinery]
+  geo_tier:
+    Core: [United Arab Emirates]
+    "Yes": [Egypt, Oman, Saudi Arabia, Turkey, South Africa, China, India, Pakistan]
+
+# Germany: searched, never emailed. Its people go to a separate LinkedIn-only file and never
+# reach the email workflow (Geo_Scope v2 compliance row).
+linkedin_only_countries: [Germany]
+
+# Speakers (speakers.py). User, 25 Oct 2026: keep every speaker in an in-scope country whatever the
+# title ("filter on country only"); a title that fails the rules above is flagged, not dropped.
+speakers:
+  titles: flag
+  # Industry words too common in company names to prove a LinkedIn match ("Gold Mining Ltd").
+  company_stop_words: [mining, minerals, resources, metals, gold, energy]

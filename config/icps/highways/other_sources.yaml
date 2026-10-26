@@ -1,0 +1,116 @@
+# Highways — OTHER SOURCES
+#
+# Source: the `Other sources` sheet of `ICP - Highways new.xlsx`. One entry per
+# directory/association the companies were scraped from. They all live in ONE
+# Clay table (`ALL_SOURCES_DEDUPED`, in `Highways [Qasim - 2026] -> Other
+# Sources`) rather than a workbook each, because the same company appears in
+# several directories and the table is deduped across them.
+#
+# WHAT THIS FILE IS FOR: countries. Per the user (2026-09-14) the people search
+# for Other Sources uses the COUNTRIES COLUMN OF THIS SHEET — the source's own
+# geography — not the ICP category's country list the way Competitive Events
+# does. A CECA member is a UK contractor; its people should be UK.
+#
+# `campaign_type` is recorded but NOT used for targeting. The Registrar decides
+# Side from the company itself, exactly as it does for Competitive Events; the
+# sheet's Campaign Type is the directory's intent, and on 47 deduped rows the
+# directories disagree with each other anyway ("ADEPT Member Directory; LCRIG
+# Member Directory" is Buy side + Sell/Buy). Keep it for provenance and as a
+# sanity check on the classifier, not as an input.
+#
+# WHAT IS DELIBERATELY ABSENT: the sheet's `Profiles / Refine by` and
+# `Job Titles` columns.
+#   * Profiles — the table's `Category` column holds the DIRECTORY's own
+#     membership label ("Architects", "Tier 3", "HERS Registered
+#     Organisations", "Corporate Members", "LEDNet associate member"), 487
+#     distinct values, many of them membership tiers with no ICP meaning. Per
+#     the user (2026-09-14) it is NOT used for targeting — it rides along as
+#     provenance and the Registrar classifies from Description, Primary
+#     Offerings and the domain, as it does for CE.
+#   * Job Titles — every title the sheet lists is ALREADY covered by the
+#     existing personas, checked term by term 2026-09-14. The generic sell-side
+#     list (CEO, Managing Director, CMO, Head of Marketing and Communications,
+#     Marketing Manager, Events Marketing Manager, Sponsorship Manager,
+#     Strategic Partnerships Manager, Sales Director, Head of Business
+#     Development, Commercial Director) all match `seller_people.yaml`; ADEPT's
+#     buy-side list (Head/Director of Highways, Procurement, Engineering) all
+#     match `highways_buyside/people.yaml`. Two sources say "See Seller JTs tab"
+#     and "See buyside ICP for JTs" outright. So there is no third persona.
+#
+# `table_name` is the Source Name token as it appears in the Clay table, which
+# is not always the sheet's `Source name` — the sheet writes "Transport for NSW
+# - filtered on: Registered Contractors", the table "Transport for NSW -
+# Registered Contractors". Matching on the sheet string alone would silently
+# give that source no countries. Both spellings are carried.
+#
+# Country strings are the Clay `country_name` enum values, so the sheet's "UK"
+# becomes "United Kingdom" — Clay silently drops an unknown value, which just
+# narrows the result set with no error.
+
+sources:
+  - name: ADEPT Member Directory
+    countries: [United Kingdom]
+    campaign_type: Buy side
+
+  - name: AGS Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side
+
+  - name: Australian Construction Association
+    countries: [Australia, New Zealand]        # sheet: "Australia and New Zealand"
+    campaign_type: Sell side
+
+  - name: CECA Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side + Buy Side
+
+  - name: CIHT Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side + Buy Side
+
+  - name: CPA Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side
+
+  - name: HEA Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side
+
+  # No rows in the table as scraped — kept so the sheet and this file line up.
+  - name: Interchange attenedee list
+    countries: [United Kingdom]
+    campaign_type: Sell side + Buy Side
+
+  - name: iseekplant
+    countries: [Australia]
+    campaign_type: Buy side
+
+  - name: ITS UK Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side
+
+  - name: LCRIG Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side + Buy Side
+
+  - name: London Build Attendee Companies
+    countries: [United Kingdom]
+    campaign_type: Sell side + Buy Side
+
+  - name: RSMA Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side
+
+  - name: TMCA Member Directory
+    countries: [United Kingdom]
+    campaign_type: Sell side
+
+  - name: "Transport for NSW - filtered on: Registered Contractors"
+    table_name: Transport for NSW - Registered Contractors
+    countries: [Australia]
+    campaign_type: Buy side
+
+  # No rows in the table as scraped.
+  - name: "Yellow pages - filter on: Road contractors in Australia"
+    countries: [Australia]
+    campaign_type: Buy side

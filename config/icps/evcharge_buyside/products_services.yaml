@@ -1,0 +1,485 @@
+# EVCharge Live — BUY SIDE company searches
+#
+# Source: the `BuySide ICP` sheet of the EVCharge ICP workbook. Rendered by the
+# same automation/cleanup/ps_query_config.py as the seller side — it lives under
+# its own ICP directory (`evcharge_buyside`) purely so `--icp evcharge_buyside`
+# selects it without any code change.
+#
+# BUY SIDE, not sell side. These are the organisations that OWN or OPERATE
+# fleets, depots, networks and estates — the people who *buy* charging
+# infrastructure. The seller-side file (config/icps/evcharge/) is the mirror
+# image: vendors selling into them. Do not merge the two.
+#
+# What the sheet contributes per Top level:
+#   Industries column -> `industry` (the sheet's "sub level")
+#   Countries (sheet row 2, one list for every entry) -> `countries`
+# Job Titles / MATCH TYPE / SENIORITY are for the People table only and are
+# deliberately absent here (user, 2026-08-09).
+#
+# Sheet countries normalised to Clay's `country_name` enum:
+#   "Saudi" -> Saudi Arabia, "UK" -> United Kingdom, "UAE" -> United Arab Emirates.
+countries:
+  - Australia
+  - Indonesia
+  - Qatar
+  - South Africa
+  - Saudi Arabia
+  - Thailand
+  - United Kingdom
+  - United Arab Emirates
+  - United States
+
+# The relevance gate. Every category here is a broad operator industry —
+# "Truck Transportation" alone is every haulier on earth — so an EV/charging
+# anchor is what makes the list an EVCharge audience rather than a transport
+# directory. Buy-side wording differs from the seller side: these organisations
+# describe themselves as electrifying a fleet, hitting net zero or running
+# depots, not as selling chargers.
+ev_anchor:
+  - EV
+  - EVs
+  - electric vehicle
+  - electric vehicles
+  - EV fleet
+  - electric fleet
+  - fleet electrification
+  - electrification
+  - electrify
+  - electric bus
+  - electric buses
+  - electric truck
+  - electric trucks
+  - EV charging
+  - charging infrastructure
+  - charge point
+  - charging points
+  - depot charging
+  - e-mobility
+  - zero emission
+  - zero-emission
+  - decarbonisation
+  - decarbonization
+  - net zero
+  - sustainable transport
+  - green fleet
+  - alternative fuels
+
+# Unused on the buy side today; ps_query_config requires the key to exist and
+# validates any category that selects it with `ev_anchor: adjacent`.
+adjacent_anchor:
+  - EV
+  - electric vehicle
+  - electric vehicles
+  - EV charging
+  - charging infrastructure
+  - electrification
+  - net zero
+  - decarbonisation
+  - sustainability
+
+categories:
+
+  # Sheet rows 10-26. Fleet and network operators: the organisations with
+  # vehicles to electrify and depots to charge them in.
+  - name: Transport, Mobility & Logistics
+    # ev_anchor: false — the EV terms live in `description` below and are the
+    # only relevance filter. Setting the anchor too would AND the identical list
+    # against itself: harmless but a confusing query to read back.
+    ev_anchor: false
+    industry:
+      - Airlines and Aviation
+      - Ambulance Services
+      - Freight and Package Transportation
+      - Ground Passenger Transportation
+      - Maritime
+      - Maritime Transportation
+      - Rail Transportation
+      - School and Employee Bus Services
+      - Shuttles and Special Needs Transportation Services
+      - Sightseeing Transportation
+      - Taxi and Limousine Services
+      - Transportation, Logistics, Supply Chain and Storage
+      - Transportation/Trucking/Railroad
+      - Truck Transportation
+      - Urban Transit Services
+      - Warehousing
+      - Warehousing and Storage
+    # The sheet gives no product/service keywords on the buy side — its
+    # Industries column IS the sub level. So `description` carries the EV
+    # relevance gate on its own: without it, "Truck Transportation" across nine
+    # countries is every haulier on earth rather than an EVCharge audience.
+    description:
+      - EV
+      - EVs
+      - electric vehicle
+      - electric vehicles
+      - EV fleet
+      - electric fleet
+      - fleet electrification
+      - electrification
+      - electrify
+      - electric bus
+      - electric buses
+      - electric truck
+      - electric trucks
+      - EV charging
+      - charging infrastructure
+      - charge point
+      - charging points
+      - depot charging
+      - e-mobility
+      - zero emission
+      - zero-emission
+      - decarbonisation
+      - decarbonization
+      - net zero
+      - sustainable transport
+      - green fleet
+      - alternative fuels
+    products_and_services: []
+
+  # Sheet rows 28-39. Cities, authorities and agencies that own kerbside, depots and public estates.
+  - name: Government, Public Sector & Authorities
+    ev_anchor: false
+    industry:
+      - Government Administration
+      - Utilities Administration
+      - Law Enforcement
+      - Public Safety
+      - Public Policy
+      - Public Policy Offices
+      - Transportation Programs
+      - Housing and Community Development
+      - Housing Programs
+      - Water Supply and Irrigation Systems
+      - Waste Collection
+      - Waste Treatment and Disposal
+    description:
+      - EV
+      - EVs
+      - electric vehicle
+      - electric vehicles
+      - EV fleet
+      - electric fleet
+      - fleet electrification
+      - electrification
+      - electrify
+      - electric bus
+      - electric buses
+      - electric truck
+      - electric trucks
+      - EV charging
+      - charging infrastructure
+      - charge point
+      - charging points
+      - depot charging
+      - e-mobility
+      - zero emission
+      - zero-emission
+      - decarbonisation
+      - decarbonization
+      - net zero
+      - sustainable transport
+      - green fleet
+      - alternative fuels
+    products_and_services: []
+
+  # Sheet rows 41-52. Grid and generation owners — the connection side of a charging project.
+  - name: Energy, Utilities & Infrastructure Owners
+    ev_anchor: false
+    industry:
+      - Utilities
+      - Electric Power Generation
+      - Electric Power Transmission, Control, and Distribution
+      - Natural Gas Distribution
+      - Steam and Air-Conditioning Supply
+      - Water, Waste, Steam, and Air Conditioning Services
+      - Renewable Energy Power Generation
+      - Solar Electric Power Generation
+      - Wind Electric Power Generation
+      - Hydroelectric Power Generation
+      - Geothermal Electric Power Generation
+      - Nuclear Electric Power Generation
+    description:
+      - EV
+      - EVs
+      - electric vehicle
+      - electric vehicles
+      - EV fleet
+      - electric fleet
+      - fleet electrification
+      - electrification
+      - electrify
+      - electric bus
+      - electric buses
+      - electric truck
+      - electric trucks
+      - EV charging
+      - charging infrastructure
+      - charge point
+      - charging points
+      - depot charging
+      - e-mobility
+      - zero emission
+      - zero-emission
+      - decarbonisation
+      - decarbonization
+      - net zero
+      - sustainable transport
+      - green fleet
+      - alternative fuels
+    products_and_services: []
+
+  # Sheet rows 54-66. Owners of land, buildings, parking and destinations. The sheet's 'Recreational Facilities (Sporting Stadiums)' maps to the enum value 'Recreational Facilities'; the parenthetical is a note, not part of the name.
+  - name: Real Estate, Property & Facilities
+    ev_anchor: false
+    industry:
+      - Real Estate
+      - Commercial Real Estate
+      - Leasing Non-residential Real Estate
+      - Leasing Residential Real Estate
+      - Real Estate and Equipment Rental Services
+      - Facilities Services
+      - Accommodation Services
+      - Hotels and Motels
+      - Hospitality
+      - Leisure, Travel & Tourism
+      - Amusement Parks and Arcades
+      - Gambling Facilities and Casinos
+      - Recreational Facilities
+    description:
+      - EV
+      - EVs
+      - electric vehicle
+      - electric vehicles
+      - EV fleet
+      - electric fleet
+      - fleet electrification
+      - electrification
+      - electrify
+      - electric bus
+      - electric buses
+      - electric truck
+      - electric trucks
+      - EV charging
+      - charging infrastructure
+      - charge point
+      - charging points
+      - depot charging
+      - e-mobility
+      - zero emission
+      - zero-emission
+      - decarbonisation
+      - decarbonization
+      - net zero
+      - sustainable transport
+      - green fleet
+      - alternative fuels
+    products_and_services: []
+
+  # Sheet rows 68-74. The clients commissioning build programmes that charging gets designed into.
+  - name: Construction Clients & Infrastructure Owners
+    ev_anchor: false
+    industry:
+      - Building Construction
+      - Construction
+      - Civil Engineering
+      - Highway, Street, and Bridge Construction
+      - Nonresidential Building Construction
+      - Residential Building Construction
+      - Utility System Construction
+    description:
+      - EV
+      - EVs
+      - electric vehicle
+      - electric vehicles
+      - EV fleet
+      - electric fleet
+      - fleet electrification
+      - electrification
+      - electrify
+      - electric bus
+      - electric buses
+      - electric truck
+      - electric trucks
+      - EV charging
+      - charging infrastructure
+      - charge point
+      - charging points
+      - depot charging
+      - e-mobility
+      - zero emission
+      - zero-emission
+      - decarbonisation
+      - decarbonization
+      - net zero
+      - sustainable transport
+      - green fleet
+      - alternative fuels
+    products_and_services: []
+
+  # Sheet rows 76-79. Destination charging hosts: forecourts, supermarkets, restaurants.
+  - name: Retail, Food & Destination Sites
+    ev_anchor: false
+    industry:
+      - Retail
+      - Food and Beverage Retail
+      - Restaurants
+      - Retail Gasoline
+    description:
+      - EV
+      - EVs
+      - electric vehicle
+      - electric vehicles
+      - EV fleet
+      - electric fleet
+      - fleet electrification
+      - electrification
+      - electrify
+      - electric bus
+      - electric buses
+      - electric truck
+      - electric trucks
+      - EV charging
+      - charging infrastructure
+      - charge point
+      - charging points
+      - depot charging
+      - e-mobility
+      - zero emission
+      - zero-emission
+      - decarbonisation
+      - decarbonization
+      - net zero
+      - sustainable transport
+      - green fleet
+      - alternative fuels
+    products_and_services: []
+
+  # Sheet rows 85-89. Large single-site estates with their own fleets and staff parking.
+  - name: Health, Education & Large Campuses
+    ev_anchor: false
+    industry:
+      - Hospitals and Health Care
+      - Hospitals
+      - Higher Education
+      - Education Administration Programs
+      - Health and Human Services
+    description:
+      - EV
+      - EVs
+      - electric vehicle
+      - electric vehicles
+      - EV fleet
+      - electric fleet
+      - fleet electrification
+      - electrification
+      - electrify
+      - electric bus
+      - electric buses
+      - electric truck
+      - electric trucks
+      - EV charging
+      - charging infrastructure
+      - charge point
+      - charging points
+      - depot charging
+      - e-mobility
+      - zero emission
+      - zero-emission
+      - decarbonisation
+      - decarbonization
+      - net zero
+      - sustainable transport
+      - green fleet
+      - alternative fuels
+    products_and_services: []
+
+  # Sheet row 2: "All Industries (exclude Aviation/Aerospace)" — the catch-all
+  # for EV-charging buyers whose industry is not one of the six above. Built
+  # LAST and deliberately shaped differently:
+  #
+  #   * NO positive industry list. That is the point of the row, so the country
+  #     and description clauses carry the entire filter.
+  #   * Because nothing gates the industry, the keywords must be far stricter
+  #     than the other categories. Weak signals are removed on purpose: bare
+  #     "EV", "electrification", "net zero", "sustainability" and
+  #     "decarbonisation" appear in the boilerplate of virtually every large
+  #     company and would return a directory, not an audience. Every phrase
+  #     below names charging or a fleet transition explicitly — the buying
+  #     intent the Brief describes ("if you are building, funding, operating or
+  #     supplying EV charging infrastructure").
+  #   * The sheet's carve-out is applied as `industry_not`, covering all seven
+  #     aviation/aerospace/space enum values rather than just the obvious one.
+  - name: All Industries (exclude Aviation & Aerospace)
+    ev_anchor: false
+    # Two groups of exclusion, both necessary once the industry gate is gone.
+    #
+    # 1. The sheet's own carve-out: aviation / aerospace / space.
+    # 2. The SELL side and the bystanders. Verified against a live preview,
+    #    which returned Sungrow, Growatt, GoodWe, CHINT, SolarEdge, Delta,
+    #    Enphase, ChargePoint and Enel X — every one a vendor already covered by
+    #    the seller-side Products & Services folder — plus Taylor Hopkinson and
+    #    Brightsmith, recruiters who write about EV charging because they staff
+    #    it. On a buy-side list these are wrong answers, and without an industry
+    #    gate nothing else keeps them out.
+    #
+    # Deliberately NOT excluded: Utilities, Oil and Gas, Electric Power
+    # Generation and Real Estate. Those are genuine buyers here (bp, ScottishPower,
+    # Dubai Electricity & Water, Prologis) even though some also sell.
+    industry_not:
+      # the sheet's carve-out
+      - Airlines and Aviation
+      - Aviation & Aerospace
+      - Aviation and Aerospace Component Manufacturing
+      - Defense & Space
+      - Defense and Space Manufacturing
+      - Space Research and Technology
+      - Flight Training
+      # hardware and equipment vendors — the seller side
+      - Renewable Energy Equipment Manufacturing
+      - Renewable Energy Semiconductor Manufacturing
+      - Electrical Equipment Manufacturing
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Computers and Electronics Manufacturing
+      - Industrial Machinery Manufacturing
+      - Machinery Manufacturing
+      - Automation Machinery Manufacturing
+      - Motor Vehicle Manufacturing
+      - Motor Vehicle Parts Manufacturing
+      - Semiconductor Manufacturing
+      - Semiconductors
+      # software and services vendors — the seller side
+      - Software Development
+      - IT Services and IT Consulting
+      # bystanders: write about EV charging, never buy it
+      - Staffing and Recruiting
+      - Executive Search Services
+      - Human Resources Services
+    description:
+      - EV charging
+      - EV chargers
+      - electric vehicle charging
+      - charging infrastructure
+      - charging network
+      - charging stations
+      - charge points
+      - charging points
+      - depot charging
+      - workplace charging
+      - destination charging
+      - rapid charging
+      - EV infrastructure
+      - EV fleet
+      - electric fleet
+      - fleet electrification
+      - electrifying our fleet
+      - zero emission fleet
+      - electric bus fleet
+      - electric truck fleet
+      - vehicle-to-grid
+      - EV transition
+      - EV adoption
+      - EV rollout
+      - electric vehicle infrastructure
+    products_and_services: []

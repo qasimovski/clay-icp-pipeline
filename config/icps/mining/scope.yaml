@@ -1,0 +1,131 @@
+# Mining ICP: which scraped companies are in scope, and how the earlier (V1) typing maps onto V2.
+# Read by .claude/skills/event-icp-clay-workflow/scripts/remap_prior.py.
+# Source: "Mining Playbook ICP.xlsx", V2 tabs (Competitor v2, Products_Services v2, BuySide ICP v2);
+# decisions of 25 Oct 2026. V2 ALWAYS WINS: V1's KEEP/DROP is never read, only V1's per-row type.
+# The same decisions produced scrapers_mining/v2_remap.py; this file is them as variables.
+
+icp_version: Mining V2 tabs
+
+# V1 type -> [Side, Classification]. The labels are icp.yaml's category keys, character for character.
+type_map:
+  HEAVY_EQUIP: [Sell Side, Heavy Equipment]
+  PROCESSING: [Sell Side, Processing Technology]
+  MATERIAL_HANDLING: [Sell Side, Production & Material Handling Solutions]
+  CONSULTING: [Sell Side, Mining & Technical Consulting]
+  AUTOMATION: [Sell Side, Automation & Digital Technologies]
+  WATER_WASTE: [Sell Side, Water & Waste Management]
+  POWER: [Sell Side, Power Solutions]
+  DISTRIBUTOR: [Sell Side, Distributors & Dealers]
+  MINER: [Buy Side, Mining & Minerals Operators]
+  GOV: [Buy Side, Government & Regulators]
+  TRADE_PROMO: [Buy Side, Government & Regulators]
+  QUARRY: [Buy Side, "Quarrying, Aggregates & Cement"]
+  EPC: [Buy Side, EPC Contractors & Engineering Services]
+  INVESTOR: [Buy Side, Investors & Financial Institutions]
+  PROCESSOR: [Buy Side, "Processing, Refining & Smelting"]
+
+# V1 types with no V2 home (user: drop). Any other type not in type_map is dropped as
+# "out of ICP in the new version" (V2 "OUT OF ICP - always exclude").
+drop_types:
+  INDUSTRIAL: no V2 category (user, 25 Oct 2026)
+  MINING_SUPPLIES: no V2 category (user, 25 Oct 2026)
+  SITE_SERVICES: no V2 category (user, 25 Oct 2026)
+  PLACEHOLDER: placeholder / non-company record
+
+unknown_types: [UNKNOWN, ""]
+
+# Row rules, applied at every event before the type.
+drop_if:
+  - {column: Sanctioned HQ, equals: "Y", reason: "sanctioned HQ (V2: no data build for Iran, Russia, Belarus)"}
+
+label_sets:
+  SELL_ALL: [Heavy Equipment, Processing Technology, Production & Material Handling Solutions,
+             Mining & Technical Consulting, Automation & Digital Technologies, Water & Waste Management,
+             Power Solutions, Distributors & Dealers]
+  MAKERS: [Heavy Equipment, Processing Technology, Production & Material Handling Solutions,
+           Mining & Technical Consulting, Automation & Digital Technologies, Water & Waste Management,
+           Power Solutions]
+
+regions:
+  MEA:
+    tokens: [united arab emirates, uae, saudi arabia, ksa, oman, qatar, kuwait, bahrain, jordan, egypt,
+             iraq, lebanon, yemen, turkey, turkiye, türkiye, algeria, angola, benin, botswana,
+             burkina faso, burundi, cameroon, cape verde, central african republic, chad, comoros, congo,
+             drc, cote d, côte d, ivory coast, djibouti, equatorial guinea, eritrea, eswatini, swaziland,
+             ethiopia, gabon, gambia, ghana, guinea, kenya, lesotho, liberia, libya, madagascar, malawi,
+             mali, mauritania, mauritius, morocco, mozambique, namibia, niger, nigeria, rwanda, senegal,
+             sierra leone, somalia, south africa, south sudan, tanzania, togo, tunisia, uganda, zambia,
+             zimbabwe]
+    not: [papua new guinea]
+
+# Competitor v2 col C (Tier). Tier 1-2 keep every V2 label; their unknowns go to the classifier.
+# Tier 3 is "tight filters only": each event keeps only what its V2 note (col J) names, and an
+# unknown is dropped (unsure -> drop).
+tiers:
+  1: {keep: all, unknown: classify}
+  2: {keep: all, unknown: classify}
+  3: {keep: listed, unknown: drop}
+
+# The in-scope events of Competitor v2. The 16 Cut events are simply not listed.
+events:
+  Electra Mining: {tier: 1}
+  Minexpo Africa: {tier: 1}
+  China Coal and Mining Expo: {tier: 1}
+  IMME: {tier: 1}
+  MINEX: {tier: 1}
+  Mining Turkey: {tier: 1}
+  Future Minerals Forum: {tier: 1}
+  DRC Mining Week: {tier: 2}
+  Mining Indaba: {tier: 2}
+  WAMPEX: {tier: 2}
+  Expomin: {tier: 2}
+  MINEXCHANGE: {tier: 2}
+  Mining Indonesia: {tier: 2}
+  AIMEX: {tier: 2}
+  IMARC: {tier: 2}
+  Euro Mine Expo: {tier: 2}
+  Hillhead: {tier: 2}
+  Egypt Mining Forum: {tier: 2}
+  ADIPEC: {tier: 3, keep: [SELL_ALL], note: keep mining and heavy-industry suppliers only}
+  CONEXPO: {tier: 3, keep: [SELL_ALL], note: "keep aggregates, quarry and mining suppliers only"}
+  Bauma Conexpo India: {tier: 3, keep: [SELL_ALL], note: keep mining and quarry suppliers only}
+  Bauma China: {tier: 3, keep: [MAKERS], note: keep mining and quarry machinery makers only}
+  BICES: {tier: 3, keep: [MAKERS], note: keep mining machinery exporters only}
+  SaMoter: {tier: 3, keep: [MAKERS], note: keep quarry and mining makers}
+  Global Resources Innovation Expo: {tier: 3, keep: [MAKERS], note: keep exporting mining technology suppliers only}
+  Mines and Money:
+    tier: 3
+    keep: [Mining & Minerals Operators, Investors & Financial Institutions, Government & Regulators]
+    note: keep miners, investors and government only
+  PDAC:
+    tier: 3
+    keep: [Mining & Minerals Operators, Government & Regulators]
+    region: {region: MEA, labels: [Mining & Minerals Operators, Government & Regulators],
+             fields: [Country, Countries Of Exploration]}
+    note: keep Middle East and Africa miners and governments only
+  CIM Connect:
+    tier: 3
+    keep: [SELL_ALL, Mining & Minerals Operators]
+    region: {region: MEA, labels: [Mining & Minerals Operators], fields: [Country, Countries Of Exploration]}
+    note: keep Middle East and Africa-relevant miners and suppliers only
+  Odisha Mining Expo: {tier: 3, keep: [SELL_ALL], note: keep Indian suppliers that export}
+  Mines Minerals & Metal Asia: {tier: 3, keep: [SELL_ALL, Mining & Minerals Operators], note: keep miners and export suppliers}
+  Mining Metals Central Asia: {tier: 3, keep: [SELL_ALL], note: "no type rule in the note; col E: sellers, tight filters"}
+  Mining and Minerals Hall: {tier: 3, keep: [SELL_ALL], note: "no type rule in the note; col E: sellers, tight filters"}
+
+# Re-check (recheck.py): labels whose V1 typing was wider than V2's rules. On 25 Oct 2026 the queue was
+# built from per-company signals (no mining mention in V1's note, V1 low confidence, rental); queueing
+# whole labels re-checks more companies, which costs agent time only (homepage fetch is free).
+recheck:
+  labels:
+    Automation & Digital Technologies: "automation: V2 needs a mining reference or a V2 sub-level product"
+    Distributors & Dealers: "distributor: may be general industrial supply or rental only"
+    Water & Waste Management: "water: V2 needs a mining product, not a utility"
+    Government & Regulators: "government: V2 group 2 is mining ministries, regulators and trade promotion only"
+    Investors & Financial Institutions: "investor: V2 needs a mining / metals / resources / commodities focus"
+    EPC Contractors & Engineering Services: "EPC: V2 needs mining projects in the description"
+  out_codes: [OIL_GAS, CONSTRUCTION, WATER_UTILITY, GENERIC_IT, GENERIC_CONSULTING, NOT_V2_SUBLEVEL,
+              NO_MINING_LINK, NOT_A_COMPANY]
+  # Kept with the current label but listed for the user: rental-only firms (user's rule, 25 Oct: in when
+  # the rented kit is a V2 sub-level used at mines; out when construction-only, oil & gas or a marketplace).
+  extra_verdicts: [RENTAL]

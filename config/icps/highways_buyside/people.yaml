@@ -1,0 +1,543 @@
+# Highways — BUY SIDE people searches over the BuySide P&S `Companies` tables.
+#
+# Source: the `BuySide ICP` sheet of `ICP - Highways new.xlsx`.
+# Column B = JOB TITLES, C = MATCH TYPE, D = SENIORITY, E = Countries.
+# Titles are PER INDUSTRY here (unlike the seller sheet's single persona), which
+# is why this file lists them per category.
+#
+# Rendered by automation/cleanup/ps_buyside_people_config.py into, per workbook:
+#
+#   select from people
+#   where experiences.count(
+#       is_current = true
+#       and seniority in (<seniority>)
+#       and ((job_title in (<titles_exact>)
+#             and description contains (<exact_relevance>))
+#            or job_title contains (<the category's titles + senior_titles>))
+#       and not job_title contains (<exclude_titles>)
+#       and company.locations.count(country_name in (<countries>)) >= 1
+#     ) >= 1
+#     and <the clay.filter_to_companies(...) clause Clay prefilled>
+#   limit <per_company_limit> by clay_company_id
+#
+# The WHOLE persona sits in ONE experiences.count(...) predicate — split across
+# two, a Head of Highways at council A and any role at council B with an
+# in-region office would pass while no single role qualifies.
+#
+# Countries come from config/icps/highways_buyside/products_services.yaml (the
+# sheet gives every industry the same five), so the people search and the
+# company search cannot drift apart on geography.
+
+# 10 people per company, per the user (2026-09-12) — kept identical to the
+# sell-side cap in config/icps/highways/seller_people.yaml so the two sides stay
+# comparable. Set in the QUERY via `limit N by clay_company_id`, never in the
+# panel's "People per company" box.
+per_company_limit: 10
+
+# Sheet column D: "All except intern / assistant / trainee". Clay's experience
+# seniority enum has no Assistant value, so that exclusion is satisfied by
+# absence plus the exclude_titles list below. `Unknown` is left out: a
+# parse-failure bucket, not a level.
+seniority:
+  - Founder
+  - Owner
+  - Board Member
+  - Partner
+  - C-suite
+  - VP
+  - Director
+  - Head
+  - Manager
+  - Senior
+  - Mid-level
+
+# Appended to EVERY category's contains list. The sheet names C-titles only on
+# the contractor and parking rows, but a Director of Highways sits under a COO
+# at every one of these organisations, so the leadership layer is applied
+# uniformly rather than per row.
+senior_titles:
+  - Chief Executive
+  - Managing Director
+  - Director General
+  - Chief Executive Officer
+  - Chief Operating Officer
+  - Chief Engineer
+  - Chief Technology Officer
+  - Chief Technical Officer
+
+# Exclusion list supplied by the user 2026-09-12, applied to EVERY query on
+# both sides. Excluded if the job title CONTAINS the term.
+#
+# EIGHT TERMS THE USER GAVE WERE REMOVED because they collide with titles the
+# ICP sheets explicitly search for — asking for a title and rejecting it in the
+# same predicate returns nobody for that term, which is the self-cancelling
+# failure ps_buyside_people_config.validate() exists to catch:
+#     Brand, Communications, Product   (Seller JTs rows 22, 25, 41)
+#     Maintenance                      (BuySide ICP, National (State) Government)
+#     Data                             (BuySide ICP, five industries)
+#     Legal, Counsel, Consultant       (BuySide ICP, Finance, Investment, Legal)
+#
+# The last three were nearly kept on the grounds that `Finance, Investment,
+# Legal` is absent from the Registrar's closed list, so the CE classifier can
+# never emit it. That is true but not sufficient: this file also feeds
+# build_ps_people.py, and the category IS live in products_services.yaml. One
+# config, two routes — the collision is real on the P&S route.
+#
+# `Finance` itself stays: that category's title is "Project Finance" and the
+# clash test is whole-value. `Data Analyst` stays for the same reason — it is
+# the specific role meant and does not swallow `Data`.
+#
+# VERIFIED LIVE 2026-09-12 on tarmac.com through the v2 workflow's Find People
+# node: the same query returned a 419-person pool without the list and 383 with
+# it. Note what it does NOT catch — "PA to Chief Operating Officer" survives,
+# because the title spells the role `PA` and the list carries `Assistant`. `PA`
+# is not added here: it is not in either sheet, and whether the action's exclude
+# matching is whole-token or substring is undocumented (substring would take
+# `Partner`, `Partnerships` and `Paving` with it).
+#
+# Five terms were ADDED back from the buy-side list this replaces — Apprentice,
+# Assistant, Graduate, Student, Volunteer. They come from the sheets' own
+# seniority rule ("All except Intern/Trainee, Assistant, Entry, Freelance"),
+# Clay's seniority enum cannot express them, and none of them collide.
+exclude_titles:
+  - HR
+  - Human Resources
+  - Talent
+  - People
+  - Recruitment
+  - Recruiter
+  - Hiring
+  - Administrative
+  - Admin
+  - Secretary
+  - Receptionist
+  - Coordinator
+  - Office Manager
+  - Finance
+  - Accounting
+  - Accountant
+  - Controller
+  - Lawyer
+  - Attorney
+  - Compliance
+  - Risk
+  - Audit
+  - Social Media
+  - Content
+  - Copywriter
+  - Designer
+  - Graphic
+  - UX
+  - UI
+  - Developer
+  - Software
+  - DevOps
+  - Data Analyst
+  - Customer Success
+  - Help Desk
+  - Facilities
+  - Security
+  - Janitorial
+  - Intern
+  - Trainee
+  - Contractor
+  - Freelance
+  - Temp
+  - Vendor
+  - Third Party
+  - Investor
+  - QA
+  - Quality
+  - Platform
+  - Apprentice
+  - Assistant
+  - Graduate
+  - Student
+  - Volunteer
+
+# ANDed onto the EXACT-title branch only, per the user (2026-08-15). A bare
+# "COO"/"CTO"/"Managing Director" says nothing about sector, so the ROLE's own
+# experience description must carry Highways language.
+#
+# Written from the BUY SIDE point of view, which is why it differs from the
+# seller list: it leans on the words an authority, operator or client-side
+# contractor uses about the network they are responsible for — network,
+# carriageway, maintenance, concession, local authority, capital programme —
+# rather than the words a supplier uses about its product.
+#
+# `description` is the EXPERIENCE description (docs/CLAY_QUERY_SKILL.md,
+# "Experience fields"), whole-word token matching. Not applied to the contains
+# branch: those titles (Highways, Roads, Asset Management, Network Operations …)
+# already name the domain, and the user asked to skip it there.
+exact_relevance:
+  - road
+  - roads
+  - roadworks
+  - highway
+  - highways
+  - motorway
+  - motorways
+  - carriageway
+  - trunk road
+  - street works
+  - streetworks
+  - traffic
+  - transport
+  - transportation
+  - infrastructure
+  - civil engineering
+  - civils
+  - construction
+  - rail
+  - bridge
+  - bridges
+  - tunnel
+  - tunnels
+  - drainage
+  - asphalt
+  - surfacing
+  - pavement
+  - network operations
+  - asset management
+  - maintenance
+  - local authority
+  - highways authority
+  - capital programme
+  - concession
+  - toll
+  - tolling
+  - parking
+  - mobility
+
+categories:
+
+  # Sheet rows 2-38. All Contains. Added beyond the sheet: Roads (the sheet has
+  # the singular only on this row), Funding and Regulation — the words national
+  # transport bodies actually use for the money and the rulebook.
+  - name: National (State) Government
+    titles:
+      - Planning
+      - Engineering
+      - Construction
+      - Infrastructure
+      - Road
+      - Roads
+      - Highways
+      - Transport
+      - Asset Management
+      - Maintenance
+      - Operations
+      - Traffic
+      - Resilience
+      - Emergency Planning
+      - Environment
+      - Nature Recovery
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Climate
+      - Innovation
+      - Technology
+      - Digital
+      - Smart Infrastructure
+      - Vehicles
+      - Policy
+      - Strategy
+      - Investment
+      - Procurement
+      - Commercial
+      - Corridor Planning
+      - Incident Management
+      - Emergency Response
+      - Network Operations
+      - Network Strategy
+      - Capital Projects
+      - Partnerships
+      - Funding
+      - Regulation
+      # Sheet: "Program Management Transport / Roads" (added 2026-10-12;
+      # the category already scopes transport/roads; UK/AU spelling too).
+      - Program Management
+      - Programme Management
+
+  # Sheet rows 39-74. All Contains. The sheet lists "Highways" twice; carried
+  # once. Added: Devolution and Combined Authority, which is how the UK
+  # regional bodies title these roles.
+  - name: Regional (Federal) Government
+    titles:
+      - Highways
+      - Road
+      - Roads
+      - Procurement
+      - Engineering
+      - Engineer
+      - Transport
+      - Investment
+      - Innovation
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Intelligent Traffic Systems
+      - Intelligent Transport Systems
+      - Data
+      - Bridge
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Waste
+      - Planning
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Incident Management
+      - Emergency Response
+      - Network Operations
+      - Capital Projects
+      - Devolution
+      - Combined Authority
+      # Sheet: "Program Management Transport / Roads" (added 2026-10-12;
+      # the category already scopes transport/roads; UK/AU spelling too).
+      - Program Management
+      - Programme Management
+
+  # Sheet rows 75-109. All Contains. "Place" appears twice; carried once.
+  # Added: Street Works, Street Scene, Traffic and Network Manager — the exact
+  # titles UK highways authorities use.
+  - name: Local Government
+    titles:
+      - Road
+      - Roads
+      - Highways
+      - Procurement
+      - Engineering
+      - Transport
+      - Innovation
+      - Investment
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Asset Performance
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Intelligent Traffic Systems
+      - Intelligent Transport Systems
+      - Data
+      - Bridge
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Drainage
+      - Waste
+      - Planning
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Incident Management
+      - Emergency Response
+      - Street Works
+      - Street Scene
+      - Traffic
+      - Network Manager
+      # Sheet: "Program Management Transport / Roads" (added 2026-10-12;
+      # the category already scopes transport/roads; UK/AU spelling too).
+      - Program Management
+      - Programme Management
+
+  # Sheet rows 110-150. Two exact (COO, CTO) + 38 Contains.
+  - name: Major Engineering Contractors / Tier 1 Contractor
+    titles_exact:
+      - COO
+      - CTO
+      - Chief Operating Officer
+      - Chief Technology Officer
+    titles:
+      - Bid
+      - Supply Chain
+      - Highways
+      - Roads
+      - Procurement
+      - Engineer
+      - Transport
+      - Innovation
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Asset Performance
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Continuous Improvement
+      - Intelligent Traffic Systems
+      - Data
+      - Bridges
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Waste
+      - Planning
+      - Surveyor
+      - Preconstruction
+      - Estimator
+      - Site
+      - Chief Engineer
+      - Major Projects
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Capital Projects
+      # Sheet: "Program Management Transport / Roads" (added 2026-10-12;
+      # the category already scopes transport/roads; UK/AU spelling too).
+      - Program Management
+      - Programme Management
+
+  # Sheet rows 151-188. Four exact (COO, Chief Operating Officer, CTO, Chief
+  # Technical Officer) + 32 Contains. The sheet writes "Supply"; carried as
+  # Supply Chain, which is the actual function.
+  - name: Sub-engineering contractors
+    titles_exact:
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technical Officer
+    titles:
+      - Bid
+      - Supply Chain
+      - Highways
+      - Roads
+      - Procurement
+      - Engineer
+      - Transport
+      - Innovation
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Asset Performance
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Intelligent Traffic Systems
+      - Intelligent Transport Systems
+      - Data
+      - Bridge
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Waste
+      - Planning
+      - Major Projects
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      # Sheet: "Program Management Transport / Roads" (added 2026-10-12;
+      # the category already scopes transport/roads; UK/AU spelling too).
+      - Program Management
+      - Programme Management
+
+  # Sheet rows 189-223. All Contains. Added: Concession, Toll and Tolling —
+  # the operator-side words the sheet's own Industry description uses but its
+  # title list omits.
+  - name: Road / Bridge / Tunnel Operator
+    titles:
+      - Highways
+      - Roads
+      - Procurement
+      - Engineer
+      - Transport
+      - Innovation
+      - Project
+      - Infrastructure
+      - Environment
+      - Place
+      - Asset Management
+      - Technical
+      - Performance
+      - Design
+      - Operations
+      - Intelligent Traffic Systems
+      - Intelligent Transport Systems
+      - Data
+      - Construction
+      - Bridges
+      - Structural
+      - Tunnel
+      - Parking
+      - Water
+      - Waste
+      - Drainage
+      - Planning
+      - Major Projects
+      - Corridor Planning
+      - Contracts
+      - Tendering
+      - Incident Management
+      - Network Operations
+      - Network Strategy
+      - Concession
+      - Toll
+      - Tolling
+      # Sheet: "Program Management Transport / Roads" (added 2026-10-12;
+      # the category already scopes transport/roads; UK/AU spelling too).
+      - Program Management
+      - Programme Management
+
+  # Sheet rows 224-237. Five exact + seven Contains — the only category where
+  # the sheet leans on exact C-titles rather than functions.
+  - name: Parking Operations
+    titles_exact:
+      - CEO
+      - Chief Executive Officer
+      - COO
+      - Chief Operating Officer
+      - Managing Director
+    titles:
+      - Commercial
+      - Contract
+      - Technology
+      - Innovation
+      - Infrastructure
+      - Planning
+      - Contracts
+      - Tendering
+      - Parking
+      - Operations
+
+  # Sheet row 242. EIGHT JOB TITLES AND NOTHING ELSE — no match type, no
+  # seniority, no countries. Treated as Contains with the ICP defaults, matching
+  # how the company-side entry for this industry was inferred (see
+  # products_services.yaml). Added: Infrastructure Investment and Project
+  # Finance, so the list reaches the people who actually fund road schemes
+  # rather than every advisor.
+  - name: Finance, Investment, Legal
+    titles:
+      - Investment
+      - Portfolio Manager
+      - Advisor
+      - Infrastructure
+      - Public Policy
+      - Consultant
+      - Principal
+      - Business Development
+      - Project Finance
+      - Transaction
+      - Legal
+      - Counsel

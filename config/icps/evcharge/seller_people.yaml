@@ -1,0 +1,154 @@
+# EVCharge Live — seller-side people searches over the Products & Services
+# Companies tables.
+#
+# Source of truth: the `Seller JTs` sheet of the EVCharge ICP workbook.
+# Column A = JOB TITLES, column B = MATCH TYPE, column C = SENIORITY, and
+# column D = "JOB TITLES - to find at non sector specific companies".
+#
+# Rendered by automation/cleanup/ps_people_config.py into, per workbook:
+#
+#   select from people
+#   where experiences.count(
+#       is_current = true
+#       and seniority in (<seniority>)
+#       and (job_title in (<titles_exact>) or job_title contains (<titles_contains>))
+#       and company.locations.count(country_name in (<countries>)) >= 1
+#     ) >= 1
+#     and <the clay.filter_to_companies(...) clause Clay prefilled>
+#   limit <per_company_limit> by clay_company_id
+#
+# Correctness rules this shape encodes (docs/PEOPLE_PASSES.md):
+#   - The WHOLE persona lives in ONE experiences.count(...) predicate. Splitting
+#     the title and the company-country across two predicates lets two DIFFERENT
+#     jobs satisfy them between them (CEO at company A, any role at company B
+#     with an in-region office) — silently wrong, plausible-looking results.
+#   - Company office location, not person location: the better market-relevance
+#     signal for event targeting, and profile locations go stale. Fixed here so
+#     segments stay comparable.
+#   - Always cap per company. Without `limit N by clay_company_id` one large
+#     employer returns unbounded people and the cost lands on enrichment.
+#   - The `clay.filter_to_companies(@table("t_...:gv_...:f_..."))` clause is read
+#     off Clay's own prefill at run time and never stored here: it names live
+#     table/view/filter ids (docs/SENSITIVE_DATA.md) and differs per workbook.
+
+# Per the user (2026-08-07): 10 people per company, set in the QUERY via
+# `limit N by clay_company_id` — not in the panel's "People per company" box.
+per_company_limit: 10
+
+# Sheet column C: "Seniority = All except Intern/Trainee, Assistant, Entry,
+# Freelance", which the user restated as "Mid-Level and Above".
+#
+# Clay's experience `seniority` enum has no "Assistant" or "Freelance" value, so
+# those two exclusions are satisfied by absence. "Unknown" is also left out: it
+# is a parse-failure bucket rather than a level, so including it would readmit
+# exactly the junior profiles the exclusion list is there to remove.
+seniority:
+  - Founder
+  - Owner
+  - Board Member
+  - Partner
+  - C-suite
+  - VP
+  - Director
+  - Head
+  - Manager
+  - Senior
+  - Mid-level
+
+# Sheet column B = "Job Title Must Match Exactly" -> Clay's "Job Title is",
+# i.e. `job_title in (...)` — whole-value matching.
+#
+# NOTE the deliberate trade-off: `in` is exact, so "Group CEO" and "CEO, EMEA"
+# do NOT match here. docs/PEOPLE_PASSES.md warns against `in` for that reason,
+# but the sheet asks for exact matching explicitly and the user confirmed it.
+# In practice the contains list below recovers most compound C-titles via
+# "President", "Founder", "Managing Director", "Commercial", "Revenue",
+# "Marketing" and "Operations".
+titles_exact:
+  - Chief Executive Officer
+  - CEO
+  - Chief Commercial Officer
+  - CCO
+  - Chief Revenue Officer
+  - CRO
+  - Chief Marketing Officer
+  - CMO
+  - Chief Operating Officer
+  - COO
+
+# Sheet column B = "Job Title Must Contain Exact Keyword" -> `job_title
+# contains (...)`, which is whole-word token matching and case-insensitive.
+titles_contains:
+  - Alliances
+  - Americas
+  - APAC
+  - Brand Director
+  - Business Development
+  - Channel
+  - Charging
+  - Commercial
+  - Communications
+  - Country
+  - Customer Success
+  - Demand Generation
+  - Deployment
+  - EMEA
+  - Energy Solutions
+  - Engineering
+  - Events
+  - Founder
+  - Go-to-Market
+  - Grid Integration
+  - Growth
+  - Hardware
+  - Infrastructure
+  - Innovation
+  - Installations
+  - International Markets
+  - Key Account
+  - M&A
+  - Managing Director
+  - Market Entry
+  - Marketing
+  - Microgrids
+  - Operations
+  - Partnerships
+  - Power Systems
+  - President
+  - Product
+  - Regional
+  - Research & Development
+  - Revenue
+  - Sales
+  - Service Delivery
+  - Software
+  - Solutions
+  - Strategic
+  - Strategy
+  - V2G Solutions
+
+# Sheet column D: "JOB TITLES - to find at non sector specific companies".
+#
+# At an EV-charging company almost any commercial leader is relevant. At a law
+# firm, a bank or a construction group — the horizontal categories — the
+# relevant person is the one who covers this sector, so their title has to carry
+# the sector word. These are appended to `titles_contains` for exactly the
+# categories that took an anchor in products_services.yaml (`ev_anchor` true or
+# adjacent), which are the same "non sector specific" ones.
+#
+# "Infrastructure" is already in titles_contains and is not repeated.
+titles_contains_non_sector:
+  - Climate
+  - Energy
+  - ESG
+  - Mobility
+  - Power
+  - Renewables
+  - Smart Cities
+  - Sustainability
+  - Transport
+  - Utilities
+
+# Countries: identical to the Products & Services list, per the user. Read from
+# products_services.yaml rather than duplicated, so the two can never drift.
+countries_from: products_services.yaml
