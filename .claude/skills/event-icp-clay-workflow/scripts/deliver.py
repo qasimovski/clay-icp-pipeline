@@ -14,6 +14,7 @@
         --out event_tables/ --plan plan.json
     python deliver.py salesforce --people "people - supabase.csv" --schema "Competitive Events.csv" \
         --out salesforce.csv [--event-ids event_ids.csv] [--map sf_map.yaml]
+        (event_ids.csv: Event,Id[,Name] - Name = Salesforce's event name, used for Competitive Event Name)
     python deliver.py rows --plan plan.json --state state.json --prefix Seamless --out "Clay Tables rows"
 
 THE CSV FILENAME IS THE TABLE NAME: Clay names an imported table after the file
@@ -100,6 +101,12 @@ def split_by_decisions(a):
         ph, rows = read_csv(path)
         for r in rows:
             if a.exclude_source and r.get("Source") in a.exclude_source:
+                continue
+            # HARD RULE (user, 29 Oct 2026): speakers never go into the Clay review copies; they go to
+            # the Salesforce CSV only. A speaker-only row is left out here whatever the flags say. A
+            # person the search found who also spoke ("Find People + Speaker") stays: they are in the
+            # company's people table because of the search, not because they spoke.
+            if (r.get("Source") or "").strip() == "Speaker":
                 continue
             people.append(dict(r, **{"Outreach Channel": channel}))
     if not people:
@@ -238,6 +245,11 @@ def cmd_salesforce(a):
         _, er = read_csv(a.event_ids)
         ids = {r["Event"]: r["Id"] for r in er}
         mapping["Competitive Event Id"] = lambda r: ids.get(r.get("Event"), "")
+        # The earlier uploads carry Salesforce's own event name ("Energyear - Italia"), not the scraped one
+        # ("Energyear Italia 2026"): an optional Name column in the ids file supplies it.
+        names = {r["Event"]: r["Name"] for r in er if r.get("Name")}
+        if names:
+            mapping["Competitive Event Name"] = lambda r: names.get(r.get("Event")) or r.get("Event", "")
     if a.explode_events:
         people = explode(people)
     out, filled = [], collections.Counter()

@@ -14,7 +14,10 @@ assets/scope.example.yaml, the real Mining V2 file):
     drop_types    old types with no home in the new version, each with its reason
     unknown_types old types that mean "not typed"      -> Clay classifier, or dropped, per tier
     drop_if       row rules, e.g. sanctioned HQ        -> dropped everywhere
-    events        the Competitor sheet: in-scope events, their tier, and per-event keep rules
+                  ({column, equals | not_equals | in | not_in, reason}; the same shape per event)
+    events        the Competitor sheet: in-scope events, their tier, and per-event keep rules:
+                  keep (labels / label sets), region, entities ([Sponsor] = "sponsors only"), and
+                  drop_if (row rules for that event only, e.g. a co-located show's rows)
     tiers         per tier: keep every label, or only what the event names; what to do with unknowns
     label_sets / regions   named lists the event rules refer to (SELL_ALL, MEA ...)
 An event that is not in `events` is dropped whole ("Cut").
@@ -105,6 +108,21 @@ def paths(patterns):
     return [p for pat in patterns or [] for p in sorted(glob.glob(pat))]
 
 
+RULE_OPS = ("equals", "not_equals", "in", "not_in")
+
+
+def rule_hits(rule, row):
+    """A drop_if rule: {column, equals | not_equals | in | not_in, reason}. Values compare stripped."""
+    v = (row.get(rule["column"]) or "").strip()
+    if "equals" in rule:
+        return v == str(rule["equals"])
+    if "not_equals" in rule:
+        return v != str(rule["not_equals"])
+    if "in" in rule:
+        return v in {str(x) for x in rule["in"]}
+    return v not in {str(x) for x in rule["not_in"]}
+
+
 class Scope:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -120,12 +138,17 @@ class Scope:
             yes = re.compile(r"\b(" + "|".join(re.escape(x) for x in r.get("tokens") or []) + r")", re.I)
             no = re.compile("|".join(re.escape(x) for x in r.get("not") or []) or r"(?!x)x", re.I)
             self.regions[name] = (yes, no)
-        labels = {v[1] for v in self.type_map.values()}
+        labels = {v[1] for v in self.type_map.values()} | set(cfg.get("extra_labels") or [])
         for name, ev in self.events.items():
             for lab in self.labels(ev.get("keep")) - labels:
                 raise SystemExit(f"scope.yaml: event {name!r} keeps {lab!r}, which no type_map entry produces")
             if str(ev.get("tier")) not in self.tiers:
                 raise SystemExit(f"scope.yaml: event {name!r} has tier {ev.get('tier')!r}, not in `tiers`")
+            for rule in list(self.drop_if) + list(ev.get("drop_if") or []):
+                ops = [k for k in RULE_OPS if k in rule]
+                if not rule.get("column") or len(ops) != 1 or not rule.get("reason"):
+                    raise SystemExit(f"scope.yaml: event {name!r} drop_if {rule!r} needs column, reason and "
+                                     f"exactly one of {', '.join(RULE_OPS)}")
 
     def labels(self, spec):
         """A keep list: label names and/or label_set names."""
@@ -150,9 +173,12 @@ class Scope:
             return "DROP", "", "", "event not in scope (Cut)"
         tier = str(ev.get("tier"))
         t = self.tiers[tier]
-        for rule in self.drop_if:
-            if (row.get(rule["column"]) or "").strip() == str(rule["equals"]):
+        for rule in list(self.drop_if) + list(ev.get("drop_if") or []):
+            if rule_hits(rule, row):
                 return "DROP", "", "", rule["reason"]
+        ents = ev.get("entities")
+        if ents and (row.get("Entity") or "") not in ents:
+            return "DROP", "", "", f"Tier {tier} note: {'/'.join(ents)} only ({row.get('Entity') or 'no entity'})"
         if ptype in self.unknown:
             if (ev.get("unknown") or t.get("unknown", "drop")) == "classify":
                 return "CLASSIFY", "", "", f"unknown type at a Tier {tier} event -> Clay classifier"

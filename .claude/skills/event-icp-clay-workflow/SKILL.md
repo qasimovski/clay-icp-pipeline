@@ -211,6 +211,15 @@ python scripts/bulk_run.py --workflow <people wf> --feed people_feed.csv --work 
     --inputs "Company Name,Domain,Side,Classification,Countries Override,Seniority Group,Fit" --id-cols Domain --plan
 ```
 
+**Never pay twice for the same answer (user, 29 Oct 2026).** Every company is searched and enriched once,
+however many events it was at: the feed is one row per domain and `bulk_run.py` sends one row per id.
+Across runs, pass `--reuse-from <earlier --work folders of the same workflow>` to every `bulk_run.py` call
+(Find People, Enrich Company, Enrich Person, the finder): an id that an earlier run answered with the SAME
+inputs, completely, within 90 days (`--max-age-days`) is copied, not sent (0 actions). Same inputs is the
+safeguard: Enrich Company (domain only) is reused across events and ICPs, while a Find People search (its
+inputs carry the ICP's side, category, countries and seniority) is reused only for the same ICP and titles.
+No new Supabase tables: the run folders are the ledger. Emails keep reusing Supabase as before.
+
 **Go deeper at full companies.** A company that returns exactly 10 is searched again per seniority
 group. Ask before going deeper than the groups in `icp.yaml`.
 
@@ -244,6 +253,11 @@ Follow `references/speakers.md`:
 
 A wrong profile is worse than a miss. Profiles that two methods disagree on are excluded.
 
+**Speakers never go into Clay tables.** They go into the review list and the Salesforce CSV only
+(user, 29 Oct 2026, after Solar briefly got per-event "Speakers" tables). Never build or import a
+speakers table into the Clay review copies. `deliver.py split` always leaves speaker-only rows out, and
+`import_ce_delivery_tables.py` refuses any speakers table in a plan.
+
 ## Phase 9: the review list, the Clay review copies, and the marketing manager (HARD STOP)
 
 ```bash
@@ -257,7 +271,8 @@ python scripts/approval.py review --people "<S> - review.csv" --out "<S> - peopl
 
 **The per-event Clay review copies:** `deliver.py split --decisions` → import into the user's
 folder → the Clay Tables rows. Follow `references/delivery.md`: the convention, the import, the
-low-memory rules, and confirming what is and isn't in the folder (speakers? LinkedIn-only?).
+low-memory rules, and confirming what is and isn't in the folder (LinkedIn-only?). Speakers are never in
+it: they reach Salesforce through the review list and `deliver.py salesforce` only.
 
 People are found, but **no email is looked up, found or validated yet.** The manager often
 removes titles, countries or companies, and enriching first pays for people they then delete.

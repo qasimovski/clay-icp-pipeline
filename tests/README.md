@@ -23,9 +23,10 @@ a second and touches no Clay account.
 | `test_render_build_prompt.py` | build specs rendering wrong instead of failing |
 | `test_blocklist_destination_memo.py` | the destination memo carrying past Clay's source cap |
 | `test_workbook_navigation_reuse.py` | redundant workbook loads in two-table passes |
+| `test_delivery_plan_paths.py` | a WSL-written delivery plan importing 0-row tables on win32; a speakers table reaching the Clay review copies (speakers go to the Salesforce CSV only) |
 | `test_local_settings.py` | live Clay ids reappearing in tracked source |
 | `test_people_email_run_guard.py` | the email waterfall re-firing on a table that already ran (the write-ahead log's retry semantics) |
-| `test_icp_rerun_rules.py` | an event re-run under a new ICP version reading the OLD keep/drop (V2 must win), a Cut event or a Tier 3 note slipping through, a per-keyword exclusion applied globally, a LinkedIn-only (Germany) person reaching the email file, a flagged title dropped instead of kept for the approver, a person missing from an event their company exhibited at, an unquoted `Yes:` or comma label silently changing the config — each one pays for the wrong people or loses the right ones |
+| `test_icp_rerun_rules.py` | an event re-run under a new ICP version reading the OLD keep/drop (V2 must win), a Cut event or a Tier 3 note slipping through, a per-keyword exclusion applied globally, a LinkedIn-only (Germany) person reaching the email file, a flagged title dropped instead of kept for the approver, a person missing from an event their company exhibited at, a speaker-only row landing in a Clay people table, an unquoted `Yes:` or comma label silently changing the config — each one pays for the wrong people or loses the right ones |
 
 What is **not** covered: the Playwright UI interactions themselves (selector
 drift against the live Clay DOM). Those are only verifiable against a real

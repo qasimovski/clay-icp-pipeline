@@ -243,6 +243,10 @@ def cmd_people(a):
             ppl = [p for h in halves for p in people_of(h[d])[0]]
             by_domain[d] = (ppl, "" if ppl else "no people")
         print(f"seniority split applied to {len(doms):,} companies")
+    accepted = {x.strip().lower() for x in (getattr(a, "accept_failed", "") or "").split(",") if x.strip()}
+    if accepted & failed:
+        print(f"accepted as permanently failed (not searchable): {sorted(accepted & failed)}")
+    failed -= accepted
     if failed - set(by_domain):
         raise SystemExit(f"{len(failed - set(by_domain))} people searches failed — "
                          f"bulk_run.py --retry-failed before exporting")
@@ -366,6 +370,9 @@ def main():
     p.add_argument("--split", action="append", default=[])
     p.add_argument("--icp", required=True)
     p.add_argument("--out", required=True)
+    p.add_argument("--accept-failed", default="",
+                   help="comma list of domains whose search can never succeed (ERROR_INVALID_INPUT, e.g. an IP); "
+                        "they are reported, not exported, instead of blocking the export")
     e = sub.add_parser("emails")
     e.add_argument("--people", required=True, help="the approved people CSV that was bulk-run")
     e.add_argument("--results", required=True)

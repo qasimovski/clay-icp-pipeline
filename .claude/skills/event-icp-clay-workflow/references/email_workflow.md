@@ -15,6 +15,13 @@ Trigger (one approved person: LinkedIn URL, First/Last/Person Name, Company Name
                                                                                     └no→ Record (miss) → Out - No Email Found
 ```
 
+**One profile, one paid lookup (2026-10-29).** The run is keyed `--id-cols "LinkedIn URL"`, and `bulk_run.py`
+sends one search per id, so a person who sits on several rows (several events, or two sister companies) is
+enriched once. That dedupe is on the URL TEXT: Clay writes `.../in/x/` and Blitz `.../in/x`, and Solar had 285
+profiles spelled both ways. `review_list.py` now writes one canonical form (`https://www.linkedin.com/in/<slug>`),
+and `bulk_run.py` refuses a LinkedIn-keyed feed that still spells one profile two ways. Across runs, the
+Supabase-first branch stops anyone already enriched (stored email, or "searched before") from being paid again.
+
 `scripts/email_workflow.py` generates all 32 nodes from one definition (no branch merges back, so each
 provider gets its own tail; a small Read node after each provider pulls the email out of Clay's
 `{result, success, textPreview}` wrapper), checks the graph offline, and builds it through the CLI.

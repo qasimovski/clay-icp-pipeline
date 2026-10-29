@@ -5,9 +5,10 @@ people already, so they skip Find People. But each one has to be matched to the 
 profile, and **a wrong person is far worse than no answer** because the profile gets contacted.
 
 Ask first:
-- Are speakers in scope for this run, and are they delivered with the review tables or separately?
-  Mining kept them out of the per-event tables ("leave the speaker's data") and gave them their
-  own Salesforce file.
+- Are speakers in scope for this run? (Don't ask where they're delivered: **speakers never go into
+  the Clay review tables**, only into the review list and the Salesforce CSV. User, 29 Oct 2026;
+  Mining did the same: "leave the speaker's data". `deliver.py split` drops speaker-only rows and
+  the importer refuses a speakers table.)
 - Title rule: keep every speaker in an in-scope country and flag a failing title
   (`speakers.titles: flag`, Mining: "keep all speakers, filter on country only"), or apply the
   sheet's title rules (`filter`).

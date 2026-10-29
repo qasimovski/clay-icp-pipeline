@@ -198,6 +198,26 @@ def test_scope_refuses_a_keep_label_no_type_produces():
         rp.Scope(bad)
 
 
+def test_per_event_entities_and_row_rules():
+    """Solar, 26 Oct 2026: "sponsors only" notes and co-located floors (London Build rows) are config."""
+    cfg = json.loads(json.dumps(SCOPE))
+    cfg["extra_labels"] = ["Fire Safety"]                              # a label only the classifier gives
+    cfg["events"]["Sponsor Summit"] = {"tier": 1, "entities": ["Sponsor"], "keep": ["Fire Safety"]}
+    cfg["events"]["Shared Floor"] = {"tier": 1, "drop_if": [
+        {"column": "Show", "equals": "London Build", "reason": "co-located show"},
+        {"column": "PV tag", "not_in": ["yes", "partly"], "reason": "not PV"}]}
+    s = rp.Scope(cfg)
+    assert s.decide("Sponsor Summit", {"Entity": "Exhibitor"}, "HEAVY")[0] == "DROP"
+    assert s.decide("Sponsor Summit", {"Entity": "Sponsor"}, "HEAVY")[0] == "DROP"   # label not kept
+    assert s.judge_label("Sponsor Summit", {"Entity": "Sponsor"}, "Sell Side", "Fire Safety")[0] == "KEEP"
+    assert s.decide("Shared Floor", {"Show": "London Build", "PV tag": "yes"}, "HEAVY")[0] == "DROP"
+    assert s.decide("Shared Floor", {"Show": "elemental", "PV tag": ""}, "HEAVY")[0] == "DROP"
+    assert s.decide("Shared Floor", {"Show": "elemental", "PV tag": "partly"}, "HEAVY")[0] == "KEEP"
+    cfg["events"]["Shared Floor"]["drop_if"][0].pop("equals")          # a rule with no operator
+    with pytest.raises(SystemExit):
+        rp.Scope(cfg)
+
+
 # ---------------------------------------------------------------- deliver split --decisions
 def test_people_are_placed_in_every_event_and_keep_their_channel(tmp_path):
     write_csv(tmp_path / "dec.csv", [
@@ -226,6 +246,27 @@ def test_people_are_placed_in_every_event_and_keep_their_channel(tmp_path):
             "u1": "Email + LinkedIn", "u2": "LinkedIn + phone only (Germany)"}     # speaker u3 left out
     companies = read_csv(plan[("B Expo", "Exhibitors")]["csv"])
     assert companies[0]["Decision"] == "DROP" and companies[0]["People Found"] == "0"
+
+
+def test_speakers_never_reach_the_clay_tables_without_any_flag(tmp_path):
+    """Speakers go to the Salesforce CSV only (user, 29 Oct 2026): split drops a speaker-only row even when
+    --exclude-source is not given; a person the search found who also spoke stays in their people table."""
+    write_csv(tmp_path / "dec.csv", [
+        {"Event": "A Expo", "Entity": "Exhibitor", "Company Name": "Acme", "Website": "", "Domain": "acme.com",
+         "Country": "", "Side": "Sell Side", "Classification": "Heavy Equipment", "Decision": "KEEP", "Reason": "r"}])
+    person = {"Domain": "acme.com", "Side": "Sell Side", "Job Title": "CEO"}
+    write_csv(tmp_path / "p.csv", [dict(person, Source="Find People", **{"LinkedIn URL": "u1"}),
+                                   dict(person, Source="Speaker", **{"LinkedIn URL": "u2"}),
+                                   dict(person, Source="Find People + Speaker", **{"LinkedIn URL": "u3"})])
+    a = types.SimpleNamespace(decisions=str(tmp_path / "dec.csv"), people=[str(tmp_path / "p.csv")],
+                              linkedin_only=[], channel="Email + LinkedIn", linkedin_only_label="LinkedIn only",
+                              exclude_source=[], entity_col="Exhibitor/Sponsor", single_workbook=None,
+                              out=str(tmp_path / "t"), plan=str(tmp_path / "plan.json"))
+    deliver.cmd_split(a)
+    plan = json.load(open(tmp_path / "plan.json", encoding="utf-8"))
+    assert not any("speaker" in e["table"].lower() for e in plan)
+    people = next(e for e in plan if e["kind"] == "people")
+    assert {r["LinkedIn URL"] for r in read_csv(people["csv"])} == {"u1", "u3"}
 
 
 # ---------------------------------------------------------------- seniority depth
@@ -280,3 +321,58 @@ def test_scraped_website_quirks(raw, want):
 
 def test_marketplace_storefront_is_flagged():
     assert build_feed.flag("hdsieve.en.alibaba.com").startswith("hosted")
+
+
+# ---------------------------------------------------------------- one profile, one paid lookup
+def test_one_linkedin_profile_is_never_enriched_twice(tmp_path):
+    """Clay writes ".../in/x/" and Blitz ".../in/x" (Solar, Oct 2026: 285 profiles had both). The email run
+    dedupes on the URL text, so two spellings meant two paid lookups. review_list writes one canonical
+    form, and bulk_run refuses a LinkedIn-keyed feed that still spells one profile two ways."""
+    rl, br = load("review_list"), load("bulk_run")
+    for u in ("https://www.linkedin.com/in/jane-doe/", "http://uk.linkedin.com/in/jane-doe?trk=x",
+              "https://www.linkedin.com/in/jane-doe#experience/", "https://www.linkedin.com/in/jane-doe"):
+        assert rl.canonical_linkedin(u) == "https://www.linkedin.com/in/jane-doe"
+    rows = [{"LinkedIn URL": "https://www.linkedin.com/in/jane-doe/"},
+            {"LinkedIn URL": "https://www.linkedin.com/in/jane-doe"}]
+    with pytest.raises(SystemExit, match="paid for twice"):
+        br.check_linkedin_spellings(rows, "LinkedIn URL")
+    br.check_linkedin_spellings(rows[:1] * 2, "LinkedIn URL")      # same text twice: bulk_run sends it once
+    br.check_linkedin_spellings(rows, "Row ID")                      # not keyed on the URL: not this check's job
+
+
+# ---------------------------------------------------------------- reuse earlier runs' answers
+def _run_dir(root, name, workflow, sent, results, age_days=0):
+    d = root / name
+    (d / "feeds").mkdir(parents=True)
+    (d / "results").mkdir()
+    (d / "state.json").write_text(json.dumps({"_workflow": workflow} if workflow else {}), encoding="utf-8")
+    (d / "feeds" / "chunk_000.jsonl").write_text(
+        "".join(json.dumps({"id": i, "inputs": x}) + "\n" for i, x in sent.items()), encoding="utf-8")
+    p = d / "results" / "chunk_000.jsonl"
+    p.write_text("".join(json.dumps(r) + "\n" for r in results), encoding="utf-8")
+    t = os.path.getmtime(p) - age_days * 86400
+    os.utime(p, (t, t))
+    return str(d)
+
+
+def test_an_answer_already_paid_for_is_reused_not_bought_again(tmp_path):
+    """User, 29 Oct 2026: never enrich a company twice for the same event or ICP; reuse window 90 days; across
+    ICPs only company data. Same workflow + same inputs + complete + fresh -> reused; anything else is sent."""
+    br = load("bulk_run")
+    co = {"Company Domain": "acme.com"}
+    ppl_solar = {"Domain": "acme.com", "Side": "Sell Side", "Classification": "Inverters"}
+    ppl_mining = {"Domain": "acme.com", "Side": "Sell Side", "Classification": "Heavy Equipment"}
+    ok = {"id": "acme.com", "status": "complete", "result": {"name": "Acme"}}
+    fresh = _run_dir(tmp_path, "company_mining", "wf_co", {"acme.com": co}, [ok])
+    old = _run_dir(tmp_path, "company_2025", "wf_co", {"acme.com": co}, [ok], age_days=120)
+    failed = _run_dir(tmp_path, "company_failed", "wf_co", {"acme.com": co},
+                      [ok, {"id": "acme.com", "status": "failed"}])
+    people_mining = _run_dir(tmp_path, "people_mining", "wf_ppl", {"acme.com": ppl_mining}, [ok])
+    recs_co = [{"id": "acme.com", "inputs": co}]
+    assert set(br.reusable([fresh], recs_co, "wf_co", 90)) == {"acme.com"}       # company data: reused
+    assert br.reusable([old], recs_co, "wf_co", 90) == {}                          # older than 90 days
+    assert br.reusable([failed], recs_co, "wf_co", 90) == {}                       # last answer failed
+    assert br.reusable([fresh], recs_co, "wf_other", 90) == {}                     # another workflow
+    # people: a Mining search has other inputs (category), so Solar searches again
+    assert br.reusable([people_mining], [{"id": "acme.com", "inputs": ppl_solar}], "wf_ppl", 90) == {}
+    assert set(br.reusable([people_mining], [{"id": "acme.com", "inputs": ppl_mining}], "wf_ppl", 90)) == {"acme.com"}

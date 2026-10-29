@@ -34,8 +34,11 @@ from build_feed import norm_domain  # noqa: E402
 from collect import load_results  # noqa: E402
 
 csv.field_size_limit(10**9)
+# Solar, 28 Oct 2026: + Company Description, Specialities and Total Funding - the Salesforce schema has all three
+# and Enrich Company returns them; without them the upload left those columns empty.
 COMPANY_COLS = ["Company Size", "Company Type", "Company Industry", "Sub - Industry", "Primary Offerings",
-                "Business Stage", "Annual Revenue", "Founded", "Company LinkedIn URL", "Company Website"]
+                "Business Stage", "Annual Revenue", "Founded", "Company LinkedIn URL", "Company Website",
+                "Company Description", "Specialities", "Total Funding Amount Range USD"]
 SPEAKER_COLS = ["Source", "Speaker Event(s)", "Speaker Event Title"]
 
 
@@ -57,6 +60,14 @@ def slug(u):
     return m.group(1).strip("/") if m else (u or "").lower()
 
 
+def canonical_linkedin(u):
+    """https://www.linkedin.com/in/<slug>: no trailing slash, query, fragment or country subdomain.
+    Clay writes ".../in/x/" and Blitz ".../in/x"; the email step dedupes on the URL TEXT, so two spellings
+    of one profile would be enriched (and paid for) twice. Solar, 29 Oct 2026: 285 profiles had both."""
+    m = re.search(r"linkedin\.com/in/([^/?#\s]+)", u or "")
+    return f"https://www.linkedin.com/in/{m.group(1)}" if m else (u or "").strip()
+
+
 def join(v):
     return ", ".join(str(x) for x in v if x) if isinstance(v, list) else (str(v) if v else "")
 
@@ -76,7 +87,10 @@ def companies(dirs):
                 "Primary Offerings": join(dd.get("primary_offerings")),
                 "Business Stage": join(dd.get("business_stage")), "Annual Revenue": p.get("annual_revenue") or "",
                 "Founded": str(p.get("founded") or ""), "Company LinkedIn URL": p.get("url") or "",
-                "Company Website": p.get("website") or ""}
+                "Company Website": p.get("website") or "",
+                "Company Description": " ".join((p.get("description") or "").split()),
+                "Specialities": join(p.get("specialties")),
+                "Total Funding Amount Range USD": p.get("total_funding_amount_range_usd") or ""}
     return out
 
 
@@ -132,6 +146,8 @@ def cmd_build(a):
     drop = {c.strip() for c in (a.drop_cols or "").split(",") if c.strip()}
     cols = [c for c in dict.fromkeys(base_cols + SPEAKER_COLS + COMPANY_COLS) if c not in drop]
     out_main, out_li = a.out_prefix + ".csv", a.out_prefix + " - LinkedIn only.csv"
+    for p in people + li_only:
+        p["LinkedIn URL"] = canonical_linkedin(p.get("LinkedIn URL"))
     write(out_main, people, cols)
     write(out_li, li_only, cols)
     print(f"speakers: {tagged:,} already in the people lists (tagged), added {dict(added)}")
