@@ -248,6 +248,17 @@ def import_one(page, fid, ev, wid, r, live):
     return wid
 
 
+def drop_speaker_tables(plan):
+    """HARD RULE (user, 29 Oct 2026): speakers are never imported into the Clay review copies; they go
+    to the Salesforce CSV only. Any plan entry for a speakers table is refused, whatever produced the
+    plan (Solar briefly got 71 per-event "Speakers" tables before this rule)."""
+    refused = [e for e in plan if "speaker" in e["table"].lower()]
+    if refused:
+        print(f"!! refusing {len(refused)} speakers table(s): speakers go to the Salesforce CSV only, "
+              f"never to Clay ({sorted({e['table'] for e in refused})})")
+    return [e for e in plan if "speaker" not in e["table"].lower()]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -284,6 +295,8 @@ def main():
         raise SystemExit(f"!! {len(missing)} CSV(s) in the plan do not exist, "
                          f"first: {missing[0]} — refusing to import blind")
     state = state_io.load_json(STATE)
+
+    plan = drop_speaker_tables(plan)
 
     by_event = collections.OrderedDict()
     for e in plan:

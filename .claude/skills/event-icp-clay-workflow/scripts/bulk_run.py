@@ -8,6 +8,10 @@
     ... --limit 1          # ONE chunk first, always (a pilot)
     ...                    # then the rest
     ... --retry-failed     # re-send only rows whose result was "failed"
+    ... --reuse-from runs/enrich_company ../other_icp/runs/enrich_company   # earlier answers: copied, not bought
+
+NEVER PAY TWICE (user, 29 Oct 2026). One row per id within a run; across runs, --reuse-from copies every id
+an earlier run of the SAME workflow answered completely, with the SAME inputs, within --max-age-days (90).
 
 THE DEFAULT SPENDS. A bare run starts every pending chunk; --plan shows the plan
 and spends nothing. The email workflow always runs with --approval approval.json:
@@ -23,9 +27,11 @@ The workflow must be published and registered as a routine
 """
 
 import argparse
+import collections
 import csv
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -44,6 +50,27 @@ def save_state(path, state):
     os.replace(tmp, path)
 
 
+def check_linkedin_spellings(rows, id_cols):
+    """Refuse a feed keyed on LinkedIn URL that spells one profile two ways (".../in/x" and ".../in/x/").
+    One search per id dedupes on the TEXT, so both spellings would be enriched and paid for (Solar, Oct 2026:
+    Clay writes the trailing slash, Blitz doesn't; 285 profiles had both). review_list.py writes one
+    canonical form; this catches any other feed before a credit is spent."""
+    if "LinkedIn URL" not in [c.strip() for c in id_cols.split(",")]:
+        return
+    spell = collections.defaultdict(set)
+    for r in rows:
+        u = (r.get("LinkedIn URL") or "").strip()
+        m = re.search(r"linkedin\.com/in/([^/?#\s]+)", u.lower())
+        if m:
+            spell[m.group(1)].add(u)
+    clash = {s: v for s, v in spell.items() if len(v) > 1}
+    if clash:
+        v = next(iter(clash.values()))
+        raise SystemExit(f"{len(clash)} LinkedIn profile(s) appear under 2+ spellings (e.g. {sorted(v)}): they "
+                         f"would be searched and paid for twice. Normalise the feed to "
+                         f"https://www.linkedin.com/in/<slug> first (review_list.canonical_linkedin).")
+
+
 def build_chunks(args, feeds, state):
     existing = sorted(n for n in os.listdir(feeds) if n.endswith(".jsonl"))
     if existing and not args.retry_failed:
@@ -60,6 +87,7 @@ def build_chunks(args, feeds, state):
     missing = [c for c in cols + args.id_cols.split(",") if c.strip() and c.strip() not in rows[0]]
     if missing:
         raise SystemExit(f"feed has no column(s) {missing} — check --inputs / --id-cols")
+    check_linkedin_spellings(rows, args.id_cols)
     seen, recs = set(), []
     for r in rows:
         rid = "|".join((r.get(c.strip()) or "").strip() for c in args.id_cols.split(","))
@@ -67,6 +95,18 @@ def build_chunks(args, feeds, state):
             continue                      # one search per id
         seen.add(rid)
         recs.append({"id": rid, "inputs": {c: r.get(c, "") for c in cols}})
+    if getattr(args, "reuse_from", None) and not args.retry_failed:
+        hit = reusable(args.reuse_from, recs, args.workflow, args.max_age_days)
+        if hit:
+            os.makedirs(os.path.join(args.work, "results"), exist_ok=True)
+            with open(os.path.join(args.work, "results", "reused.jsonl"), "w", encoding="utf-8", newline="\n") as fh:
+                for r in hit.values():
+                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"reuse: {len(hit):,} of {len(recs):,} already answered by an earlier run (0 actions); "
+              f"{len(recs) - len(hit):,} to send")
+        recs = [x for x in recs if x["id"] not in hit]
+        if not recs:
+            return []
     long_ids = [x["id"] for x in recs if len(x["id"]) > 64]
     if long_ids:
         # Clay rejects a bulk row id over 64 characters (Mining speakers, Oct 2026). Give the feed a
@@ -94,6 +134,52 @@ def build_chunks(args, feeds, state):
                 fh.write(json.dumps(x, ensure_ascii=False) + "\n")
         paths.append(p)
     return paths
+
+
+def reusable(reuse_dirs, recs, workflow, max_age_days, now=None):
+    """{id: result record} that an earlier run already paid for and that this run may copy instead of
+    sending (user, 29 Oct 2026: "when you enrich a company once, you should not do it twice for the same
+    competitive event or for the same ICP"; reuse window 90 days; across ICPs only company data is reused).
+
+    A record is reused only when ALL hold:
+      - the earlier run used the same workflow (its state.json `_workflow`; folders from before this rule
+        have none, and are trusted because the operator named them);
+      - it sent EXACTLY the same inputs for that id (so a Find People search, whose inputs carry the ICP's
+        side / category / countries / seniority, is never reused for another ICP or title set, while Enrich
+        Company, keyed by domain alone, is reused across events and ICPs);
+      - its latest result is "complete" and the result file is at most max_age_days old.
+    """
+    now = now or time.time()
+    want = {x["id"]: x["inputs"] for x in recs}
+    out = {}
+    for d in reuse_dirs:
+        st = load_state(os.path.join(d, "state.json")) if os.path.exists(os.path.join(d, "state.json")) else {}
+        if st.get("_workflow") and st["_workflow"] != workflow:
+            print(f"reuse: skipping {d} (workflow {st['_workflow']}, not {workflow})")
+            continue
+        sent = {}
+        fdir = os.path.join(d, "feeds")
+        for n in sorted(os.listdir(fdir)) if os.path.isdir(fdir) else []:
+            for line in open(os.path.join(fdir, n), encoding="utf-8"):
+                if line.strip():
+                    x = json.loads(line)
+                    sent[x["id"]] = x["inputs"]
+        rdir = os.path.join(d, "results")
+        for n in sorted(os.listdir(rdir)) if os.path.isdir(rdir) else []:
+            p = os.path.join(rdir, n)
+            if (now - os.path.getmtime(p)) / 86400 > max_age_days:
+                continue
+            for line in open(p, encoding="utf-8"):
+                if not line.strip():
+                    continue
+                r = json.loads(line)
+                i = r.get("id")
+                if i in want and sent.get(i) == want[i]:
+                    if r.get("status") == "complete":
+                        out[i] = r
+                    else:
+                        out.pop(i, None)          # a later failed record beats an earlier success
+    return out
 
 
 def failed_ids(results):
@@ -158,6 +244,10 @@ def main():
     ap.add_argument("--timeout", type=int, default=2400, help="seconds to wait per chunk")
     ap.add_argument("--plan", action="store_true", help="show the plan, spend nothing")
     ap.add_argument("--retry-failed", action="store_true")
+    ap.add_argument("--reuse-from", nargs="*", default=[],
+                    help="earlier --work folders of the SAME workflow: rows they answered with the same inputs "
+                         "within --max-age-days are copied, not sent (0 actions)")
+    ap.add_argument("--max-age-days", type=int, default=90, help="reuse window (user, 29 Oct 2026: 90 days)")
     ap.add_argument("--approval", help="approval.json from approval.py apply: REQUIRED for the email workflow; the feed must be "
                                        "byte-identical to the list the marketing manager approved")
     args = ap.parse_args()
@@ -169,6 +259,9 @@ def main():
     os.makedirs(results, exist_ok=True)
     state_path = os.path.join(args.work, "state.json")
     state = load_state(state_path)
+    if state.setdefault("_workflow", args.workflow) != args.workflow:
+        raise SystemExit(f"{args.work} belongs to workflow {state['_workflow']} - use a new --work folder")
+    save_state(state_path, state)
     if args.approval:                    # the marketing-manager gate: no approved list, no paid email search
         from approval import verify
         rec = verify(args.approval, args.feed)
@@ -178,6 +271,10 @@ def main():
         print(f"approved by {rec['approved_by']} at {rec['approved_at']}: {rec['rows_approved']} people")
     chunks = build_chunks(args, feeds, state)
     pending = [c for c in chunks if (state.get(os.path.basename(c)) or {}).get("status") != "done"]
+    if args.retry_failed:
+        # Solar, 28 Oct 2026: "--retry-failed --limit 1" ran the next REGULAR chunk (250 unapproved rows)
+        # because retry chunks sort after the pending regular ones. A retry runs retry rows only.
+        pending = [c for c in pending if os.path.basename(c).startswith("retry_")]
     rows = sum(sum(1 for _ in open(c, encoding="utf-8")) for c in pending)
     print(f"chunks {len(chunks)}  pending {len(pending)}  rows to run {rows:,}")
     if args.plan:

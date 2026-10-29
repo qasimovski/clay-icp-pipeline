@@ -273,6 +273,13 @@ def cross_check(icp, rules, scope):
         for k, v in sets.items():
             for x in v - sell_labels - buy_labels:
                 problems.append(f"scope: label_sets.{k} has {x!r}, not an icp.yaml category")
+        for x in set(scope.get("extra_labels") or []) - sell_labels - buy_labels:
+            problems.append(f"scope: extra_labels has {x!r}, not an icp.yaml category")
+        editions = set((rules or {}).get("editions") or {})
+        for ev, e in (scope.get("events") or {}).items():
+            for x in (e or {}).get("editions") or []:
+                if editions and x not in editions and not x.startswith("All editions"):
+                    problems.append(f"scope: event {ev!r} targets edition {x!r}, not in post_filter editions")
         for ev, e in (scope.get("events") or {}).items():
             named = list((e or {}).get("keep") or []) + list(((e or {}).get("region") or {}).get("labels") or [])
             for x in named:

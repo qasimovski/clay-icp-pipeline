@@ -346,11 +346,18 @@ def company_cols(c):
             "Primary Offerings": join(dd.get("primary_offerings")),
             "Business Stage": join(dd.get("business_stage")), "Annual Revenue": c.get("annual_revenue") or "",
             "Founded": str(c.get("founded") or ""), "Company LinkedIn URL": c.get("url") or "",
-            "Company Website": c.get("website") or "", "Company Description": c.get("description") or ""}
+            "Company Website": c.get("website") or "", "Company Description": c.get("description") or "",
+            "Specialities": join(c.get("specialties")),
+            "Total Funding Amount Range USD": c.get("total_funding_amount_range_usd") or ""}
 
 
 def location(p):
+    """(city, state, country). Enrich Person's nested `structured_location` first (city / state split by
+    the provider), then the free-text `location_name`. The country is the profile's `country`."""
     country = p.get("country") or ""
+    sl = p.get("structured_location") or {}
+    if sl.get("city") or sl.get("state"):
+        return sl.get("city") or "", sl.get("state") or "", country
     parts = [x.strip() for x in (p.get("location_name") or "").split(",") if x.strip()]
     if parts and country and parts[-1].lower() == country.lower():
         parts = parts[:-1]
@@ -398,7 +405,11 @@ def cmd_people(a):
                "Title Check": "; ".join([f.get("Title Check", "")] * bool(f.get("Title Check")) + notes),
                "Geo Tier": R.geo_tier(s["Side"], country) if in_geo else "",
                "Source": "Speaker", "Speaker Event(s)": s["Events"], "Speaker Event Title": s["Job Title"],
-               "Speaker Event Company": s["Company"], "Profile Source": s["Profile Source"], **company_cols(c)}
+               "Speaker Event Company": s["Company"], "Profile Source": s["Profile Source"],
+               "Headline": p.get("headline") or "", **company_cols(c)}
+        # nested current_experience fills what Enrich Company can't (no company match, or a company page only)
+        row["Company LinkedIn URL"] = row["Company LinkedIn URL"] or ce.get("url") or ""
+        row["Company Website"] = row["Company Website"] or ce.get("company_domain") or ""
         checks.append({**row, "Country In Scope": "yes" if in_geo else "no",
                        "Title Passes Sheet Rules": "yes" if title_ok else "no", "Dropped Because": reason})
         if not in_geo:

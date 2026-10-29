@@ -120,8 +120,11 @@ def cmd_fetch(a):
     import warnings
     warnings.filterwarnings("ignore")
     done = cache(a.cache)
-    todo = {q["Domain"]: q.get("Website") or "http://" + q["Domain"] for q in read(a.queue)[1]
-            if q["Domain"] and q["Domain"] not in done}
+    def url_of(q):
+        w = (q.get("Website") or "").strip() or q["Domain"]
+        return w if re.match(r"(?i)^https?://", w) else "http://" + w.lstrip("/")   # bare domains (website finder)
+
+    todo = {q["Domain"]: url_of(q) for q in read(a.queue)[1] if q["Domain"] and q["Domain"] not in done}
     print(f"fetch: {len(todo):,} homepages (free)", flush=True)
 
     def work(item):
@@ -161,6 +164,8 @@ def cmd_batches(a):
             web = f"homepage {f['url']}: unreachable ({f.get('error', 'no text')})"
         else:
             web = "homepage not fetched"
+        if q.get("Evidence"):                         # text we already hold (scrape, earlier enrichment)
+            web += f" || held: {q['Evidence']}"
         rows.append({"domain": q["Domain"], "name": q["Company Name"], "events": q.get("Events", ""),
                      "country": q.get("Country", ""), "current_side": q.get("Side", ""),
                      "current_label": q.get("Classification", ""), "prior_type": q.get("Prior Type", ""),

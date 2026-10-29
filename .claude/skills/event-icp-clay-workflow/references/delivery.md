@@ -29,7 +29,10 @@ The repo's `config/local.yaml` needs `workspace_id` (see `config/local.yaml.exam
     same person can sit in several events' tables (Mining: 19,082 people → 37,790 rows).
   - **Outreach Channel tag:** every person carries one. `--linkedin-only` rows get
     `LinkedIn + phone only (<country>)` and must never reach the email step.
-  - **Speakers:** `--exclude-source Speaker` when they are delivered apart.
+  - **Speakers: never in the Clay review copies** (user, 29 Oct 2026). They go to the Salesforce CSV
+    only. `split` always drops speaker-only rows (Source "Speaker"); a person the search found who also
+    spoke ("Find People + Speaker") stays in their company's people table. Never add a per-event
+    "Speakers" table: the importer refuses one.
 
   ```bash
   python scripts/deliver.py split --decisions remap/decisions.csv --people "<S> - review.csv" \
@@ -45,7 +48,8 @@ The repo's `config/local.yaml` needs `workspace_id` (see `config/local.yaml.exam
   skipped.
 - **Pilot one event**, let the user look at it in Clay, then the rest.
 - **Before the user forwards the folder, confirm** what is in it and what isn't, e.g. "speakers
-  not included, Germany included and tagged". The user asked exactly that on Mining.
+  not included (they go to Salesforce only), Germany included and tagged". The user asked exactly that
+  on Mining.
 
 ## The Clay Tables sheet rows
 
