@@ -25,6 +25,36 @@ blocklist_table: "REPLACE_ME - Blocklist - Companies"   # one level up from even
 workspace_id: "REPLACE_ME"
 evcharge_folder_id: "REPLACE_ME"       # the EVCharge folder
 evcharge_subfolder_id: "REPLACE_ME"    # "Competitive Events" inside it
+evcharge_ps_folder_id: "REPLACE_ME"    # "Products & Services" inside it
+evcharge_buyside_folder_id: "REPLACE_ME"  # "Buyside P&S" inside it
+                                       # (automation/cleanup/build_ps_companies.py;
+                                       #  override with CLAY_EVCHARGE_PS_FOLDER_ID)
+
+# Highways import (automation/clay_sync/import_highways.py). Same shape as the
+# EVCharge ids above — read them out of the folder URL in Clay. Environment
+# overrides: CLAY_HIGHWAYS_FOLDER_ID / CLAY_HIGHWAYS_SUBFOLDER_ID.
+highways_folder_id: "REPLACE_ME"       # the Highways folder
+highways_subfolder_id: "REPLACE_ME"    # "Competitive Events" inside it
+# The handoff folder for review copies, e.g.
+#   "Highways - Qasim to Katie" -> "Competitive Events"
+# Created by hand in Clay; nothing in this repo creates folders. Open the
+# SUBFOLDER and take the id from the URL. import_ce_delivery_tables.py can
+# reach nothing outside it.
+highways_delivery_folder_id: ""   # or $CLAY_HIGHWAYS_DELIVERY_FOLDER_ID
+
+highways_ps_folder_id: "REPLACE_ME"    # "Products & Services" inside it
+highways_buyside_ps_folder_id: "REPLACE_ME"  # "BuySide P&S" inside it
+                                       # (read as <icp>_ps_folder_id, so the ICP
+                                       #  dir is config/icps/highways_buyside/)
+                                       # (automation/cleanup/build_ps_companies.py
+                                       #  --icp highways; override with
+                                       #  CLAY_HIGHWAYS_PS_FOLDER_ID)
+
+# Supabase project holding the blocklist ledgers (blocklist_ledger/). Used to
+# build the Clay HTTP-API column URLs:
+#   https://<supabase_project_ref>.supabase.co/rest/v1/rpc/<ledger_check_fn>
+# The publishable key is NOT stored here — it lives in the Clay saved account.
+supabase_project_ref: "REPLACE_ME"
 
 # Blocklist destination (automation/build_automation/blocklist_send.py). Open
 # the blocklist workbook's Table 1 in Clay and read the three ids out of the
@@ -40,3 +70,13 @@ blocklist_view_id: "REPLACE_ME"        # gv_...
 # downloaded CSVs: <export_root>/<Workbook>/<Table name>.csv. A local
 # filesystem path, so it varies per machine. Override: $CLAY_EXPORT_ROOT.
 export_root: "REPLACE_ME"              # e.g. C:\Users\you\Labs - Tables
+
+# Highways Workflows route (docs/WORKFLOWS_ROUTE.md). Read back from a live
+# workflow with `clay workflows graph get <wfId>`; the people workflow's own
+# ids live in the gitignored automation/cleanup/ce_nodes/people_workflow.json,
+# written when it is built.
+highways_ce_workflow_id: ""   # the CE classification workflow (Registrar)
+highways_ce_registrar_node_id: ""   # its Highways Registrar agent node
+highways_ce_build_node_id: ""   # its Build Company Record node
+highways_ce_mapping_node_id: ""   # its ICP Mapping node
+highways_other_sources_table_id: ""   # ALL_SOURCES_DEDUPED

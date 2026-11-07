@@ -25,6 +25,11 @@ python automation/cleanup/pipeline_config.py --entity sponsors --icp labs
 
 ---
 
+> **Not the only route.** When the companies are unclassified — Competitive Events,
+> Other Sources — the classify → ICP map → find people pass runs as Clay Workflows
+> from the CLI instead of the steps below. See `WORKFLOWS_ROUTE.md`; step (h) here
+> is still where its people land.
+
 ## 0. Prerequisites (one time)
 
 ```bash

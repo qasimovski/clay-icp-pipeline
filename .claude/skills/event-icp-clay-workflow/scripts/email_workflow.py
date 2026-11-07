@@ -13,8 +13,11 @@ waterfall hits only, and every paid answer written back to Supabase. Runs ONLY o
                found -> ZeroBounce -> Record Body -> Record (HTTP api.record_contacts) -> Out
                none  -> LeadMagic -> Found? -> (same tail) | none -> Prospeo -> Found? -> (same tail)
                                                                    | none -> Record miss -> Out - No Email Found
+               none, name LeadMagic rejects (not 2+ Latin-script words) -> Prospeo directly
 
-No branch ever merges back, so each tail is generated once per provider from one definition.
+Prospeo is the one node with two incoming edges (LeadMagic miss, or a Blitz miss on a name LeadMagic
+would error on); Clay runs it when EITHER fires (draft-tested 2026-10-29, published as v2). Every other
+tail is generated once per provider from one definition.
 
     python email_workflow.py spec   --config email_workflow.yaml --out email_spec.json     # offline: nodes + edges
     python email_workflow.py check  --config email_workflow.yaml                           # offline: graph integrity
@@ -139,7 +142,10 @@ def handler(context):
     person = {"linkedin_url": li, "first_name": first, "last_name": last, "full_name": full,
               "domain": s(context, "Domain"), "company_name": s(context, "Company Name"),
               "job_title": s(context, "Job Title"), "country": s(context, "Mailing Country")}
-    return {**person,
+    # LeadMagic errors (and stops the row) on a name that is not two+ Latin-script words: "Please include a full
+    # name" / "Validation Error" for 张春阁, 春阁 张 (EVCharge, 2026-10-29). Prospeo takes those names, so they skip it.
+    latin = all(ch.isspace() or ch in ".'-" or ord(ch) <= 0x024F or 0x0300 <= ord(ch) <= 0x036F for ch in full)
+    return {**person, "lm_name_ok": latin and len(full.split()) >= 2,
             "lookup_body": json.dumps({"people": [{k: person[k] for k in ("linkedin_url", "first_name", "last_name", "full_name", "domain")}]}),
             "blitz_body": json.dumps({"person_linkedin_url": li})}
 '''
@@ -233,7 +239,7 @@ def _schema(**props):
 
 
 def _out(fields):
-    return {k: {"type": "boolean" if k in ("sendable", "recorded") or k.startswith("route_") or k == "found" else "string", "description": v}
+    return {k: {"type": "boolean" if k in ("sendable", "recorded", "found", "lm_name_ok") or k.startswith("route_") else "string", "description": v}
             for k, v in fields.items()}
 
 
@@ -284,7 +290,8 @@ def graph(cfg):
     add("build", {"nodeType": "code", "name": "Build Person", "description": "Shapes one approved person; JSON bodies for the HTTP calls.",
                   "code": BUILD_PERSON,
                   "inputSchema": _schema(**{c: _ref("trigger", f"$['{c}']") for c in TRIGGER_INPUTS}),
-                  "outputSchema": _out({**{f: f for f in PERSON_FIELDS}, "lookup_body": "lookup_contacts body", "blitz_body": "Blitz body"})},
+                  "outputSchema": _out({**{f: f for f in PERSON_FIELDS}, "lm_name_ok": "LeadMagic accepts this name",
+                                        "lookup_body": "lookup_contacts body", "blitz_body": "Blitz body"})},
         ("trigger", None, None))
     add("sb_lookup", _http("Supabase Lookup", "api.lookup_contacts with the team key (Supabase GTM API account): reuse anything stored.",
                            base + "lookup_contacts", "lookup_body", "build", acc.get("supabase")), ("build", None, None))
@@ -317,8 +324,15 @@ def graph(cfg):
                   BLITZ_EMAIL_URL, "blitz_body", "build", acc.get("blitz"))
     add("blitz", blitz, ("route", "find", routes[4][1]))
     add("read_blitz", _read_node("Read Blitz", "blitz"), ("blitz", None, None))
-    add("blitz_found", _cond("Blitz Found?", "", "found", "read_blitz", "$.found", ("found", "Blitz hit - validate"), ("none", "No Blitz email - LeadMagic")),
-        ("read_blitz", None, None))
+    blitz_found = _cond("Blitz Found?", "", "found", "read_blitz", "$.found", ("found", "Blitz hit - validate"), ("none", "No Blitz email - LeadMagic"))
+    blitz_found["inputSchema"]["properties"]["lm_name_ok"] = {"type": "boolean", "sourceNodeId": "<build>", "sourcePath": "$.lm_name_ok"}
+    rules = blitz_found["rulesConditionalConfig"]["rules"]
+    rules[1]["condition"]["items"].append({"type": "BinOp", "dataPath": ["lm_name_ok"], "operator": "True"})
+    rules.append({"id": "skip_lm", "name": "No Blitz email, name LeadMagic rejects - Prospeo",
+                  "condition": {"type": "GroupOp", "combinationMode": "And",
+                                "items": [{"type": "BinOp", "dataPath": ["found"], "operator": "False"},
+                                          {"type": "BinOp", "dataPath": ["lm_name_ok"], "operator": "False"}]}})
+    add("blitz_found", blitz_found, ("read_blitz", None, None))
     lm_tool = {"toolType": "clay_action", "actionPackageId": LEADMAGIC[0], "actionKey": LEADMAGIC[1], "description": "LeadMagic find work email",
                "inputMappingConfig": {"name": {"type": "reference", "expression": "{{full_name}}"},
                                       "domain": {"type": "reference", "expression": "{{domain}}"}}}
@@ -337,7 +351,7 @@ def graph(cfg):
         pr_tool["appAccountId"] = acc["prospeo"]
     add("prospeo", {"nodeType": "tool", "name": "Prospeo - Find Work Email", "description": "Own Prospeo key (connected account).",
                     "tools": [pr_tool], "inputSchema": _schema(full_name=_ref("build", "$.full_name"), domain=_ref("build", "$.domain"))},
-        ("lm_found", "none", "No LeadMagic email - Prospeo"))
+        ("lm_found", "none", "No LeadMagic email - Prospeo"), ("blitz_found", "skip_lm", "No Blitz email, name LeadMagic rejects - Prospeo"))
     add("read_pr", _read_node("Read Prospeo", "prospeo"), ("prospeo", None, None))
     add("pr_found", _cond("Prospeo Found?", "", "found", "read_pr", "$.found", ("found", "Prospeo hit - validate"),
                           ("none", "No email found - record the miss")), ("read_pr", None, None))

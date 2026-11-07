@@ -13,7 +13,14 @@ Trigger (one approved person: LinkedIn URL, First/Last/Person Name, Company Name
                                                        └no→ LeadMagic → Found? ─yes→ (same tail)
                                                                       └no→ Prospeo → Found? ─yes→ (same tail)
                                                                                     └no→ Record (miss) → Out - No Email Found
+                                       Blitz miss + a name LeadMagic rejects ─→ Prospeo directly (skips LeadMagic)
 ```
+
+**Names LeadMagic rejects skip it (v2, 2026-10-29).** LeadMagic errors on a name that is not two or more
+Latin-script words (Chinese/Japanese/Korean names: "Please include a full name" / "Validation Error"), and a
+tool error stops the whole row, so Prospeo never ran. Build Person sets `lm_name_ok`; Blitz Found? sends a miss
+with `lm_name_ok = false` straight to Prospeo, which accepts those names. Prospeo has two incoming edges and
+Clay runs it when either fires. EVCharge: 389 such people went from "not run" to searched (17 Prospeo hits).
 
 **One profile, one paid lookup (2026-10-29).** The run is keyed `--id-cols "LinkedIn URL"`, and `bulk_run.py`
 sends one search per id, so a person who sits on several rows (several events, or two sister companies) is

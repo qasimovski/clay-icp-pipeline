@@ -19,6 +19,9 @@
 #
 # Seniority, both tabs: "All except Intern/Trainee, Assistant, Entry, Freelance"
 # -> every Clay slug except entry and intern, plus the title exclusions below.
+# Short brand for the final Salesforce CSV names (Competitive_<Brand>.csv, Buy_side_<Brand>.csv ...;
+# user, 2026-11-07; .claude/skills/event-icp-clay-workflow/scripts/sf_naming.py). Letters and digits only.
+salesforce_brand: Mining
 seniority:
 - founder
 - owner

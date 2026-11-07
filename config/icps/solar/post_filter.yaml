@@ -1,0 +1,136 @@
+# APPROVED by the user, 26 Oct 2026 ("yes, approved"). Competitor v2 per-event COUNTRIES column ignored: Geo Scope v2 wins (user, 26 Oct 2026).
+# Solar & Storage Live ICP: rules applied to the people Clay returns, because the Clay search can't
+# express them. Clay's search (icp.yaml) is the wider net; this file is the sheet's exact wording.
+# Source: "Solar___Storage_Live_ICP_-_Tiered.xlsx" V2 tabs; decisions of 26 Oct 2026.
+#
+# Matching: `exact` = the whole title, or one part of a compound title split on & / | , ; @ and
+# " - " ("CEO & Founder" passes CEO). `contains` = the keyword appears as whole words. A person
+# passes when any keyword matches and none of that keyword's `exclude` words appear in the title.
+# Kept but FLAGGED in "Title Check" for the marketing manager, never dropped (as Mining):
+# near-exact titles ("Group CEO") and non-English titles (总经理) the rules can't read.
+
+sell:
+  # Seller JTs v2. A person matching both lists is tagged Booker (Booker wins).
+  personas:
+    Booker:
+      exact: [CMO, MD, GM, CCO, VP, Director]
+      contains:
+        Marketing: {exclude: &mkt_junior [Coordinator, Assistant]}   # "Exclude Coordinator/Assistant"
+        Brand: {exclude: [Brand Ambassador]}
+        Communication: {exclude: &telecom [Telecommunication, Telecommunications]}
+        Communications: {exclude: *telecom}
+        Mkt: {exclude: *mkt_junior}
+        Event: {}
+        Events: {}
+        Exhibition: {}
+        Exhibitions: {}
+        Trade Show: {}
+        # "Fairs Coordinator / Trade Fair Manager (exclude Coordinator if junior)": seniority can't
+        # be read from a title, so Coordinator is NOT excluded here; seniority already drops entry.
+        Fair: {}
+        Fairs: {}
+        CEO: {}
+        Chief Executive Officer: {}
+        Founder: {}
+        Co-Founder: {}
+        Owner: {exclude: [Product Owner]}
+        Managing Director: {}
+        General Manager: {}
+        President: {}            # Vice President also passes: it is its own Booker row below
+        Country Manager: {}
+        Chairman: {}
+        Chief Commercial Officer: {}
+        Vice President: {}
+        Regional Director: {}
+        Head of: {exclude: [Head of Finance, Head of HR, Head of Legal, Head of Procurement]}
+        Sales Director: {}
+        Commercial Director: {}
+        Business Development Director: {}
+    Stand staff:
+      exact: [BDM]
+      contains:
+        Sales: {exclude: [Sales Coordinator, Sales Support, Sales Administrator]}
+        Business Development: {}
+        Account Manager: {}
+        Regional Manager: {}
+        Area Manager: {}
+        Channel: {}
+        Distribution: {}
+        Partner: {}
+        Partnerships: {}
+        Commercial: {}
+        Overseas: {}
+        International: {}
+        Export: {}
+        Exporter: {}
+        Product Manager: {exclude: [Product Owner]}
+        Project Manager: {}
+        Application Engineer: {}
+        Applications Engineer: {}
+        Solution: {}
+        Solutions: {}
+        Technical Sales: {}
+  # Geo Scope v2 SELL SIDE. Every other searched country is Secondary.
+  geo_tier:
+    Core: [United Kingdom, Germany, Italy, Spain, Turkey, South Africa, China]
+    "Yes": [Switzerland, France, Belgium, Netherlands, Portugal, Poland, Saudi Arabia,
+            United Arab Emirates, Jordan, Egypt, Nigeria, Philippines, Vietnam, Thailand, Malaysia,
+            Singapore, Indonesia, India, South Korea, Taiwan]
+    Exhibitor sourcing: [Mexico, Brazil, Australia]
+
+buy:
+  # BuySide ICP v2: each group's titles in icp.yaml are `contains`, except these cross-cutting
+  # titles, which are `exact` (rows 33-45, "Exact only - Contains on Director/MD pulls every function").
+  exact: [CEO, Chief Executive Officer, Owner, Founder, Co-Founder, Managing Director, MD,
+          General Manager, President, COO, Chief Operating Officer, CTO, Chief Technology Officer,
+          CFO, Chief Financial Officer, Director]
+  # A group that ALSO lists a cross-cutting exact title as its own Contains keyword (col F).
+  contains_too:
+    Installers & EPCs: [Owner]                  # electrical contractors: "Owner" Contains
+    Landowners & agriculture: [Owner, Director] # farms: "Owner", "Director" Contains
+  # The EXCLUDE row (row 68), applied to every buy title, plus the seniority exclusions.
+  exclude: [Intern, Trainee, Student, Assistant, Entry, Freelance, Receptionist, HR, Human Resources,
+            Recruit, Recruiter, Recruitment, Talent, Legal, Counsel, Lawyer, Accountant, Payroll,
+            Teacher, Nurse, Customer Service, Software Developer, Product Owner, Media Buyer]
+  # Best tier across the 16 editions' BUY columns (an edition's home country is Core). The
+  # per-edition split is `editions` below.
+  geo_tier:
+    Core: [United Kingdom, Switzerland, France, Italy, Spain, Saudi Arabia, United Arab Emirates,
+           Egypt, South Africa, Nigeria, Philippines, Vietnam, Thailand, Malaysia, Indonesia]
+    "Yes": [Ireland, Liechtenstein, Portugal, Qatar, Kuwait, Bahrain, Oman, Botswana, Namibia,
+            Zimbabwe, Zambia, Mozambique, Ghana, Singapore]
+
+# Germany: searched, LinkedIn URL only. No phone and no email are ever looked up (user,
+# 26 Oct 2026: "we will only be finding their LinkedIn, which is free"). Its people go to a separate
+# LinkedIn-only file and never reach the email workflow.
+linkedin_only_countries: [Germany]
+
+# Speakers (user, 26 Oct 2026): in scope; kept when their company passes the ICP AND their title
+# passes the Seller / Buyer lists above (filter, not flag).
+speakers:
+  titles: filter
+  # Industry words too common in company names to prove a LinkedIn match ("Solar Energy Ltd").
+  company_stop_words: [solar, energy, power, renewable, renewables, storage, battery, pv, electric,
+                       electrical, technology, technologies, green, new energy]
+
+# Geo Scope v2 BUY columns, one per SSL edition (Sudan, Libya, Iraq, Lebanon, Myanmar removed).
+# A buy-side person goes to every edition whose column lists their country, intersected with the
+# event's "Best fit for" (scope.yaml). A sell-side person goes to the event's "Best fit for"
+# editions ("All editions (supplier sourcing)" = all 16). User, 26 Oct 2026.
+editions:
+  SSL UK (Birmingham): {"Core": ["United Kingdom"], "Yes": ["Ireland"], "Secondary": ["Belgium", "Netherlands", "Sweden", "Denmark", "Norway", "Finland"]}
+  SSL London: {"Core": ["United Kingdom"], "Yes": ["Ireland"]}
+  SSL Zurich: {"Core": ["Switzerland"], "Yes": ["Liechtenstein"], "Secondary": ["France", "Germany", "Austria"]}
+  SSL Paris: {"Core": ["France"], "Secondary": ["Belgium", "Luxembourg"]}
+  SSL Italia: {"Core": ["Italy"], "Secondary": ["Greece", "Malta"]}
+  SSL Espana: {"Core": ["Spain"], "Yes": ["Portugal"]}
+  SSL KSA: {"Core": ["Saudi Arabia"], "Yes": ["United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Oman"], "Secondary": ["Turkey", "Jordan", "Egypt"]}
+  SSL Dubai: {"Core": ["United Arab Emirates"], "Yes": ["Qatar", "Kuwait", "Bahrain", "Oman"], "Secondary": ["Saudi Arabia"]}
+  SSL Egypt: {"Core": ["Egypt"], "Secondary": ["Turkey", "Jordan", "Morocco", "Tunisia", "Algeria"]}
+  SSL Africa (Johannesburg): {"Core": ["South Africa"], "Yes": ["Botswana", "Namibia", "Zimbabwe", "Zambia", "Mozambique"], "Secondary": ["Lesotho", "Swaziland", "Malawi", "Kenya", "Tanzania", "Uganda"]}
+  SSL Nigeria: {"Core": ["Nigeria"], "Yes": ["Ghana"], "Secondary": ["Benin", "Togo", "Cameroon", "Côte d'Ivoire"]}
+  SSL Philippines: {"Core": ["Philippines"]}
+  SSL Vietnam: {"Core": ["Vietnam"], "Secondary": ["Thailand", "Cambodia", "Laos"]}
+  SSL Thailand: {"Core": ["Thailand"], "Secondary": ["Cambodia", "Laos"]}
+  SSL Malaysia: {"Core": ["Malaysia"], "Yes": ["Singapore"], "Secondary": ["Brunei Darussalam"]}
+  SSL Indonesia: {"Core": ["Indonesia"], "Secondary": ["Singapore"]}

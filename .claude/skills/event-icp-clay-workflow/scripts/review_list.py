@@ -23,9 +23,12 @@ and the company's Country, because Mailing Country (the person's) is the one use
 import argparse
 import collections
 import csv
+import hashlib
 import os
 import re
 import sys
+import unicodedata
+from urllib.parse import quote, unquote
 
 import yaml
 
@@ -65,7 +68,60 @@ def canonical_linkedin(u):
     Clay writes ".../in/x/" and Blitz ".../in/x"; the email step dedupes on the URL TEXT, so two spellings
     of one profile would be enriched (and paid for) twice. Solar, 29 Oct 2026: 285 profiles had both."""
     m = re.search(r"linkedin\.com/in/([^/?#\s]+)", u or "")
-    return f"https://www.linkedin.com/in/{m.group(1)}" if m else (u or "").strip()
+    if not m:
+        return (u or "").strip()
+    # One spelling per profile, also for non-ASCII slugs (Solar, Nov 2026: "zu%c3%b1iga", "zu%25c3%25b1iga"
+    # and the garbled "zuã±iga" were three spellings of one person): decode, repair, lower-case, re-encode.
+    s = m.group(1)
+    for _ in range(2):
+        s = unquote(s)
+    try:
+        s = s.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    return "https://www.linkedin.com/in/" + quote(s.strip("/").lower(), safe="-_.~")
+
+
+def person_id(u):
+    """A short stable id per LinkedIn profile (Clay bulk ids max 64 chars; 1,137 Solar URLs were longer):
+    p_ + sha1(canonical URL)[:16]. The email run keys on it, so one profile is one paid lookup."""
+    return "p_" + hashlib.sha1(canonical_linkedin(u).encode("utf-8")).hexdigest()[:16]
+
+
+def dedupe_people(rows):
+    """One row per person per company. Clay and Blitz can return DIFFERENT URLs for one person (an old slug vs the
+    current vanity one): Solar had 1,348 such people, each about to be enriched twice. Same name + same company
+    domain = one person; keep the profile both sources returned (Source has "+"), else Blitz's (current), else
+    the best-ranked. Same profile on several rows (several companies or events) is NOT touched here: the email
+    run sends one lookup per Person ID. -> (kept, dropped), each dropped row with "Duplicate Of"."""
+    def nm(s):
+        return " ".join(re.findall(r"[a-z]+", unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore")
+                                    .decode().lower()))
+    groups = collections.defaultdict(list)
+    for r in rows:
+        k = (nm(r.get("Person Name")), (r.get("Domain") or "").strip().lower())
+        groups[k if k[0] else ("", r.get("LinkedIn URL"))].append(r)
+
+    def rank(r):
+        src = r.get("Source") or ""
+        try:
+            n = int(r.get("Rank In Company") or 9999)
+        except ValueError:
+            n = 9999
+        return (0 if "+" in src else 1 if "Blitz" in src else 2, n)
+    keep_url = {}
+    for k, rs in groups.items():
+        if len({canonical_linkedin(r.get("LinkedIn URL")) for r in rs}) > 1:
+            keep_url[k] = canonical_linkedin(min(rs, key=rank).get("LinkedIn URL"))
+    kept, dropped = [], []
+    for r in rows:
+        k = (nm(r.get("Person Name")), (r.get("Domain") or "").strip().lower())
+        want = keep_url.get(k)
+        if want and canonical_linkedin(r.get("LinkedIn URL")) != want:
+            dropped.append({**r, "Duplicate Of": want})
+        else:
+            kept.append(r)
+    return kept, dropped
 
 
 def join(v):
@@ -94,6 +150,22 @@ def companies(dirs):
     return out
 
 
+def companies_from_csv(paths):
+    """Company columns from a company list that already holds firmographics (a Clay company search:
+    merge_company_search.py output) - the 'skip Enrich Company' route (Solar buy side, 6 Nov 2026)."""
+    out = {}
+    for path in paths:
+        for r in read(path):
+            d = norm_domain(r.get("Domain"))
+            if not d or d in out:
+                continue
+            out[d] = {"Company Size": r.get("Size") or "", "Company Type": r.get("Type") or "",
+                      "Company Industry": r.get("Industry") or "", "Annual Revenue": r.get("Annual Revenue") or "",
+                      "Company LinkedIn URL": r.get("LinkedIn URL") or "", "Company Website": d,
+                      "Company Description": " ".join((r.get("Description") or "").split())}
+    return out
+
+
 def cmd_domains(a):
     done = set()
     for d in a.skip_results:
@@ -111,7 +183,8 @@ def cmd_domains(a):
 def cmd_build(a):
     rules = yaml.safe_load(open(a.rules, encoding="utf-8")) or {}
     li_countries = set(rules.get("linkedin_only_countries") or [])
-    comp = companies(a.company_results)
+    comp = companies_from_csv(a.company_csv)
+    comp.update(companies(a.company_results))  # an Enrich Company result beats the search's columns
     people = read(a.people)
     li_only = read(a.linkedin_only) if a.linkedin_only else []
     if not people:
@@ -148,6 +221,13 @@ def cmd_build(a):
     out_main, out_li = a.out_prefix + ".csv", a.out_prefix + " - LinkedIn only.csv"
     for p in people + li_only:
         p["LinkedIn URL"] = canonical_linkedin(p.get("LinkedIn URL"))
+        p["Person ID"] = person_id(p["LinkedIn URL"])
+    cols = ["Person ID"] + [c for c in cols if c != "Person ID"]
+    people, d1 = dedupe_people(people)
+    li_only, d2 = dedupe_people(li_only)
+    if d1 or d2:
+        write(a.out_prefix + " - duplicates removed.csv", d1 + d2, cols + ["Duplicate Of"])
+        print(f"people-level duplicates removed (same person + company, two LinkedIn URLs): {len(d1) + len(d2):,}")
     write(out_main, people, cols)
     write(out_li, li_only, cols)
     print(f"speakers: {tagged:,} already in the people lists (tagged), added {dict(added)}")
@@ -173,6 +253,9 @@ def main():
     b.add_argument("--linkedin-only", help="post_filter.py LinkedIn-only file")
     b.add_argument("--speakers", help="speakers.py people output")
     b.add_argument("--company-results", nargs="*", default=[])
+    b.add_argument("--company-csv", nargs="*", default=[],
+                   help="company list(s) that already carry firmographics (Domain, Size, Type, Industry, "
+                        "Annual Revenue, LinkedIn URL, Description): used instead of Enrich Company")
     b.add_argument("--rules", required=True)
     b.add_argument("--drop-cols", default="")
     b.add_argument("--out-prefix", required=True)

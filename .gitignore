@@ -24,6 +24,9 @@ automation/clay_sync/*.state.json
 # build_*.py scripts. Committed code (*.py + people_search_fill.js) is portable.
 automation/cleanup/*.json
 automation/cleanup/*_logs/
+# Bulk workflow inputs (export_workflow_rows.py): live table/row ids plus the
+# scraped + enriched company rows themselves, so never tracked.
+automation/cleanup/*.jsonl
 
 # Python
 __pycache__/
@@ -45,10 +48,12 @@ Thumbs.db
 /*.png
 # Pre-merge snapshots written by the people-builds rollout
 *.premerge
-# Import-run state/logs from the EVCharge pass (live workbook ids)
+# Import-run state/logs from the EVCharge / Highways passes (live workbook and
+# table ids). Globbed rather than listed per-tree so the next import pass's log
+# dir is excluded the moment it is created, not after someone notices.
 automation/clay_sync/*_state.json
 automation/clay_sync/*_state_*.json
-automation/clay_sync/evcharge_logs/
+automation/clay_sync/*_logs/
 
 # Live Clay query files — carry table/view/filter IDs (workspace identifiers)
 # AND the full targeted title/country lists, i.e. the same proprietary ICP
@@ -59,3 +64,35 @@ People - Filters*.txt
 
 # Blocklist ledger — real company/people exports fed to load_csv.js
 blocklist_ledger/*.csv
+
+# Classification results pulled back from Clay Workflows bulk runs. Real company
+# names, domains and descriptions plus the model's reasoning — business data, and
+# the same SENSITIVE_DATA.md logic that keeps *_normalized.csv out applies here.
+automation/cleanup/ce_classification_exports/
+automation/cleanup/ce_classification_feeds/
+automation/cleanup/ce_classification_results/
+automation/cleanup/ce_combine_cache.json
+automation/cleanup/ce_classification_rollout.lock
+
+# People pass over the classified Competitive Events companies
+automation/cleanup/ce_people_feeds/
+automation/cleanup/ce_people_results/
+automation/cleanup/ce_people_rollout_state.json
+automation/cleanup/ce_people_rollout.lock
+automation/cleanup/ps_people_cache/
+
+# Workflows-route run data (2026-11-07 sweep): bulk-run feeds/results, delivery table CSVs, workflow node
+# dumps and paste pages. Real companies and people, plus live workbook/table/node ids in the links and node
+# JSON — business data under docs/SENSITIVE_DATA.md, never source. The scripts that make them are tracked.
+automation/cleanup/*_feeds/
+automation/cleanup/*_results/
+automation/cleanup/*_results_*/
+automation/cleanup/*_tables/
+automation/cleanup/*_tables_*/
+automation/cleanup/ce_nodes/
+automation/cleanup/*.csv
+automation/cleanup/*.txt
+automation/cleanup/*.html
+automation/cleanup/*.tsv
+automation/cleanup/*.bak
+automation/cleanup/*.bak.*

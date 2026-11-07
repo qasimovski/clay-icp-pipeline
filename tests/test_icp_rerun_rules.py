@@ -376,3 +376,138 @@ def test_an_answer_already_paid_for_is_reused_not_bought_again(tmp_path):
     # people: a Mining search has other inputs (category), so Solar searches again
     assert br.reusable([people_mining], [{"id": "acme.com", "inputs": ppl_solar}], "wf_ppl", 90) == {}
     assert set(br.reusable([people_mining], [{"id": "acme.com", "inputs": ppl_mining}], "wf_ppl", 90)) == {"acme.com"}
+
+
+# ---------------------------------------------------------------- manager review: a rule for ONE event's table
+def test_an_event_rule_takes_people_off_that_event_only():
+    """Solar, Nov 2026: the manager wanted ONE event's table filtered to its countries. A person outside them
+    loses that event; if it was their only event they leave the list, otherwise they stay for the others."""
+    ap = load("approval")
+    ev = "Future of Energy Summit 2026"
+    rows = [{"LinkedIn URL": "u1", "Mailing Country": "France", "Events": ev, "Speaker Event(s)": ""},
+            {"LinkedIn URL": "u2", "Mailing Country": "France", "Events": f"{ev}; RE+ 2027", "Speaker Event(s)": ""},
+            {"LinkedIn URL": "u3", "Mailing Country": "Kenya", "Events": ev, "Speaker Event(s)": ""},
+            {"LinkedIn URL": "u4", "Mailing Country": "France", "Events": "RE+ 2027", "Speaker Event(s)": ""}]
+    kept, removed = ap.apply_changes([dict(r) for r in rows], {"event_rules": [
+        {"event": ev, "keep_only_countries": ["Kenya", "South Africa"]}]})
+    assert [r["LinkedIn URL"] for r in removed] == ["u1"]                     # only at that event: gone
+    assert removed[0]["Removed Because"].startswith("event rule")
+    by = {r["LinkedIn URL"]: r for r in kept}
+    assert by["u2"]["Events"] == "RE+ 2027" and by["u2"]["_events_dropped"] == ev   # kept for the other event
+    assert by["u3"]["Events"] == ev and "_events_dropped" not in by["u3"]           # in scope: untouched
+    assert by["u4"]["Events"] == "RE+ 2027"                                         # never at that event
+    with pytest.raises(SystemExit):
+        ap.apply_changes([dict(rows[0])], {"event_rules": [{"event": ev}]})       # a rule with no countries
+
+
+def test_an_event_rule_can_leave_the_events_speakers_alone():
+    """columns: [Events] covers the event's tables only; a speaker of that event keeps it (user, Nov 2026)."""
+    ap = load("approval")
+    ev = "Future of Energy Summit 2026"
+    rows = [{"LinkedIn URL": "s1", "Mailing Country": "France", "Events": "", "Speaker Event(s)": ev},
+            {"LinkedIn URL": "p1", "Mailing Country": "France", "Events": ev, "Speaker Event(s)": ""}]
+    kept, removed = ap.apply_changes([dict(r) for r in rows], {"event_rules": [
+        {"event": ev, "keep_only_countries": ["Kenya"], "columns": ["Events"]}]})
+    assert [r["LinkedIn URL"] for r in kept] == ["s1"] and kept[0]["Speaker Event(s)"] == ev
+    assert [r["LinkedIn URL"] for r in removed] == ["p1"]
+
+
+def test_one_person_is_one_row_and_one_id():
+    """Solar, Nov 2026: Clay and Blitz returned different URLs for one person (old slug vs vanity), and one slug
+    came in three encodings; each would have been enriched twice. Same name + company -> one row (both sources,
+    else Blitz); every spelling of one profile -> one Person ID (<= 64 chars for Clay bulk ids)."""
+    rl = load("review_list")
+    a = rl.canonical_linkedin("https://www.linkedin.com/in/john-carlo-zu%c3%b1iga-18879225/")
+    for u in ("https://uk.linkedin.com/in/John-Carlo-Zu%25C3%25B1iga-18879225",
+              "https://www.linkedin.com/in/john-carlo-zuÃ±iga-18879225"):              # garbled ñ
+        assert rl.canonical_linkedin(u) == a
+    assert rl.person_id(a) == rl.person_id(a + "/") and len(rl.person_id(a)) <= 64
+    rows = [{"Person Name": "Scott Rosenberg", "Domain": "257.co", "Source": "Clay",
+             "LinkedIn URL": "https://www.linkedin.com/in/scott-rosenberg-693104", "Rank In Company": "3"},
+            {"Person Name": "Scott Rosenberg", "Domain": "257.co", "Source": "Blitz",
+             "LinkedIn URL": "https://www.linkedin.com/in/scottarosenberg", "Rank In Company": "5"},
+            {"Person Name": "Scott Rosenberg", "Domain": "other.com", "Source": "Clay",
+             "LinkedIn URL": "https://www.linkedin.com/in/scott-rosenberg-693104", "Rank In Company": "1"}]
+    kept, dropped = rl.dedupe_people(rows)
+    assert [r["LinkedIn URL"].rsplit("/", 1)[1] for r in kept] == ["scottarosenberg", "scott-rosenberg-693104"]
+    assert len(dropped) == 1 and dropped[0]["Duplicate Of"].endswith("scottarosenberg")
+
+
+def test_salesforce_has_one_row_per_person_per_event():
+    """Solar, Nov 2026: 561 people sat at one event twice (two sister companies); Salesforce gets one row."""
+
+    rows = [
+        {"Person Linkedin Url": "u1", "Competitive Event Name": "E", "Website URL": "a.com",
+         "Contact Email": "x@b.com", "Is CA Speaker": "FALSE"},
+        {"Person Linkedin Url": "u1", "Competitive Event Name": "E", "Website URL": "https://www.b.com/",
+         "Contact Email": "x@b.com", "Is CA Speaker": "FALSE"},
+        {"Person Linkedin Url": "u1", "Competitive Event Name": "E", "Website URL": "c.com",
+         "Contact Email": "", "Is CA Speaker": "TRUE"},
+        {"Person Linkedin Url": "u1", "Competitive Event Name": "F", "Website URL": "a.com",
+         "Contact Email": "", "Is CA Speaker": "FALSE"},
+    ]
+    kept, dropped = deliver.one_row_per_person_event(rows)
+    assert len(kept) == 2 and len(dropped) == 2
+    e = next(r for r in kept if r["Competitive Event Name"] == "E")
+    assert e["Website URL"] == "https://www.b.com/"     # the company that matches the email domain
+    assert e["Is CA Speaker"] == "TRUE"                  # still a speaker if any copy was
+
+
+def test_a_category_exclusion_in_icp_yaml_is_applied_by_the_post_filter():
+    # EVCharge buy side, 2026-11-06: the sheet's exact "MD" (Managing Director) matched physicians in
+    # Hospitals & health. The category excludes MD in icp.yaml; Clay and Blitz honour that, and so must
+    # the post filter, for that category only.
+    icp = {"buy": {"default_countries": ["United States"],
+                   "categories": {"Hospitals & health": {"titles": ["Estates"], "exclude_titles": ["MD"]},
+                                  "Logistics": {"titles": ["Fleet"]}}}}
+    r = pf.Rules(icp, {"buy": {"exact": ["MD"]}})
+    assert r.judge("Buy Side", "Hospitals & health", "MD", "United States")[0].startswith("excluded word")
+    assert r.judge("Buy Side", "Logistics", "MD", "United States")[0] == ""
+
+
+# ---------------------------------------------------------------- Salesforce file names
+sfn = load("sf_naming")
+
+
+@pytest.mark.parametrize("scope,brand,part,want", [
+    ("competitive", "EVCharge", "", "Competitive_EVCharge.csv"),
+    ("other_sources", "EVCharge", "Trades", "Other_sources_EVCharge_Trades.csv"),
+    ("buy_side", "Solar", "", "Buy_side_Solar.csv"),
+    ("sell_side", "Mining", "", "Sell_side_Mining.csv"),
+])
+def test_salesforce_file_names_follow_the_rule(scope, brand, part, want):
+    # User, 2026-11-07: Competitive_ / Other_sources_ / Buy_side_ / Sell_side_{brand}; short brand, no spaces.
+    assert sfn.filename(scope, brand, part) == want
+    assert sfn.check(want)[1] == brand
+
+
+@pytest.mark.parametrize("bad", ["EV Charge", "Solar & Storage Live", "", "EV-Charge"])
+def test_a_brand_with_spaces_or_symbols_is_refused(bad):
+    with pytest.raises(sfn.NameError_):
+        sfn.filename("buy_side", bad)
+
+
+@pytest.mark.parametrize("bad", ["Solar BS - Salesforce.csv", "buy_side_EVCharge.csv", "Buy_side_EV Charge.csv",
+                                 "BuySide_EVCharge.csv", "Buy_side_EVCharge.xlsx"])
+def test_an_old_style_or_misspelt_name_is_refused(bad):
+    with pytest.raises(sfn.NameError_):
+        sfn.check(bad)
+
+
+def test_companions_keep_the_base_name():
+    assert sfn.companion("sf/Buy_side_EVCharge.csv", "LinkedIn only") == "sf/Buy_side_EVCharge - LinkedIn only.csv"
+
+
+def test_deliver_names_the_salesforce_file_and_refuses_a_bad_out(tmp_path):
+    icp = tmp_path / "icp.yaml"
+    icp.write_text("salesforce_brand: EVCharge\n", encoding="utf-8")
+    ns = types.SimpleNamespace
+    base = dict(brand=None, icp=str(icp), part=None, out=None, out_dir=str(tmp_path / "sf"))
+    got = deliver.salesforce_out(ns(**dict(base, scope="buy_side")))
+    assert os.path.basename(got) == "Buy_side_EVCharge.csv" and os.path.isdir(tmp_path / "sf")
+    with pytest.raises(SystemExit):                       # a hand-written name that breaks the rule
+        deliver.salesforce_out(ns(**dict(base, scope=None, out="EVCharge BS - Salesforce.csv")))
+    with pytest.raises(SystemExit):                       # --out disagreeing with --scope
+        deliver.salesforce_out(ns(**dict(base, scope="buy_side", out="Competitive_EVCharge.csv")))
+    assert deliver.salesforce_out(ns(**dict(base, scope=None, out="x/Other_sources_EVCharge_Trades.csv"))) \
+        == "x/Other_sources_EVCharge_Trades.csv"

@@ -1,0 +1,1351 @@
+# DRAFT 2026-11-06. EVCharge BUY SIDE company searches, from the "BuySide ICP v2" tab.
+#
+# Source: scrapers_evcharge/EV Charge Playbook ICP v3.xlsx, tab "BuySide ICP v2" (10 buyer groups,
+# 35 sub-segments) and tab "Geo_Scope v2" (BUY columns). No "BuySide ICP v3" tab exists; the user
+# said to use V3 if present, else V2 (2026-11-06). V2 always wins (memory: icp-version-precedence).
+#
+# The August 2026 build in config/icps/evcharge_buyside/ is the OLD BuySide ICP (v1) and is left
+# untouched: its live state files (automation/cleanup/*evcharge_buyside*.json) still point at it.
+#
+# Route (user, 2026-11-06: "do the same as Solar's buy side"): Clay company search from the CLI
+# (`clay searches query-mode`, automation/cleanup/clay_company_search.py) -> ONE company CSV
+# (merge_company_search.py) -> Find People in Clay -> Blitz for the companies Clay finds nobody at.
+#
+# Decisions (user, 2026-11-06):
+#   - Geo: the user first said geo is for the people, not the companies, then answered the
+#     clarifying question "You can use country filters". So, as for Solar: a company qualifies
+#     with ANY office in a buy country, and the broad sectors also require a current employee
+#     with the buyer persona who is located in a buy country (people.exists below).
+#   - Buy countries = every Geo_Scope v2 BUY value that is not Parked (Core / Yes / Secondary,
+#     incl. Ukraine and Moldova marked "Confirm") PLUS the Philippines. Middle East, Africa, the
+#     rest of South-East Asia, New Zealand and Australia stay parked.
+#   - Dedupe: drop companies already in EVCharge Competitive Events and EVCharge Other Sources
+#     (Solar precedent). The August V1 buy-side companies are NOT dropped (V2 re-decides them);
+#     people already delivered in August are dropped at the people step.
+#   - Enrich Company is skipped: the search returns firmographics, joined onto people by domain.
+#
+# Precision, not caps (Solar rule): the sheet's industries, "Extra keyword filter (company)",
+# example organisations and notes are spread across industry / description / description_not /
+# anchors, and the broad sectors carry the persona filter (people_titles). The persona list is the
+# sheet's "Segment title keywords" with the generic words left out (Operations, Engineering,
+# Procurement, Development, Owner, Director: every company has them; sheet notes treat generic
+# words the same way); the cross-cutting EV titles are added. The full persona is applied at the
+# people search, not here.
+#
+# persona_companion: Solar's persona filter dropped big real targets whose staff Clay has not
+# typed (2026-11-06, user chose "persona + add back 1,000+ staff"). Here every category with
+# people_titles automatically gets a companion "<name> (1,000+ staff)": the same query without
+# the persona, sizes 1,001+. The merge files it under the same sub-segment ("Found By" says which).
+#
+# Industry names the sheet uses that are not Clay enum values were mapped:
+#   Shopping Centres & Malls -> Retail / Leasing Non-residential Real Estate + mall keywords
+#   Fuel Distributors -> Wholesale Petroleum and Petroleum Products
+#   Retail Building Materials -> Retail Building Materials and Garden Equipment
+#   Airlines and Aviation (airports only) -> Airlines and Aviation + airport keywords
+#   Courier / Retail (delivery arms) -> Freight and Package Transportation + parcel keywords
+#   Public Transport (Government) -> Urban Transit Services (+ a transit-agency search on
+#     Government Administration)
+#   Truck/Van manufacturing -> Motor Vehicle Manufacturing
+#   Technology (ride-hail) -> Technology, Information and Internet + ride-hail keywords
+#   Construction (plant) -> Construction
+#   Investment Management (real estate) -> Investment Management + real-estate keywords
+
+# Company office countries, in Clay's COMPANY enum ("Macedonia" for North Macedonia, "Czechia").
+countries:
+  # Americas (EVCS USA, pan-American)
+  - United States
+  - Canada
+  - Mexico
+  - Brazil
+  - Chile
+  - Colombia
+  - Argentina
+  - Peru
+  - Costa Rica
+  - Uruguay
+  # UK & Ireland
+  - United Kingdom
+  - Ireland
+  # Western Europe
+  - Germany
+  - France
+  - Netherlands
+  - Belgium
+  - Luxembourg
+  - Austria
+  - Switzerland
+  # Nordics
+  - Norway
+  - Sweden
+  - Denmark
+  - Finland
+  - Iceland
+  # Southern Europe
+  - Spain
+  - Portugal
+  - Italy
+  - Greece
+  - Malta
+  - Cyprus
+  - Turkey
+  # Eastern Europe
+  - Poland
+  - Czechia
+  - Hungary
+  - Romania
+  - Slovakia
+  - Bulgaria
+  - Croatia
+  - Slovenia
+  - Serbia
+  - Estonia
+  - Latvia
+  - Lithuania
+  - Bosnia and Herzegovina
+  - Macedonia
+  - Albania
+  - Montenegro
+  - Ukraine
+  - Moldova
+  # Unparked by the user, 2026-11-06 (PhilEnergy)
+  - Philippines
+
+# The same 50 in Clay's PEOPLE enum ("Czech Republic", "North Macedonia").
+person_countries:
+  - United States
+  - Canada
+  - Mexico
+  - Brazil
+  - Chile
+  - Colombia
+  - Argentina
+  - Peru
+  - Costa Rica
+  - Uruguay
+  - United Kingdom
+  - Ireland
+  - Germany
+  - France
+  - Netherlands
+  - Belgium
+  - Luxembourg
+  - Austria
+  - Switzerland
+  - Norway
+  - Sweden
+  - Denmark
+  - Finland
+  - Iceland
+  - Spain
+  - Portugal
+  - Italy
+  - Greece
+  - Malta
+  - Cyprus
+  - Turkey
+  - Poland
+  - Czech Republic
+  - Hungary
+  - Romania
+  - Slovakia
+  - Bulgaria
+  - Croatia
+  - Slovenia
+  - Serbia
+  - Estonia
+  - Latvia
+  - Lithuania
+  - Bosnia and Herzegovina
+  - North Macedonia
+  - Albania
+  - Montenegro
+  - Ukraine
+  - Moldova
+  - Philippines
+
+persona_companion:
+  suffix: (1,000+ staff)
+  company_size:
+    - 1,001-5,000
+    - 5,001-10,000
+    - 10,001+
+
+# The sheet has no tier column; Tier is left blank and "Priority" carries the sheet's
+# "Priority (proposed)" value.
+tiers: {}
+
+anchors:
+  # Installers must mention EV work (sheet: "Electrical & EV installers"; "Solar & MEP installers
+  # moving into EV"). Without it this is every electrician in 50 countries.
+  ev:
+    - EV
+    - EVs
+    - electric vehicle
+    - electric vehicles
+    - EV charging
+    - EV charger
+    - EV chargers
+    - charging station
+    - charging stations
+    - charge point
+    - charge points
+    - chargepoint
+    - e-mobility
+    - emobility
+    - wallbox
+    - electric car
+  # Funds: only the ones that invest in infrastructure / the energy transition (the sheet's
+  # examples are the lenders and equity behind CPO deals), not every PE/VC firm.
+  # Sample 2026-11-06: bare "infrastructure" and "climate" let in generic VCs (Greylock, GV,
+  # Khosla: "infrastructure software"); both are replaced by specific phrases.
+  transition:
+    - energy infrastructure
+    - transport infrastructure
+    - energy transition
+    - clean energy
+    - renewable energy
+    - renewables
+    - decarbonisation
+    - decarbonization
+    - e-mobility
+    - electric vehicle
+    - electric vehicles
+    - EV charging
+    - sustainable infrastructure
+    - climate infrastructure
+
+categories:
+
+  # =====================================================================
+  # 1. Sites - destinations
+  # =====================================================================
+  - name: Retail & shopping centres
+    group: 1. Sites - destinations
+    priority: High
+    industry:
+      - Retail
+      - Real Estate
+      - Commercial Real Estate
+      - Leasing Non-residential Real Estate
+    description:
+      - shopping centre
+      - shopping centres
+      - shopping center
+      - shopping centers
+      - shopping mall
+      - shopping malls
+      - mall
+      - malls
+      - retail park
+      - retail parks
+      - outlet centre
+      - outlet center
+      - outlet village
+      - designer outlet
+    people_titles:
+      - Centre Manager
+      - Center Manager
+      - Mall Manager
+      - Property Manager
+      - Asset Manager
+      - Estates
+      - Facilities
+      - Car Park
+      - Parking
+      - Energy
+      - Sustainability
+
+  - name: Hotels & hospitality
+    group: 1. Sites - destinations
+    priority: High
+    industry:
+      - Hospitality
+      - Hotels and Motels
+      - Accommodation Services
+    # Sample 2026-11-06: Food and Beverage Services let in Nespresso and a farm co-op that mention
+    # hotels as customers, so it is dropped.
+    description:
+      - hotel
+      - hotels
+      - hotel group
+      - resort
+      - resorts
+      - holiday park
+      - holiday parks
+      - motel
+      - motels
+    people_titles:
+      - Head of Property
+      - Property
+      - Estates
+      - Facilities
+      - Sustainability
+      - Energy
+      - Development Director
+      - Head of Development
+
+  - name: Leisure, venues & attractions
+    group: 1. Sites - destinations
+    priority: Medium
+    notes: Sheet - anything people drive to with a car park.
+    industry:
+      - Spectator Sports
+      - Recreational Facilities
+      - Entertainment Providers
+      - Amusement Parks and Arcades
+      - Museums, Historical Sites, and Zoos
+      - Events Services
+      - Wellness and Fitness Services
+      - Golf Courses and Country Clubs
+    description:
+      - stadium
+      - stadiums
+      - arena
+      - arenas
+      - convention centre
+      - convention center
+      - exhibition centre
+      - exhibition center
+      - conference centre
+      - conference center
+      - theme park
+      - theme parks
+      - golf club
+      - golf course
+      - golf resort
+      - gym
+      - gyms
+      - fitness club
+      - health club
+      - cinema
+      - cinemas
+      - visitor attraction
+      - visitor attractions
+      - heritage site
+      - zoo
+      - racecourse
+      - ski resort
+    # Sample 2026-11-06: bare "attraction(s)" matched media firms (NBCUniversal, ILM, Garena); dropped.
+    people_titles:
+      - Venue Director
+      - Venue Manager
+      - Facilities
+      - Estates
+      - Car Park
+      - Parking
+      - Sustainability
+      - Head of Property
+      - Energy
+
+  - name: Hospitals & health
+    group: 1. Sites - destinations
+    priority: Medium
+    notes: Sheet - car parks for staff and visitors, plus fleets.
+    industry:
+      - Hospitals and Health Care
+      - Hospitals
+      - Health and Human Services
+    description:
+      - hospital
+      - hospitals
+      - NHS trust
+      - NHS foundation trust
+      - health system
+      - health systems
+      - healthcare system
+      - medical center
+      - medical centre
+      - health board
+    # Sample 2026-11-06: insurers, medtech and distributors (UnitedHealth, Cigna, GE HealthCare,
+    # J&J MedTech, Cardinal Health) matched "health system". They are not sites.
+    description_not:
+      - health insurance
+      - health insurer
+      - health plan
+      - health plans
+      - medical technology
+      - medtech
+      - medical devices
+      - pharmaceutical
+      - pharmaceuticals
+      - distributor
+    people_titles:
+      - Estates
+      - Facilities
+      - Transport
+      - Travel Plan
+      - Parking
+      - Car Park
+      - Sustainability
+      - Capital Projects
+      - Energy
+      - Fleet
+
+  - name: Universities, colleges & schools
+    group: 1. Sites - destinations
+    priority: Medium
+    notes: Sheet - US school districts also run bus fleets. Researchers and lecturers are not buyers.
+    industry:
+      - Higher Education
+      - Education Administration Programs
+      - Primary and Secondary Education
+    description:
+      - university
+      - universities
+      - college
+      - colleges
+      - school district
+      - school districts
+      - academy trust
+      - multi-academy trust
+      - campus
+    people_titles:
+      - Estates
+      - Facilities
+      - Campus Operations
+      - Sustainability
+      - Transportation Director
+      - Transport Manager
+      - Parking
+      - Capital Projects
+      - Energy Manager
+      - Head of Energy
+
+  - name: Workplaces & offices
+    group: 1. Sites - destinations
+    priority: Medium
+    notes: Sheet - facilities management firms run sites for clients.
+    industry:
+      - Real Estate
+      - Commercial Real Estate
+      - Leasing Non-residential Real Estate
+      - Facilities Services
+    description:
+      - office building
+      - office buildings
+      - office portfolio
+      - office space
+      - office campus
+      - business park
+      - business parks
+      - science park
+      - REIT
+      - workplace
+      - facilities management
+      - facility management
+      - integrated facilities
+    people_titles:
+      - Workplace
+      - Facilities
+      - Property
+      - Real Estate
+      - Portfolio
+      - ESG
+      - Net Zero
+      - Energy
+
+  - name: Transport hubs
+    group: 1. Sites - destinations
+    priority: Medium
+    notes: Sheet - airports and ground handling only, exclude airlines. Airlines can still match on
+      airport wording; flagged for the review.
+    industry:
+      - Airlines and Aviation
+      - Rail Transportation
+      - Maritime Transportation
+      - Transportation, Logistics, Supply Chain and Storage
+    description:
+      - airport
+      - airports
+      - airport operator
+      - ground handling
+      - railway station
+      - railway stations
+      - rail station
+      - train station
+      - park and ride
+      - port authority
+      - port operator
+      - seaport
+      - ferry terminal
+      - ferry
+      - ferries
+      - harbour
+      - harbor
+    # Sample 2026-11-06: airlines filled the list (they have Ground Operations / Property /
+    # Sustainability staff too). The persona is now the airport-only landside roles, and there is
+    # no 1,000+ companion (it would add every big airline back).
+    people_titles:
+      - Car Parks
+      - Car Park
+      - Parking
+      - Landside
+      - Surface Access
+      - Ground Transportation
+    persona_companion: false
+
+  # =====================================================================
+  # 2. Sites - homes (drive-from)
+  # =====================================================================
+  - name: Multi-family / MDU & flats
+    group: 2. Sites - homes (drive-from)
+    priority: High
+    industry:
+      - Real Estate
+      - Leasing Residential Real Estate
+      - Real Estate and Equipment Rental Services
+    description:
+      - apartment
+      - apartments
+      - apartment communities
+      - multifamily
+      - multi-family
+      - MDU
+      - residential property
+      - residential properties
+      - residential portfolio
+      - rental homes
+      - residential lettings
+    # Sample 2026-11-06: portals, data firms, brokers and homebuilders (Zillow, CoStar, Redfin,
+    # Coldwell Banker, Lennar, Taylor Wimpey). Sheet: homebuilders OUT.
+    description_not:
+      - brokerage
+      - brokerages
+      - marketplace
+      - real estate agents
+      - realtor
+      - realtors
+      - homebuilder
+      - homebuilders
+      - home builder
+      - home builders
+      - housebuilder
+      - housebuilders
+    people_titles:
+      - Asset Management
+      - Asset Manager
+      - Head of Property
+      - Technical Director
+      - Resident Services
+      - Sustainability
+      - Energy
+
+  - name: Build-to-rent
+    group: 2. Sites - homes (drive-from)
+    priority: High
+    industry:
+      - Real Estate
+      - Leasing Residential Real Estate
+    description:
+      - build to rent
+      - build-to-rent
+      - BTR
+      - single-family rental
+      - single family rental
+      - private rented sector
+
+  - name: Housing associations & social housing
+    group: 2. Sites - homes (drive-from)
+    priority: Medium
+    industry:
+      - Housing and Community Development
+      - Non-profit Organizations
+      - Real Estate
+    description:
+      - housing association
+      - housing associations
+      - social housing
+      - housing authority
+      - public housing
+      - housing provider
+      - housing cooperative
+      - registered provider
+    # Sample 2026-11-06: Taylor Wimpey and Peruvian developers matched; homebuilders are OUT.
+    description_not:
+      - homebuilder
+      - homebuilders
+      - housebuilder
+      - housebuilders
+      - real estate developer
+      - inmobiliaria
+
+  - name: Condo associations & HOAs (US)
+    group: 2. Sites - homes (drive-from)
+    priority: Low
+    notes: Sheet - US only. Homebuilders are OUT (installers fit chargers on new builds).
+    countries:
+      - United States
+    industry:
+      - Real Estate
+      - Civic and Social Organizations
+    description:
+      - HOA
+      - homeowners association
+      - homeowners associations
+      - condominium association
+      - condo association
+      - community association
+      - community associations
+      - association management
+    description_not:
+      - homebuilder
+      - homebuilders
+
+  # =====================================================================
+  # 3. Forecourts & retail
+  # =====================================================================
+  - name: Fuel retail & forecourts
+    group: 3. Forecourts & retail
+    priority: High
+    notes: Sheet - converting petrol/diesel sites to charging.
+    industry:
+      - Retail Gasoline
+      - Oil and Gas
+      - Wholesale Petroleum and Petroleum Products
+      - Retail
+    description:
+      - forecourt
+      - forecourts
+      - fuel station
+      - fuel stations
+      - petrol station
+      - petrol stations
+      - gas station
+      - gas stations
+      - service station
+      - service stations
+      - filling station
+      - filling stations
+      - truck stop
+      - truck stops
+      - travel center
+      - travel centers
+      - service area
+      - service areas
+      - motorway services
+      - fuel retail
+      - fuel retailer
+    people_titles:
+      - Forecourt
+      - Fuel
+      - Network Development
+      - Site Development
+      - Property
+      - New Energies
+      - Future Energy
+      - eMobility
+      - E-Mobility
+      - EV
+
+  - name: Supermarkets & grocery
+    group: 3. Forecourts & retail
+    priority: High
+    industry:
+      - Retail Groceries
+      - Food and Beverage Retail
+      - Retail
+    description:
+      - supermarket
+      - supermarkets
+      - grocery
+      - groceries
+      - grocer
+      - grocers
+      - hypermarket
+      - hypermarkets
+      - food retailer
+    people_titles:
+      - Property
+      - Estates
+      - Energy
+      - Sustainability
+      - Car Park
+      - Store Development
+      - Net Zero
+      - Real Estate
+
+  - name: Quick-service & drive-through
+    group: 3. Forecourts & retail
+    priority: Medium
+    industry:
+      - Restaurants
+      - Food and Beverage Services
+    description:
+      - drive-thru
+      - drive-through
+      - drive thru
+      - QSR
+      - quick service restaurant
+      - quick-service restaurant
+      - restaurant chain
+      - fast food
+      - franchisee
+    people_titles:
+      - Property
+      - Real Estate
+      - Estates
+      - Site Development
+      - Energy
+      - Sustainability
+
+  - name: Big-box & DIY retail
+    group: 3. Forecourts & retail
+    priority: Medium
+    industry:
+      - Retail
+      - Retail Office Equipment
+      - Retail Building Materials and Garden Equipment
+      - Retail Furniture and Home Furnishings
+    description:
+      - DIY
+      - home improvement
+      - big box
+      - big-box
+      - retail park
+      - hardware store
+      - hardware stores
+      - builders merchant
+      - warehouse club
+      - department store
+      - department stores
+      - home centre
+      - home center
+      - garden centre
+      - garden centres
+    people_titles:
+      - Property
+      - Real Estate
+      - Estates
+      - Energy
+      - Sustainability
+      - Car Park
+
+  # =====================================================================
+  # 4. Fleets
+  # =====================================================================
+  - name: Logistics, haulage & supply chain
+    group: 4. Fleets
+    priority: High
+    notes: Sheet - large HGV fleets down to small logistics firms. The persona (Fleet / Transport /
+      Depot ...) keeps asset-light forwarders and brokers out.
+    industry:
+      - Truck Transportation
+      - Transportation, Logistics, Supply Chain and Storage
+      - Warehousing and Storage
+      - Wholesale
+    description:
+      - logistics
+      - haulage
+      - haulier
+      - hauliers
+      - freight
+      - 3PL
+      - distribution
+      - trucking
+      - road transport
+      - road haulage
+    people_titles:
+      - Fleet
+      - Transport Manager
+      - Head of Transport
+      - Depot
+      - Decarbonisation
+      - Decarbonization
+      - Electrification
+      - EV
+      - Sustainability
+
+  - name: Parcel & home delivery
+    group: 4. Fleets
+    priority: High
+    notes: Sheet - links to Home Delivery World.
+    # Sample 2026-11-06: Retail let in shops that offer home delivery (Primark, Petz, Cobasi);
+    # dropped. Grocers' own fleets are reached through Supermarkets & grocery.
+    industry:
+      - Freight and Package Transportation
+      - Transportation, Logistics, Supply Chain and Storage
+    description:
+      - parcel
+      - parcels
+      - courier
+      - couriers
+      - last mile
+      - last-mile
+      - home delivery
+      - grocery delivery
+      - express delivery
+      - same-day delivery
+    people_titles:
+      - Fleet
+      - Transport
+      - Depot
+      - Last Mile
+      - Electrification
+      - Sustainability
+      - EV
+
+  - name: Bus, coach & public transport
+    group: 4. Fleets
+    priority: High
+    industry:
+      - Urban Transit Services
+      - Ground Passenger Transportation
+    description:
+      - bus
+      - buses
+      - coach
+      - coaches
+      - bus operator
+      - transit agency
+      - transit authority
+      - transport authority
+      - public transport
+      - public transit
+      - tram
+      - trams
+    # Sample 2026-11-06: Lyft matched on transit wording; ride-hail has its own sub-segment.
+    description_not:
+      - rideshare
+      - ride-hailing
+      - ride-sharing
+
+  # A "transit agencies" search on Government Administration was tried and dropped (sample
+  # 2026-11-06): it returned whole cities and states (DfT, City of Seattle, State of Ohio), which
+  # belong to 5. Government; agencies proper are typed Urban Transit Services (MTA, CTA, TTC).
+
+  - name: School & employee buses
+    group: 4. Fleets
+    priority: Medium
+    industry:
+      - School and Employee Bus Services
+      - Ground Passenger Transportation
+    description:
+      - school bus
+      - school buses
+      - student transportation
+      - pupil transport
+      - home to school
+      - employee shuttle
+      - staff transport
+      - shuttle
+
+  - name: Taxi, private hire & ride-hail
+    group: 4. Fleets
+    priority: High
+    notes: Sheet - also drivers charging at depots and hubs.
+    industry:
+      - Taxi and Limousine Services
+      - Ground Passenger Transportation
+      - Technology, Information and Internet
+    description:
+      - taxi
+      - taxis
+      - private hire
+      - ride-hail
+      - ride-hailing
+      - ride hailing
+      - chauffeur
+      - minicab
+      - limousine
+    # Sample 2026-11-06: "taxi" also means aircraft taxiing (ADB SAFEGATE); bare "cab" dropped.
+    description_not:
+      - airfield
+      - aircraft
+      - airport lighting
+
+  - name: Car rental & leasing
+    group: 4. Fleets
+    priority: High
+    notes: Sheet - moved from sell side.
+    industry:
+      - Transportation, Logistics, Supply Chain and Storage
+      - Leasing Non-residential Real Estate
+      - Financial Services
+      - Equipment Rental Services
+      - Retail Motor Vehicles
+    description:
+      - car rental
+      - car hire
+      - vehicle rental
+      - vehicle leasing
+      - fleet leasing
+      - car leasing
+      - contract hire
+      - car subscription
+      - van rental
+      - van hire
+      - leasing company
+
+  - name: Blue light - ambulance, fire, police
+    group: 4. Fleets
+    priority: Medium
+    notes: Sheet - police included (blue light).
+    industry:
+      - Ambulance Services
+      - Public Safety
+      - Law Enforcement
+    # Sample 2026-11-06: Government Administration let in ministries, cities and EU bodies (Home
+    # Office, City of Toronto, Council of the EU) and is dropped; vendors (Axon) are excluded.
+    description:
+      - ambulance
+      - ambulance service
+      - fire and rescue
+      - fire department
+      - fire service
+      - fire brigade
+      - police
+      - police force
+      - police department
+      - sheriff
+      - emergency services
+      - emergency medical services
+    description_not:
+      - software
+      - technology leader
+      - technology company
+      - manufacturer
+    people_titles:
+      - Fleet
+      - Transport
+      - Workshop
+      - Estates
+      - Sustainability
+      - Head of Logistics
+    persona_companion: false
+
+  - name: Municipal & council fleets
+    group: 4. Fleets
+    priority: Medium
+    # Sample 2026-11-06: Government Administration returned EU bodies and UK ministries, not
+    # council fleets; dropped (councils are 5. Government, whose persona includes fleet titles).
+    industry:
+      - Waste Collection
+      - Waste Treatment and Disposal
+      - Environmental Services
+      - Utilities Administration
+    description:
+      - refuse
+      - refuse collection
+      - waste collection
+      - waste management
+      - recycling
+      - highways maintenance
+      - street cleaning
+      - public works
+      - municipal services
+    description_not:
+      - consultancy
+      - consulting
+      - European Union
+      - European Commission
+    people_titles:
+      - Fleet
+      - Transport
+      - Depot
+      - Waste Services
+      - Sustainability
+
+  - name: Service, utility & corporate fleets
+    group: 4. Fleets
+    priority: Medium
+    industry:
+      - Telecommunications
+      - Utilities
+      - Facilities Services
+      - Construction
+    description:
+      - field service
+      - field services
+      - field engineers
+      - field engineer
+      - service engineers
+      - mobile engineers
+      - field workforce
+      - van fleet
+      - company car
+      - company cars
+    people_titles:
+      - Fleet
+      - Mobility
+      - Company Car
+      - Electrification
+      - EV
+
+  - name: Vehicle OEMs & fleet sales
+    group: 4. Fleets
+    priority: Medium
+    notes: Sheet - moved from sell side. OEMs partner on charging for their fleet customers.
+    industry:
+      - Motor Vehicle Manufacturing
+    description:
+      - OEM
+      - automaker
+      - automotive manufacturer
+      - car manufacturer
+      - vehicle manufacturer
+      - truck manufacturer
+      - van manufacturer
+      - bus manufacturer
+      - commercial vehicles
+      - electric vehicles
+      - fleet sales
+    people_titles:
+      - Fleet Sales
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Energy Services
+      - EV
+
+  # =====================================================================
+  # 5. Government. Title keywords come from the tab's GOVERNMENT BY GEO block
+  # (UK / US / Canada / Latin America / Europe), unioned for the company filter.
+  # =====================================================================
+  - name: Local / municipal authorities
+    group: 5. Government
+    priority: High
+    notes: Sheet - own public car parks, kerbside, planning and permits.
+    industry:
+      - Government Administration
+      - Public Policy Offices
+      - Transportation Programs
+    # Sample 2026-11-06: bare council / county / municipal / borough matched national agencies
+    # (HSE, Cabinet Office, European Patent Office); only local-government phrases are kept, and
+    # there is no 1,000+ companion (it would add every big ministry back).
+    description:
+      - city council
+      - county council
+      - borough council
+      - district council
+      - town council
+      - municipality
+      - municipalities
+      - city of
+      - town of
+      - county of
+      - local authority
+      - local government
+      - county government
+      - combined authority
+      - commune
+      - comune
+      - gemeente
+      - kommune
+      - ayuntamiento
+      - prefeitura
+      - municipio
+      - gmina
+    description_not:
+      - European Union
+      - European Commission
+      - ministry
+      - federal agency
+      # 2nd sample 2026-11-06: US federal bodies (National Park Service, EPA, USDA, BLM) still matched.
+      - federal government
+      - executive agency
+      - national park
+      - national parks
+    persona_companion: false
+    people_titles: &gov_titles
+      - EV Infrastructure
+      - EV Project
+      - EV Program
+      - EV Programme
+      - LEVI
+      - Transport Planner
+      - Transport Planning
+      - Transportation Planning
+      - Transportation Electrification
+      - Head of Highways
+      - Street Works
+      - Parking Services
+      - Parking
+      - Climate
+      - Net Zero
+      - Sustainability
+      - Fleet Services
+      - Fleet
+      - Public Works
+      - Permitting
+      - Right-of-Way
+      - Electromovilidad
+      - Eletromobilidade
+      - Movilidad
+      - Mobility
+      - eMobility
+      - E-Mobility
+
+  - name: Regional, state & national
+    group: 5. Government
+    priority: High
+    notes: Sheet (US) - check the status of federal EV funding before targeting federal.
+    industry:
+      - Government Administration
+      - Transportation Programs
+      - Public Policy Offices
+    description:
+      - department of transport
+      - department of transportation
+      - state DOT
+      - ministry of transport
+      - ministry of energy
+      - ministry of environment
+      - ministry of infrastructure
+      - transport ministry
+      - energy ministry
+      - energy office
+      - state energy office
+      - national highways
+      - highways agency
+      - highway administration
+      - road authority
+      - roads authority
+      - transport agency
+      - transportation agency
+      - energy agency
+      - public utility commission
+      - public utilities commission
+      - utilities commission
+      - mobility agency
+    # Sample 2026-11-06: bare "ministry" / "state government" returned foreign affairs, justice,
+    # defence and labour ministries; only transport / energy / environment bodies are kept.
+    description_not:
+      - European Union
+      - European Commission
+    persona_companion: false
+    people_titles: *gov_titles
+
+  # =====================================================================
+  # 6. Parking operators. Persona = parking staff, which is what makes a company a parking
+  # operator rather than a landlord that mentions parking.
+  # =====================================================================
+  - name: Car park operators
+    group: 6. Parking operators
+    priority: High
+    notes: Sheet - many run car parks for local authorities.
+    industry:
+      - Real Estate
+      - Facilities Services
+      - Transportation, Logistics, Supply Chain and Storage
+      - Leasing Non-residential Real Estate
+    description:
+      - parking
+      - car park
+      - car parks
+      - parking operator
+      - parking garage
+      - parking garages
+      - parking management
+      - parking facilities
+      - valet parking
+    people_titles:
+      - Parking
+      - Car Park
+      - Car Parks
+    # The parking persona IS what makes this list; without it the 1,000+ companion would be every
+    # big landlord that mentions parking.
+    persona_companion: false
+
+  # =====================================================================
+  # 7. Real estate
+  # =====================================================================
+  - name: Developers, REITs & landlords
+    group: 7. Real estate
+    priority: Medium
+    notes: Sheet - construction contractors removed.
+    industry:
+      - Real Estate
+      - Commercial Real Estate
+      - Real Estate Agents and Brokers
+      - Investment Management
+      - Leasing Non-residential Real Estate
+      - Leasing Residential Real Estate
+    description:
+      - property developer
+      - property developers
+      - real estate developer
+      - property development
+      - real estate development
+      - REIT
+      - real estate investment trust
+      - property investment
+      - real estate investment
+      - landlord
+      - landlords
+      - property portfolio
+    # Sample 2026-11-06: brokers, data firms and associations (Marcus & Millichap, Newmark, CoStar,
+    # Urban Land Institute).
+    description_not:
+      - brokerage
+      - brokerages
+      - marketplace
+      - realtor
+      - realtors
+      - membership organization
+      - nonprofit
+    people_titles:
+      - Development Director
+      - Head of Development
+      - Asset Manager
+      - Asset Management
+      - Portfolio
+      - Real Estate Director
+      - Property Director
+      - ESG
+      - Sustainability
+      - Energy
+
+  # =====================================================================
+  # 8. Energy & utilities. Electricity wording only (the Solar sample let water and gas
+  # utilities in on generic "utility" wording).
+  # =====================================================================
+  - name: Grid operators (gatekeepers)
+    group: 8. Energy & utilities
+    priority: Medium
+    notes: Sheet - don't buy chargers but gate every site and fleet project.
+    industry:
+      - Utilities
+      - Electric Power Transmission, Control, and Distribution
+      - Utilities Administration
+    description:
+      - DNO
+      - DSO
+      - TSO
+      - distribution network
+      - distribution network operator
+      - distribution system operator
+      - transmission system operator
+      - electric utility
+      - electricity distribution
+      - power distribution
+      - electric cooperative
+      - electric co-op
+      - municipal utility
+      - grid operator
+      - electricity network
+      - power grid
+    # Sample 2026-11-06: grid-equipment vendors (Hitachi Energy, Schweitzer Engineering Labs).
+    description_not:
+      - manufacturer
+      - manufacturers
+      - manufactures
+      - technology leader
+
+  - name: Utilities running own networks or fleets
+    group: 8. Energy & utilities
+    priority: Medium
+    notes: Sheet - their retail/tariff arms are sell side; CPOs proper are sell side (tab notes).
+    industry:
+      - Utilities
+      - Electric Power Generation
+      - Renewable Energy Power Generation
+    description:
+      - charging network
+      - eMobility
+      - e-mobility
+      - EV charging
+      - electric vehicle charging
+      - charge point
+      - charge points
+      - charging stations
+      - public charging
+
+  # =====================================================================
+  # 9. Investors & financiers
+  # =====================================================================
+  - name: Infrastructure funds, PE, VC, pensions
+    group: 9. Investors & financiers
+    priority: Medium
+    notes: Sheet - EUR 2.2bn of CPO financing since Jan 2025; the lenders and equity behind
+      Ionity, Electra, Believ, InstaVolt, Fastned, GreenWay, Osprey.
+    anchor: transition
+    industry:
+      - Venture Capital and Private Equity Principals
+      - Investment Management
+      - Capital Markets
+    description:
+      - infrastructure fund
+      - infrastructure funds
+      - infrastructure investor
+      - infrastructure investment
+      - private equity
+      - venture capital
+      - pension fund
+      - pension funds
+      - infrastructure equity
+      - infrastructure debt
+      - energy transition fund
+      - climate fund
+
+  - name: Banks & project finance
+    group: 9. Investors & financiers
+    priority: Medium
+    industry:
+      - Banking
+      - Investment Banking
+      - Financial Services
+    description:
+      - project finance
+      - green loan
+      - green loans
+      - infrastructure finance
+      - green finance
+      - sustainable finance
+      - energy finance
+      - renewable energy finance
+
+  # =====================================================================
+  # 10. Installers (EV anchor: they must mention EV work)
+  # =====================================================================
+  - name: Electrical & EV installers
+    group: 10. Installers
+    priority: Medium
+    notes: Sheet - install for site owners, fleets and new builds. Installers only (no makers).
+    anchor: ev
+    industry:
+      - Specialty Trade Contractors
+      - Building Equipment Contractors
+      - Construction
+      - Electrical Equipment Manufacturing
+    description:
+      - electrical contractor
+      - electrical contractors
+      - electrician
+      - electricians
+      - electrical installation
+      - electrical installations
+      - electrical services
+      - EV installer
+      - EV installers
+      - charge point installer
+      - charge point installation
+      - EV charger installation
+      - EV charging installation
+    description_not: &makers
+      - manufacturer
+      - manufacturers
+      - manufacturing
+      - manufactures
+
+  - name: Solar & MEP installers moving into EV
+    group: 10. Installers
+    priority: Medium
+    anchor: ev
+    industry:
+      - Solar Electric Power Generation
+      - Renewable Energy Equipment Manufacturing
+      - Renewable Energy Semiconductor Manufacturing
+      - Renewables & Environment
+      - Services for Renewable Energy
+      - Building Equipment Contractors
+    description:
+      - solar installer
+      - solar installers
+      - solar installation
+      - solar installations
+      - PV installer
+      - MEP
+      - MEP contractor
+      - mechanical and electrical
+      - building services
+    description_not: *makers

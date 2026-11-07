@@ -3,6 +3,14 @@
 A single central "have I seen this record before?" ledger for hundreds of Clay
 tables.
 
+> **This directory is the Labs ledger.** The EVCharge ICP has its own pair of
+> tables in the *same* Supabase project — see [`evcharge/`](evcharge/README.md).
+> They are prefixed (`evcharge_company_ledger`, `evcharge_people_ledger`) with
+> their own RPCs, and reuse the normalizers defined here rather than
+> redefining them, so `02_functions.sql` below must be applied first. The two
+> verticals dedupe independently by design: a company worked under Labs is
+> still new to EVCharge.
+
 | Ledger | Identity key | Payload (first sighting) | Plus |
 |---|---|---|---|
 | `people_ledger` | `linkedin_key` (normalized `/in/` slug) | `"Full Name"`, `"Linkedin Profile"` | `first_seen` |

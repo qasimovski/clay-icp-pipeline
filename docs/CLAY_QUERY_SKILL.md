@@ -3,6 +3,12 @@ name: clay-search-query
 description: Convert natural-language audience descriptions — including job postings, briefs, and ICP notes — into Clay search queries over people, companies, and jobs. Use when the user wants to write or refine a Clay search query, or describes leads, companies, candidates, or job postings they want to find in Clay.
 ---
 
+<!-- Refreshed 2026-11-05 from `clay searches query-mode reference` (CLI 1.12.0). Re-run that command and replace the body below the frontmatter to update. -->
+---
+name: clay-search-query
+description: Convert natural-language audience descriptions — including job postings, briefs, and ICP notes — into Clay search queries over people and companies. Use when the user wants to write or refine a Clay search query, or describes leads, companies, or candidates they want to find in Clay.
+---
+
 # Clay search query reference
 
 Use this reference to author a Clay advanced search query.
@@ -17,14 +23,14 @@ External usage:
 
 ## Context
 
-You generate Clay search queries for Clay Search — a unified store of people, companies, jobs, and work experiences. Clay is a data platform for people and company intelligence.
+You generate Clay search queries for Clay Search — a unified store of people, companies, and work experiences, with job postings reachable as filters on either. Clay is a data platform for people and company intelligence.
 
 ## Dataset Capabilities
 
 The Clay Search dataset covers:
 - People: profile data, work experience history, and education history
 - Companies: company profile data, derived classifications, and technographics
-- Jobs: open job postings, plus historical postings that closed within the last 6 months
+- Job postings (as filters on people and companies): open postings, plus historical postings that closed within the last 6 months
 
 See the field lists below for the queryable fields.
 
@@ -37,7 +43,7 @@ The Clay Search dataset CANNOT filter by (would require adding extra enrichments
 
 Preview/output boundary:
 - This skill is only for converting natural-language input (including job postings, briefs, and ICP notes) into Clay search query filters.
-- If the user asks for any additional output data (emails, phone numbers, revenue details, funding details, tech stack columns, custom research, etc.), do NOT encode that as a Clay search query filter unless it is also a genuine filter criterion. Tell the user the output or enrichment request was not captured by the query and would require adding extra enrichments once the search is run in Clay. If needed, use multiple boolean clauses or nested query blocks to structure complex searches and represent the user's intent more clearly.
+- If the user asks for any additional output data (emails, phone numbers, revenue details, tech stack columns, custom research, etc.), do NOT encode that as a Clay search query filter unless it is also a genuine filter criterion. Tell the user the output or enrichment request was not captured by the query and would require adding extra enrichments once the search is run in Clay. If needed, use multiple boolean clauses or nested query blocks to structure complex searches and represent the user's intent more clearly.
 
 If some requested criteria are not available but other meaningful criteria are available, still generate a valid query for the available criteria and tell the user what was not captured. Do not skip query generation unless no meaningful query can be produced.
 
@@ -54,7 +60,6 @@ Vocabulary:
 | --- | --- |
 | Find people, leads, candidates, employees, alumni | `people` |
 | Find accounts, companies, organizations, vendors | `companies` |
-| Find job postings, hiring roles, open roles | `jobs` |
 | Companies with people/jobs matching criteria | `companies` with `people.exists/count` or `jobs.exists/count` |
 | People at companies matching criteria | `people` with `experiences.any(... company.* ...)` |
 
@@ -64,7 +69,7 @@ Rules:
 - If the result entity is ambiguous and a query entity is already known, default to that entity.
 - Company attributes do NOT imply a companies result. For example, "people at fintech companies" returns people and filters via `experiences.any(... company.* ...)`.
 - People or role criteria do NOT imply a people result. For example, "companies with VP sales leaders" returns companies and filters via `people.exists(...)`.
-- Hiring/job criteria do NOT imply a jobs result. For example, "companies hiring engineers" returns companies and filters via `jobs.exists(...)`.
+- Job postings are never a result entity; hiring/job criteria filter people or companies. For example, "companies hiring engineers" returns companies and filters via `jobs.exists(...)`, and "people at companies hiring engineers" returns people and filters via `experiences.any(... company.jobs.any(...) ...)`.
 
 ### Partial and unsupported criteria
 
@@ -88,19 +93,16 @@ Rules:
 
 ### Low-coverage fields policy
 
-Low-coverage fields in Clay Search that should be treated as optional by default are: `latest_funding_type`, `latest_funding_date`, `funding_total_usd`, and `ai_business_types`.
+Low-coverage fields in Clay Search that should be treated as optional by default are: `ai_business_types`.
 
 When you filter on a low-coverage field, ALWAYS include an `is_null` fallback in the same logical block:
-- Equality/list match: `(latest_funding_type in ("Series A", "Series B") or latest_funding_type is_null)`
 - Text match: `(ai_business_types contains "B2B" or ai_business_types is_null)`
-- Date/number comparison: `(latest_funding_date >= "2025-01-01" or latest_funding_date is_null)`, `(funding_total_usd >= 5000000 or funding_total_usd is_null)`
-- Two-sided ranges on the same low-coverage field should still preserve the null fallback, e.g. `((funding_total_usd >= 10000000 and funding_total_usd <= 100000000) or funding_total_usd is_null)`.
 
 This "optional by default" behavior improves recall on sparse columns. Users can later remove the `is_null` clause for a stricter search.
 
 ### Value language
 
-Query values must be in English because the dataset is English-backed, regardless of the language the request is written in. Map enum values to their canonical English forms, and render free-text values (keywords, industries, locations, job titles, product/service concepts) in English — e.g. the French request "entreprises de logiciels en Allemagne" produces `industry in ("Software Development") and locations.any(country_name = "Germany")`, never `"logiciels"` or `"Allemagne"`. Keep user-supplied proper nouns exactly as given (company names, domains, LinkedIn URLs, and resource references like `@table(...)`). This governs only the wording of the values — it never removes a filter the user asked for. Capture every attribute the user specifies as its own filter, including attributes whose value happens to be the name of a language — e.g. the companies query "companies that employ Japanese speakers" still produces `people.exists(is_current = true and person.languages = "Japanese")` (current-employee scope per the tenure defaults below).
+Query values must be in English because the dataset is English-backed, regardless of the language the request is written in. Map enum values to their canonical English forms, and render free-text values (keywords, industries, locations, job titles, product/service concepts) in English — e.g. the French request "entreprises de logiciels en Allemagne" produces `industry in ("Software Development") and locations.any(is_headquarters = true and country_name = "Germany")`, never `"logiciels"` or `"Allemagne"`. Keep user-supplied proper nouns exactly as given (company names, domains, LinkedIn URLs, and resource references like `@table(...)`). This governs only the wording of the values — it never removes a filter the user asked for. Capture every attribute the user specifies as its own filter, including attributes whose value happens to be the name of a language — e.g. the companies query "companies that employ Japanese speakers" still produces `people.exists(is_current = true and person.languages = "Japanese")` (current-employee scope per the tenure defaults below).
 
 ### Role and tenure defaults
 
@@ -125,11 +127,11 @@ Only when the user **explicitly mentions stealth** add the stealth block, also j
 
 Stealth variant: `select from people where experiences.any(is_current = true and (job_title contains ("founder", "co-founder") or seniority = "Founder") and (company_name contains "stealth" or company_name is_null)) and (headline contains ("building", "building something new", "stealth") or about contains ("building", "building something new", "stealth"))`
 
-### Jobs defaults
+### Job posting defaults
 
-| User wording | Job scope |
+| User wording | Job posting scope (inside `jobs.exists` / `company.jobs.any`) |
 | --- | --- |
-| Generic job search or companies hiring for roles | include `job_still_open = true` |
+| Companies hiring for roles, people at companies hiring | include `job_still_open = true` |
 | Past, closed, historical postings | include `job_still_open = false` when closed-only; otherwise use the requested date/history filters |
 | Hiring activity over a time range | do not force `job_still_open = true`; use the date/history fields requested |
 
@@ -143,7 +145,7 @@ Stealth variant: `select from people where experiences.any(is_current = true and
 
 query         = mode "from" entity where? limit_by? limit?
 mode          = "select" | "count"
-entity        = "people" | "companies" | "jobs"
+entity        = "people" | "companies"
 where         = "where" predicate
 limit_by      = "limit" POSITIVE_INTEGER "by" "clay_company_id"
 limit         = "limit" INTEGER
@@ -176,15 +178,15 @@ BOOLEAN       = "true" | "false"
 ## Operators
 
 - "contains" is token-based (whole word match), NOT substring. e.g. description contains "engineer" matches "Software Engineer" but not "engineering".
-- "contains" also accepts a parenthesized list to match ANY of several phrases on the **same field**: description contains ("saas", "fintech") means description contains "saas" OR description contains "fintech". Applies to text fields like description, headline, about, location, tuple subfields like city, etc. **Always** prefer the list form over repeating the field with "or": use field contains ("a", "b"), NOT (field contains "a" or field contains "b"). Prefer `is_similar_to` over `contains` for job_title (or `=`/`in` for explicit exact-match asks).
+- "contains" also accepts a parenthesized list to match ANY of several phrases on the **same field**: description contains ("saas", "fintech") means description contains "saas" OR description contains "fintech". Applies to text fields like description, headline, about, and free-text job location. **Always** prefer the list form over repeating the field with "or": use field contains ("a", "b"), NOT (field contains "a" or field contains "b"). Prefer `is_similar_to` over `contains` for job_title (or `=`/`in` for explicit exact-match asks). Structured city fields (`location_city`, `person.location_city`, and `locations.city`) use exact `=`/`in` matching; follow the Location filtering section.
 - "starts_with" and "ends_with" are substring-based.
 - "is_null" and "is_not_null" take no value.
 - "in" and "not_in" take a parenthesized list: field in ("a", "b", "c")
-- "is_similar_to" is fuzzy matching whose mechanism depends on the field. On job title fields (job_title) it expands the title into related synonyms, abbreviations, and variants (takes a parenthesized list). On semantic fields (products_and_services) it semantically matches what the company does/makes/sells; takes one or more non-empty string values in a parenthesized list, e.g. products_and_services is_similar_to ("b2b saas", "crm"). Multiple values within one comparison match companies similar to ANY value. For any other text field (description, headline, about, company_name, location, etc.) use `contains`. **Default to `is_similar_to` for job_title** (best recall). Switch off it only when the user specifies, or clearly seems to specify, literal matching: exact-title asks (e.g. "exact title", "exactly", "strict match") → `=` or `in (...)` ("exact title CTO" → `job_title = "CTO"`; "exactly a VP of Sales or CTO" → `job_title in ("VP of Sales", "CTO")`); a request phrased as literal keyword include/exclude lists (e.g. "title contains ...") → mirror it verbatim with `contains`, keeping every exclusion ("...contains software engineer or developer, not mechanical or civil" → `job_title contains ("software engineer", "developer") and not job_title contains ("mechanical", "civil")`); a role qualified by required words that must appear in the title (e.g. "engineers with automation in the title", "titles that contain X and Y") is also a literal-title signal → use `contains` and AND-join each required word as its own predicate so all must co-occur ("engineers with automation in the title" → `job_title contains "engineer" and job_title contains "automation"`). **Exception:** a jobs-result query (result entity = jobs) does not support `is_similar_to` on job title fields — use `contains` there (does not affect `jobs.exists(...)` inside a companies query, nor semantic fields).
+- "is_similar_to" is fuzzy matching whose mechanism depends on the field. On job title fields (job_title) it expands the title into related synonyms, abbreviations, and variants (takes a parenthesized list). On semantic fields (products_and_services) it semantically matches what the company does/makes/sells; takes one or more non-empty string values in a parenthesized list, e.g. products_and_services is_similar_to ("b2b saas", "crm"). Multiple values within one comparison match companies similar to ANY value. For any other text field (description, headline, about, company_name, location, etc.) use `contains`. **Default to `is_similar_to` for job_title** (best recall). Switch off it only when the user specifies, or clearly seems to specify, literal matching: exact-title asks (e.g. "exact title", "exactly", "strict match") → `=` or `in (...)` ("exact title CTO" → `job_title = "CTO"`; "exactly a VP of Sales or CTO" → `job_title in ("VP of Sales", "CTO")`); a request phrased as literal keyword include/exclude lists (e.g. "title contains ...") → mirror it verbatim with `contains`, keeping every exclusion ("...contains software engineer or developer, not mechanical or civil" → `job_title contains ("software engineer", "developer") and not job_title contains ("mechanical", "civil")`); a role qualified by required words that must appear in the title (e.g. "engineers with automation in the title", "titles that contain X and Y") is also a literal-title signal → use `contains` and AND-join each required word as its own predicate so all must co-occur ("engineers with automation in the title" → `job_title contains "engineer" and job_title contains "automation"`).
 - Boolean precedence: "and" binds tighter than "or". Use parentheses to override.
 - Preserve comparison boundaries exactly: "under", "below", "fewer than", "over", "above", and "more than" are strict (`<` or `>`); "at most" and "no more than" use `<=`; "at least" uses `>=`.
 - Enum fields only support "=", "!=", "in", and "not_in". Do NOT use numeric operators (<, <=, >, >=) or text-search operators (contains, starts_with, ends_with) on them — match against the listed values exactly.
-- Enum value sets are field-specific — always match against the values listed for that exact field. Both experience and job-posting entities have a `seniority` field with DIFFERENT value sets: experience seniority (e.g. "Entry", "Senior", "Intern / In Training") vs job-posting seniority (e.g. "Entry level", "Mid-Senior level", "Executive", "Intern"). Always use the values listed for the specific entity you are querying.
+- Enum value sets are field-specific — always match against the values listed for that exact field. Both experience and job-posting entities have a `seniority` field with DIFFERENT value sets: experience seniority (e.g. "Entry", "Senior", "Intern / In Training") vs job-posting seniority (e.g. "Entry level", "Mid-Senior level", "Executive", "Intern"). Always use the values listed for the specific field you are filtering on.
 - Display labels: Some enum values are shown with a display label in parentheses, e.g. `"1" (1 employee)`. The quoted string is the Clay search query value — always use it in `query`. The parenthesized label is the human-readable form — use it when explaining uncaptured criteria to the user.
 
 ## Where Semantics
@@ -199,7 +201,7 @@ BOOLEAN       = "true" | "false"
 
 ## Common query guardrails
 
-- Collapse same-field alternatives into one list instead of an OR chain: `in (...)` for normalized/enum fields, `contains (...)` for non-normalized text like `location_city`/`location_state`. Use `location_city contains ("New York", "Brooklyn")`, not `location_city = "New York" or location_city = "Brooklyn"`.
+- Collapse same-field alternatives into one list instead of an OR chain: `in (...)` for normalized/enum fields and structured city/state fields. Use `location_city in ("New York", "New York City", "Brooklyn")`, not `location_city = "New York" or location_city = "Brooklyn"`.
 - Do not include case-only duplicates in a value list; `contains`, `is_similar_to`, `=`, and `in` are case-insensitive on text fields. Use `job_title is_similar_to ("Sales")`, not `job_title is_similar_to ("sales", "Sales")`.
 - Never silently trim explicit user lists. If the user provided 12 domains, 9 countries, or 15 job-title phrases, keep all 12/9/15 values in Clay search query when those fields are expressible.
 - Never drop negation/exclusion clauses. If the user specifies `not (title contains "X")` or excludes certain titles, always preserve that exclusion in Clay search query — e.g. `not job_title is_similar_to ("X")`. The `is_similar_to` operator does NOT implicitly exclude unrelated titles; explicit exclusions must be kept.
@@ -210,7 +212,7 @@ BOOLEAN       = "true" | "false"
 - For role keywords, emit one case-insensitive title predicate using `is_similar_to`. Use `job_title is_similar_to ("Sales")`, not `job_title is_similar_to ("sales", "Sales")`. Prefer `is_similar_to` over `contains` for job_title by default. Switch off `is_similar_to` only when the user specifies (or seems to specify) literal matching: an explicit exact-title ask (use `=`/`in`, e.g. "exact title CTO" → `job_title = "CTO"`), or a request phrased as literal keyword include/exclude lists like "title contains ..." (use `contains`, keeping all exclusions).
 - Current-employer asks with explicit domains/LinkedIn URLs or resolvable household names use `clay.filter_to_companies((...))` at the top level — NOT `company.domain` inside `experiences.any(...)`.
 - Use `company.domain` inside `experiences.any(...)` only for former employers, "used to work at" asks, or any-tenure employer history.
-- For explicit city alternatives, use `location_city contains ("New York", "Brooklyn")`, not repeated OR conditions and not an `in (...)` list.
+- For explicit city alternatives, use `location_city in ("New York", "New York City", "Brooklyn")`, not repeated OR conditions.
 - There are no `first_name` or `last_name` fields. Use `full_name contains "Name"` when a name filter is expressible, or briefly tell the user exact first/last-name requirements were not represented.
 
 Experience `seniority` mapping:
@@ -229,18 +231,13 @@ Company similarity / vertical context inside people searches:
 - Default to `industry` for company vertical filtering. NEVER emit `ai_subindustries`, `ai_industries`, or `ai_revenue_streams` unless the user explicitly asks for that field or its values.
 - Exception: if the user explicitly asks in a follow-up refinement to narrow or exclude by specific subindustries, industries, or revenue streams, predicates on the matching AI-derived field are allowed.
 - If an initial (non-refinement) request names specific subindustries, map them to the closest `industry` values in first pass. That mapping is captured — do NOT tell the user the subindustry labels were uncaptured, and do NOT hedge that they were "broadly mapped", "can't be distinguished further", "partially included", or have "no dedicated label". To help the user narrow, offer subindustries as a follow-up question instead of a not-captured caveat.
+- When a companies query asks to return one or more specific companies by name, domain, LinkedIn URL, or pasted identifier list, treat it as exact-company inclusion and use exactly one inline `clay.include_company_identifiers((...))` call. This applies even when the user does not say "exact", "only", or "include" (for example, "find me Clay, Instantly, and HubSpot"). Do NOT use top-level `domain =` or `domain in (...)` for these asks, except to preserve distinct conditions paired with explicit domains: use the single inclusion call together with parenthesized `domain = ... and ...` branches, such as `clay.include_company_identifiers(("acme.com", "beta.com")) and ((domain = "acme.com" and industry = "Health Care") or (domain = "beta.com" and industry = "Financial Services"))`. Never flatten those branch-local conditions into shared OR lists.
+- `clay.include_company_identifiers` is companies-only and inline-list-only. It does not accept resource references. Never emit more than one call in a query; combine every exact identifier into one list of at most 1000 entries. For a larger list, do not generate a query. Tell the user: "Company identifier lists are limited to 1000 entries. Reduce the list and try again."
+- For explicit company exclusion lists, use exactly one inline `clay.exclude_company_identifiers((...))` call. Never emit `not clay.include_company_identifiers((...))`; use the canonical exclusion function directly.
 - For generic industry or vertical labels such as "SaaS", "tech", "fintech", "banking", or "healthcare", use `industry` first. For plain "fintech" with no narrower product words, use exactly `industry in ("Financial Services", "Banking")`; do not add `Capital Markets`, `Insurance`, or description keywords unless the user names those narrower categories.
-- Pre-IPO is not `Pre seed`. If the user asks for `Pre-IPO` and no exact enum value exists, omit it from `latest_funding_type` and briefly tell the user `Pre-IPO` was not represented.
-- Company location filtering uses the `locations` tuple array. Use `locations.any(country_name in ("China", "Brazil", "Nigeria"))` for country alternatives. Do not emit `locations.country_iso`; company `locations` has `country_name`, `city`, `state_or_province`, `postal_code`, `region`, and `is_headquarters` subfields.
-- For "headquartered in" or "HQ in" company location asks, include `is_headquarters = true` inside the same `locations.any(...)` predicate. For generic "companies in <country/city>" asks, do not add `is_headquarters`.
+- Company location filtering uses the `locations` tuple array. For generic location asks, use `locations.any(is_headquarters = true and country_name in ("China", "Brazil", "Nigeria"))` for country alternatives. Do not emit `locations.country_iso`; company `locations` has `country_name`, `city`, `state_or_province`, `postal_code`, `region`, and `is_headquarters` subfields.
+- Generic company location language such as "companies in", "based in", or "located in" defaults to headquarters: include `is_headquarters = true` inside the same `locations.any(...)` predicate. Omit the headquarters condition only when the user explicitly asks for an office, branch, physical presence, operating market, destination coverage, or served country.
 - Do not invent `name`, `slug`, `derived_description`, or `pattern_tags`. Use listed fields such as `domain`, `description`, `industry`, and `ai_business_types`.
-
-## Jobs query guardrails
-
-- Jobs have no bare `country` or `locality` fields. Use job `location` for posting-location filters.
-- For explicit job city alternatives, use `location contains ("New York", "Brooklyn")`, not repeated OR conditions and not bare `country`.
-- Employer-company country is not directly expressible in jobs queries with current scalar `company.*` fields; keep the job filters and briefly tell the user employer-country criteria were not represented.
-- Generic job searches default to `job_still_open = true`; keep that predicate unless the user explicitly asks for closed or historical postings.
 
 ## Field docs
 
@@ -281,13 +278,12 @@ Subfields:
 - employee_growth_6mo (number): Employee growth ratio (1.1 = +10% growth, 0.9 = −10% decline).
 - employee_growth_12mo (number): Employee growth ratio (1.1 = +10% growth, 0.9 = −10% decline).
 - employee_growth_24mo (number): Employee growth ratio (1.1 = +10% growth, 0.9 = −10% decline).
-- funding_total_usd (number): Total funding raised in USD.
 - annual_revenue (string, enum): Annual revenue bracket. Use = or in with exact bucket values, not numeric operators. Values: "0-500K" ($0–$500K), "500K-1M" ($500K–$1M), "1M-5M" ($1M–$5M), "5M-10M" ($5M–$10M), "10M-25M" ($10M–$25M), "25M-75M" ($25M–$75M), "75M-200M" ($75M–$200M), "200M-500M" ($200M–$500M), "500M-1B" ($500M–$1B), "1B-10B" ($1B–$10B), "10B-100B" ($10B–$100B), "100B-1T" ($100B+)
-- latest_funding_type (string, enum): Type of the most recent funding round. Values: "Angel", "Convertible note", "Corporate round", "Debt financing", "Equity crowdfunding", "Grant", "Initial coin offering", "Non equity assistance" (Non-equity assistance), "Post IPO debt" (Post-IPO debt), "Post IPO equity" (Post-IPO equity), "Post IPO secondary" (Post-IPO secondary), "Pre seed" (Pre-seed), "Private equity", "Product crowdfunding", "Secondary market", "Seed", "Series A", "Series B", "Series C", "Series D", "Series E", "Series F", "Series G", "Series H", "Series I", "Series J", "Series unknown", "Undisclosed"
 - ai_business_types (string): Derived business model type. LOW COVERAGE — treat as optional: always pair with an is_null fallback, e.g. (ai_business_types contains "B2B" or ai_business_types is_null). Use contains for matching. Common: "B2B", "B2C", "Nonprofit"
 - industry (string, enum): The company's main industry. This is the primary, structured way to filter companies by industry. Values: "Abrasives and Nonmetallic Minerals Manufacturing", "Accessible Architecture and Design", "Accommodation Services", "Accounting", "Administration of Justice", "Administrative and Support Services", "Advertising Services", "Agricultural Chemical Manufacturing", "Agriculture, Construction, Mining Machinery Manufacturing", "Air, Water, and Waste Program Management", "Airlines and Aviation", "Alternative Dispute Resolution", "Alternative Medicine", "Ambulance Services", "Amusement Parks and Arcades", "Animal Feed Manufacturing", "Animation", "Animation and Post-production", "Apparel Manufacturing", "Apparel and Fashion", "Appliances, Electrical, and Electronics Manufacturing", "Architectural and Structural Metal Manufacturing", "Architecture and Planning", "Armed Forces", "Artists and Writers", "Arts and Crafts", "Audio and Video Equipment Manufacturing", "Automation Machinery Manufacturing", "Automotive", "Aviation & Aerospace", "Aviation and Aerospace Component Manufacturing", "Baked Goods Manufacturing", "Banking", "Bars, Taverns, and Nightclubs", "Bed-and-Breakfasts, Hostels, Homestays", "Beverage Manufacturing", "Biomass Electric Power Generation", "Biotechnology", "Biotechnology Research", "Blockchain Services", "Blogs", "Boilers, Tanks, and Shipping Container Manufacturing", "Book Publishing", "Book and Periodical Publishing", "Breweries", "Broadcast Media Production and Distribution", "Building Construction", "Building Equipment Contractors", "Building Finishing Contractors", "Building Materials", "Building Structure and Exterior Contractors", "Business Consulting and Services", "Business Content", "Business Intelligence Platforms", "Business Supplies and Equipment", "Capital Markets", "Caterers", "Chemical Manufacturing", "Chemical Raw Materials Manufacturing", "Child Day Care Services", "Chiropractors", "Civic and Social Organizations", "Civil Engineering", "Claims Adjusting, Actuarial Services", "Clay and Refractory Products Manufacturing", "Climate Data and Analytics", "Climate Technology Product Manufacturing", "Coal Mining", "Collection Agencies", "Commercial Real Estate", "Commercial and Industrial Equipment Rental", "Commercial and Industrial Machinery Maintenance", "Commercial and Service Industry Machinery Manufacturing", "Communications Equipment Manufacturing", "Community Development and Urban Planning", "Community Services", "Computer Games", "Computer Hardware", "Computer Hardware Manufacturing", "Computer Networking", "Computer Networking Products", "Computer and Network Security", "Computers and Electronics Manufacturing", "Conservation Programs", "Construction", "Construction Hardware Manufacturing", "Consumer Electronics", "Consumer Goods", "Consumer Goods Rental", "Consumer Services", "Cosmetics", "Cosmetology and Barber Schools", "Courts of Law", "Credit Intermediation", "Dairy", "Dairy Product Manufacturing", "Dance Companies", "Data Infrastructure and Analytics", "Data Security Software Products", "Defense & Space", "Defense and Space Manufacturing", "Dentists", "Design", "Design Services", "Desktop Computing Software Products", "Digital Accessibility Services", "Distilleries", "E-Learning", "E-Learning Providers", "Economic Programs", "Education", "Education Administration Programs", "Education Management", "Electric Lighting Equipment Manufacturing", "Electric Power Generation", "Electric Power Transmission, Control, and Distribution", "Electrical Equipment Manufacturing", "Electronic and Precision Equipment Maintenance", "Embedded Software Products", "Emergency and Relief Services", "Engineering Services", "Engines and Power Transmission Equipment Manufacturing", "Entertainment", "Entertainment Providers", "Environmental Quality Programs", "Environmental Services", "Equipment Rental Services", "Events Services", "Executive Offices", "Executive Search Services", "Fabricated Metal Products", "Facilities Services", "Farming, Ranching, Forestry", "Farming", "Fashion Accessories Manufacturing", "Financial Services", "Fine Art", "Fine Arts Schools", "Fire Protection", "Fisheries", "Flight Training", "Food & Beverages", "Food and Beverage Manufacturing", "Food and Beverage Retail", "Food and Beverage Services", "Food Production", "Footwear Manufacturing", "Forestry and Logging", "Freight and Package Transportation", "Fruit and Vegetable Preserves Manufacturing", "Fundraising", "Funds and Trusts", "Furniture", "Furniture and Home Furnishings Manufacturing", "Gambling Facilities and Casinos", "Geothermal Electric Power Generation", "Glass Product Manufacturing", "Glass, Ceramics and Concrete Manufacturing", "Golf Courses and Country Clubs", "Government Administration", "Government Relations", "Government Relations Services", "Graphic Design", "Ground Passenger Transportation", "HVAC and Refrigeration Equipment Manufacturing", "Health and Human Services", "Health, Wellness and Fitness", "Higher Education", "Highway, Street, and Bridge Construction", "Historical Sites", "Holding Companies", "Home Health Care Services", "Horticulture", "Hospitality", "Hospitals", "Hospitals and Health Care", "Hotels and Motels", "Household Appliance Manufacturing", "Household Services", "Household and Institutional Furniture Manufacturing", "Housing Programs", "Housing and Community Development", "Human Resources", "Human Resources Services", "Hydroelectric Power Generation", "IT Services and IT Consulting", "IT System Custom Software Development", "IT System Data Services", "IT System Design Services", "IT System Installation and Disposal", "IT System Operations and Maintenance", "IT System Testing and Evaluation", "IT System Training and Support", "Import and Export", "Individual and Family Services", "Industrial Automation", "Industrial Machinery Manufacturing", "Industry Associations", "Information Services", "Information Technology and Services", "Insurance", "Insurance Agencies and Brokerages", "Insurance Carriers", "Insurance and Employee Benefit Funds", "Interior Design", "International Affairs", "International Trade and Development", "Internet Marketplace Platforms", "Internet News", "Internet Publishing", "Investment Advice", "Investment Banking", "Investment Management", "Janitorial Services", "Landscaping Services", "Language Schools", "Laundry and Drycleaning Services", "Law Enforcement", "Law Practice", "Leasing Non-residential Real Estate", "Leasing Residential Real Estate", "Leather Product Manufacturing", "Legal Services", "Legislative Offices", "Leisure, Travel & Tourism", "Libraries", "Loan Brokers", "Luxury Goods and Jewelry", "Machinery Manufacturing", "Manufacturing", "Maritime", "Maritime Transportation", "Market Research", "Marketing Services", "Mattress and Blinds Manufacturing", "Measuring and Control Instrument Manufacturing", "Meat Products Manufacturing", "Mechanical or Industrial Engineering", "Media & Telecommunications", "Media Production", "Medical Devices", "Medical Equipment Manufacturing", "Medical Practices", "Medical and Diagnostic Laboratories", "Mental Health Care", "Metal Ore Mining", "Metal Treatments", "Metal Valve, Ball, and Roller Manufacturing", "Metalworking Machinery Manufacturing", "Military and International Affairs", "Mining", "Mobile Computing Software Products", "Mobile Food Services", "Mobile Gaming Apps", "Motor Vehicle Manufacturing", "Motor Vehicle Parts Manufacturing", "Movies and Sound Recording", "Movies, Videos and Sound", "Museums", "Museums, Historical Sites, and Zoos", "Music", "Musicians", "Nanotechnology Research", "Natural Gas Distribution", "Newspaper Publishing", "Non-profit Organization Management", "Non-profit Organizations", "Nonmetallic Mineral Mining", "Nonresidential Building Construction", "Nuclear Electric Power Generation", "Nursing Homes and Residential Care Facilities", "Office Administration", "Office Furniture and Fixtures Manufacturing", "Oil and Gas", "Oil, Gas, and Mining", "Online Audio and Video Media", "Online Media", "Online and Mail Order Retail", "Operations Consulting", "Optometrists", "Outpatient Care Centers", "Outsourcing and Offshoring Consulting", "Outsourcing/Offshoring", "Packaging and Containers", "Packaging and Containers Manufacturing", "Paint, Coating, and Adhesive Manufacturing", "Paper and Forest Product Manufacturing", "Paper and Forest Products", "Performing Arts", "Performing Arts and Spectator Sports", "Periodical Publishing", "Personal Care Product Manufacturing", "Personal Care Services", "Personal and Laundry Services", "Pet Services", "Pharmaceutical Manufacturing", "Philanthropic Fundraising Services", "Philanthropy", "Photography", "Physical, Occupational and Speech Therapists", "Physicians", "Plastics Manufacturing", "Plastics and Rubber Product Manufacturing", "Political Organizations", "Primary Metal Manufacturing", "Primary and Secondary Education", "Printing Services", "Professional Organizations", "Professional Services", "Professional Training and Coaching", "Program Development", "Public Assistance Programs", "Public Health", "Public Policy", "Public Policy Offices", "Public Relations and Communications Services", "Public Safety", "Radio and Television Broadcasting", "Rail Transportation", "Railroad Equipment Manufacturing", "Ranching", "Real Estate", "Real Estate Agents and Brokers", "Real Estate and Equipment Rental Services", "Recreational Facilities", "Religious Institutions", "Renewable Energy Equipment Manufacturing", "Renewable Energy Power Generation", "Renewable Energy Semiconductor Manufacturing", "Renewables & Environment", "Repair and Maintenance", "Research", "Research Services", "Residential Building Construction", "Restaurants", "Retail", "Retail Apparel and Fashion", "Retail Appliances, Electrical, and Electronic Equipment", "Retail Art Dealers", "Retail Art Supplies", "Retail Books and Printed News", "Retail Building Materials and Garden Equipment", "Retail Florists", "Retail Furniture and Home Furnishings", "Retail Gasoline", "Retail Groceries", "Retail Health and Personal Care Products", "Retail Luxury Goods and Jewelry", "Retail Motor Vehicles", "Retail Musical Instruments", "Retail Office Equipment", "Retail Office Supplies and Gifts", "Retail Pharmacies", "Retail Recyclable Materials & Used Merchandise", "Reupholstery and Furniture Repair", "Robotics Engineering", "Rubber Products Manufacturing", "Satellite Telecommunications", "School and Employee Bus Services", "Seafood Product Manufacturing", "Securities and Commodity Exchanges", "Security Guards and Patrol Services", "Security Systems Services", "Security and Investigations", "Semiconductor Manufacturing", "Semiconductors", "Services for Renewable Energy", "Services for the Elderly and Disabled", "Sheet Music Publishing", "Shipbuilding", "Shuttles and Special Needs Transportation Services", "Sightseeing Transportation", "Soap and Cleaning Product Manufacturing", "Social Networking Platforms", "Software Development", "Solar Electric Power Generation", "Sound Recording", "Space Research and Technology", "Specialty Trade Contractors", "Spectator Sports", "Sporting Goods", "Sporting Goods Manufacturing", "Sports Teams and Clubs", "Sports and Recreation Instruction", "Spring and Wire Product Manufacturing", "Staffing and Recruiting", "Steam and Air-Conditioning Supply", "Strategic Management Services", "Subdivision of Land", "Sugar and Confectionery Product Manufacturing", "Surveying and Mapping Services", "Taxi and Limousine Services", "Technical and Vocational Training", "Technology, Information and Internet", "Technology, Information and Media", "Telecommunications", "Telecommunications Carriers", "Telephone Call Centers", "Temporary Help Services", "Textile Manufacturing", "Theater Companies", "Think Tanks", "Tobacco", "Tobacco Manufacturing", "Translation and Localization", "Transportation Equipment Manufacturing", "Transportation Programs", "Transportation, Logistics, Supply Chain and Storage", "Transportation/Trucking/Railroad", "Travel Arrangements", "Truck Transportation", "Trusts and Estates", "Turned Products and Fastener Manufacturing", "Urban Transit Services", "Utilities", "Utilities Administration", "Utility System Construction", "Vehicle Repair and Maintenance", "Venture Capital and Private Equity Principals", "Veterinary", "Veterinary Services", "Vocational Rehabilitation Services", "Warehousing", "Warehousing and Storage", "Waste Collection", "Waste Treatment and Disposal", "Water Supply and Irrigation Systems", "Water, Waste, Steam, and Air Conditioning Services", "Wellness and Fitness Services", "Wholesale", "Wholesale Alcoholic Beverages", "Wholesale Apparel and Sewing Supplies", "Wholesale Appliances, Electrical, and Electronics", "Wholesale Building Materials", "Wholesale Chemical and Allied Products", "Wholesale Computer Equipment", "Wholesale Drugs and Sundries", "Wholesale Food and Beverage", "Wholesale Footwear", "Wholesale Furniture and Home Furnishings", "Wholesale Hardware, Plumbing, Heating Equipment", "Wholesale Import and Export", "Wholesale Luxury Goods and Jewelry", "Wholesale Machinery", "Wholesale Metals and Minerals", "Wholesale Motor Vehicles and Parts", "Wholesale Paper Products", "Wholesale Petroleum and Petroleum Products", "Wholesale Raw Farm Products", "Wholesale Recyclable Materials", "Wind Electric Power Generation", "Wine and Spirits", "Wineries", "Wireless Services", "Wood Product Manufacturing", "Writing and Editing", "Zoos and Botanical Gardens"
+- naics_codes_2022 (string, enum, array): NAICS 2022 industry classification codes as numeric strings (2-6 digits). Matching is hierarchical: a code matches companies whose more specific codes fall under it (e.g. "5132" matches a company classified "513210"). Census publishes three 2-digit sectors as ranges: "31-33" (Manufacturing), "44-45" (Retail Trade), "48-49" (Transportation and Warehousing). Use = for one code, in for multiple, e.g. naics_codes_2022 in ("31-33", "541511"). Values: "11" (11: Agriculture, Forestry, Fishing and Hunting), "111" (111: Crop Production), "1111" (1111: Oilseed and Grain Farming), "11111" (11111: Soybean Farming), "111110" (111110: Soybean Farming), "11112" (11112: Oilseed (except Soybean) Farming), "111120" (111120: Oilseed (except Soybean) Farming), "11113" (11113: Dry Pea and Bean Farming), "111130" (111130: Dry Pea and Bean Farming), "11114" (11114: Wheat Farming), "111140" (111140: Wheat Farming), "11115" (11115: Corn Farming), "111150" (111150: Corn Farming), "11116" (11116: Rice Farming), "111160" (111160: Rice Farming), "11119" (11119: Other Grain Farming), "111191" (111191: Oilseed and Grain Combination Farming), "111199" (111199: All Other Grain Farming), "1112" (1112: Vegetable and Melon Farming), "11121" (11121: Vegetable and Melon Farming), …
+- hierarchy_status (string, enum): The company's position in a known corporate hierarchy. Use "Ultimate parent" for the top-level parent or "Subsidiary" for a company beneath an ultimate parent. Use = for one status or in for multiple, e.g. hierarchy_status in ("Subsidiary", "Ultimate parent"). Values: "Ultimate parent", "Subsidiary"
 - ai_industries (string, enum, array): AI-derived industry classification. Do NOT filter on this field unless the user explicitly asks for ai_industries — default vertical filtering uses industry. Use = for exact match, in for multiple. e.g. ai_industries = "Professional, Business and Legal Services". Values: "Agriculture, Forestry and Fisheries", "Automotive, Aerospace and Defense Manufacturing", "Education and Training", "Energy, Utilities and Environmental Services", "Finance and Insurance", "Healthcare and Life Sciences", "Hospitality, Food and Travel Services", "Industrial Manufacturing and Materials", "Media, Entertainment and Culture", "Non-Profit, Public Sector and Education (Non-Commercial)", "Personal and Home Services", "Professional, Business and Legal Services", "Real Estate and Construction", "Retail and Consumer Channels", "Software and IT", "Transportation and Logistics"
-- latest_funding_date (date): Date of last funding round.
 - ai_subindustries (string, enum, array): AI-derived subindustry classification. Use = for exact match, in for multiple. e.g. ai_subindustries = "AI and ML Platforms". Values: "AI and ML Platforms", "Agriculture and Forestry Software", "Blockchain and Web3", "Carriers and ISPs", "Cloud and Infrastructure Software", "Consumer Software", "Data and Analytics Software", "Developer Tools and Platforms", "Enterprise Software Solutions", "Financial Services Software", "Government and Public Sector Software", "Hardware and Networking", "Healthcare Software", "IoT and Embedded Systems Software", "IT Services and Cybersecurity", "Manufacturing Software", "Metaverse, AR/VR and Other Emerging Platforms", "Quantum Computing Software", "Real Estate and PropTech Software", "Retail and Ecommerce Software", "Security and Identity Software", "Biotechnology and Pharmaceuticals", "Digital Health and Telemedicine", "Hospitals, Clinics and Outpatient Care", "Medical Devices and Diagnostic Equipment", "Medical Testing and Clinical Laboratories", "Mental Health and Rehabilitation Services", "Pharma Distribution and CRO Services", "Banking and Lending", "Capital Markets and Cryptocurrency", "Cryptocurrency and Blockchain Services", "Financial Services Platforms", "Insurance and InsurTech", "Investment Management and WealthTech", "Venture Capital and Private Equity", "Electric Power and Grid Management", "Nuclear and Advanced Generation", "Oil and Gas Exploration, Production and Services", "Renewable Energy and Clean Tech", "Sustainability Tech and Environmental Consulting", "Water, Waste and Environmental Management", "3D Printing and Advanced Manufacturing", "Building Materials and Chemicals", "Consumer Goods and Appliances", "Electronics and Computer Equipment", "Food, Beverage and Tobacco Production", "Industrial Machinery and Equipment", "Mining, Metals and Natural Resources", "Architecture, Urban Planning and Green Building", "Commercial Real Estate Development and Leasing", "Construction and Civil Engineering Services", "Property and Facility Management", "Residential Real Estate Development and Brokerage", "Specialty Construction Products", "Automotive Service and Collision Repair", "Brick-and-Mortar Retail", "Media and Entertainment Retail", "Online Commerce and Marketplaces", "Retail Technology", "Specialty Auctions and Collectibles", "Wholesale and Distribution", "Autonomous Vehicles and Drone Delivery", "Car and Truck Rental", "Freight and Cargo", "Logistics Technology", "Passenger Transit and Mobility", "Warehousing, Fulfillment and 3PL Services", "Accounting, Audit and Financial Advisory", "Advertising, Marketing and Multimedia Design", "Defense and Government Services", "Facilities Management and Commercial Cleaning", "Human Resources, Staffing and Recruitment", "Legal Services and Regulatory Compliance", "Management Consulting and Strategy Consulting", "Translation, Document and Information Management", "Corporate Training and Learning and Development", "E-Learning Platforms and EdTech", "K-12 and Higher Education Institutions", "Test Prep, Tutoring and After-School Services", "Vocational Training and Certification Programs", "Digital Publishing and Streaming Platforms", "Film, Television and Broadcasting", "Gaming, Esports and Interactive Entertainment", "Live Events, Experiences and Ticketed Attractions", "Museums, Art Galleries and Cultural Preservation", "Music, Audio and Podcast Services", "Sports and Recreation", "Food and Beverage Services", "Hospitality and Lodging", "Travel Agencies and Leisure Services", "Funeral Homes and Related Services", "Home Services", "Personal Care and Wellness", "Veterinary Care and Pet Services", "AgriTech and Precision Farming", "Aquaculture and Fisheries", "Crop Farming and Livestock Production", "Farming Equipment and Supplies", "Forestry, Logging and Wood Products", "Mining and Extraction", "Aviation and Aerospace Component Manufacturing", "Automotive and Rental Retail", "Commercial Space Innovation", "Defense Systems and Marine Manufacturing", "Motor Vehicle and Parts Manufacturing", "Government Administration and Municipal Services", "NGOs, Charities and Community Organizations", "Public Healthcare and Social Services", "Public/Private Research Institutions and Educational Foundations", "Student Organizations and Campus Services"
 - ai_revenue_streams (string, enum, array): AI-derived revenue stream classification. Do NOT filter on this field unless the user explicitly asks for revenue streams. Use = for exact match, in for multiple. e.g. ai_revenue_streams = "SaaS". Values: "Professional Services", "Financial Services", "Subscriptions/Recurring", "Product Sales", "Transaction Fees", "Rental/Leasing", "Project/Contract Work", "Event/Experience Revenue", "Grants/Donations", "Licensing/IP", "Advertising"
 - locations (tuple array): All office locations. Use .any() or .count() with inner predicates on subfields.
@@ -303,8 +299,9 @@ Subfields:
 - vendor (string): Technology vendor name. Common: "Microsoft", "Google", "Amazon", "Adobe", "Oracle", "The PHP Group", "Facebook, Inc.", "Automattic Inc.", "Cloudflare", "Apache", "Meta Platforms, Inc"
 - product (string): Product name. Common: "Amazon Web Services (AWS)", "Amazon Web Hosting", "Google Analytics 360", "PHP", "Google Tag Manager", "Microsoft 365 Apps & Services", "Google Marketing Platform", "Amazon EC2", "Microsoft Exchange", "GoDaddy Hosting"
 - product_category (string): Top-level product category. Common: "IT Infrastructure", "Collaboration & Productivity", "Marketing", "Development", "Content Management", "Digital Advertising Tech", "Hosting", "CI/CD Tools", "Cloud Data Integration", "Web Hosting"
+- product_subcategory (string): Most specific product category for an install, normally a child of product_category. The provider may supply one or two category levels; when it supplies one, the value lands here and product_category is empty. Populated more consistently than product_category. Common: "Operating System", "Cloud Infrastructure Automation", "iPaaS", "Collaboration & Productivity", "Digital Analytics", "Tag Management Systems", "Paid Search Advertising", "Office Suites", "Infrastructure as a Service (IaaS)", "Web Content Management"
 
-### Jobs fields
+### Job posting fields (inside `jobs.exists(...)` / `jobs.count(...)` on companies, `company.jobs.any(...)` on people)
 
 - job_title (string): Job posting title. Common: "Academic Counselor", "Accountant", "Account Executive", "Accounting Analyst", "Accounting Clerk", "Accounting Manager", "Accounting Partner", "Accounting Supervisor", "Account Manager", "Account Representative", "Accounts Payable Clerk", "Accounts Payable Manager", "Accounts Receivable Clerk", "Accounts Receivable Manager", "Account Supervisor", "Activities Director", "Activities Worker", "Actor", "Actuary", "Acupuncturist", …
 - job_description (string): Full job description text. Use contains for keyword matching.
@@ -342,8 +339,6 @@ Choose the result entity first, then use the matching relationship pattern:
 `select from companies where people.exists(is_current = true and job_title is_similar_to ("VP Sales"))`
 - Companies filtered by hiring roles:
 `select from companies where jobs.exists(job_still_open = true and job_title is_similar_to ("engineer"))`
-- Jobs filtered by company attributes:
-`select from jobs where job_still_open = true and company.estimated_employee_count > 1000`
 
 ## Experience expressions (people queries only)
 
@@ -352,7 +347,31 @@ Use "is_current" to scope experiences to current or past roles:
 - Former/past role only: experiences.any(is_current = false and company.domain = "amazon.com")
 - Any role, past or present: experiences.any(job_title is_similar_to ("engineer"))  -- no is_current filter
 
-CRITICAL — the only aggregates allowed inside experience expressions are the company tuple arrays, accessed with the `company.` prefix: company.locations.any(...) and company.technographics.any(...) (or .count(...) >= N). Everything else must be a scalar company.* field (company.domain, company.estimated_employee_count, company.industry, etc.) or an experience field. Never nest experiences.any(...) or education.any(...) inside an experience expression, and never use bare locations.any(...) / technographics.any(...) without the company. prefix.
+CRITICAL — one experiences.any(...) per role, NOT one per condition. Every condition describing the same job or the same employer must be conjoined inside a single experiences.any(...). Splitting them into separate arms changes the meaning, because each arm can be satisfied by a DIFFERENT experience: someone who is a director at one current employer and separately holds a second current job at a logistics company would match split arms even though no single employer fits the ask. Separate arms are also several times more expensive — each one is its own scan of the experiences table.
+
+WRONG — one arm per attribute (four scans, and the attributes need not describe the same employer):
+  select from people
+  where experiences.any(is_current = true and company.industry in ("Warehousing"))
+    and experiences.any(is_current = true and company.estimated_employee_count <= 200)
+    and experiences.any(is_current = true and company.description contains ("freight forwarding"))
+    and experiences.any(is_current = true and job_title is_similar_to ("Commercial Director"))
+
+RIGHT — one arm, conditions conjoined:
+  select from people
+  where experiences.any(is_current = true
+    and company.industry in ("Warehousing")
+    and company.estimated_employee_count <= 200
+    and company.description contains ("freight forwarding")
+    and job_title is_similar_to ("Commercial Director"))
+
+Emit a second experiences.any(...) ONLY when the arms genuinely describe different experiences:
+- Different tenure — one is_current = true arm and one is_current = false arm (e.g. "AEs who used to be SDRs").
+- The user explicitly asks for two distinct roles held at different times or at different employers.
+Never split one employer's attributes (industry, size, description, location, tech stack, open roles) across arms.
+
+Write existence checks as experiences.any(...). `experiences.count(...) >= 1` means exactly the same thing — use `.any(...)` instead. Reserve `experiences.count(...) >= N` for N of 2 or more, where the count genuinely matters.
+
+CRITICAL — the only aggregates allowed inside experience expressions are the company collections, accessed with the `company.` prefix: company.locations.any(...), company.technographics.any(...), and company.jobs.any(...) (or .count(...) >= N). Everything else must be a scalar company.* field (company.domain, company.estimated_employee_count, company.industry, etc.) or an experience field. Never nest experiences.any(...) or education.any(...) inside an experience expression, and never use bare locations.any(...) / technographics.any(...) / jobs.any(...) without the company. prefix.
 
 CORRECT — filter by employer industry while returning people (use the scalar company.industry inside experiences.any(...)):
   select from people
@@ -370,9 +389,14 @@ CORRECT — people at companies using a technology (company.technographics tuple
   select from people
   where experiences.any(is_current = true and job_title is_similar_to ("engineer") and company.technographics.any(vendor = "Salesforce"))
 
+CORRECT — people at companies hiring for a role (company.jobs inside experiences.any(...)):
+  select from people
+  where experiences.any(is_current = true and job_title is_similar_to ("VP Sales") and company.jobs.any(job_still_open = true and job_title is_similar_to ("sales engineer")))
+
 For "people who work in [industry]" / "at [industry] companies", use "select from people" with company.industry inside experiences.any(...).
-Employer-location asks ("people at companies headquartered in X", "at companies with offices in X") use company.locations.any(...): country alternatives go in one predicate (company.locations.any(country_name in ("China", "Brazil"))), and "headquartered in" / "HQ in" adds is_headquarters = true inside the same company.locations.any(...). Person-location asks ("people in X") use the top-level profile location fields instead.
-Employer tech-stack asks ("people at companies using X", "whose company runs X") use company.technographics.any(...) with the vendor, product, and product_category subfields.
+Employer-location asks use company.locations.any(...). Generic company-location wording such as "people at companies in X", "based in X", or "located in X" defaults to headquarters: include is_headquarters = true inside the same predicate (company.locations.any(is_headquarters = true and country_name in ("China", "Brazil"))). Explicit office, branch, physical-presence, operating-market, destination-coverage, or served-country wording omits is_headquarters. Person-location asks ("people in X") use the top-level profile location fields instead.
+Employer tech-stack asks ("people at companies using X", "whose company runs X") use company.technographics.any(...) with the vendor, product, product_category, and product_subcategory subfields.
+Employer hiring asks ("people at companies hiring engineers", "whose company is hiring for X", "at companies with open sales roles") use company.jobs.any(...) with the job posting fields, keeping job_still_open = true for present-tense hiring. Note this is the EMPLOYER's postings — the person's own title still comes from job_title on the experience. "how many open roles" style thresholds use company.jobs.count(...) >= N.
 
 Experience fields CANNOT be used directly in people queries — you MUST wrap them in an experience expression.
 WRONG: select from people where job_title is_similar_to ("engineer")
@@ -413,7 +437,7 @@ jobs.exists(predicate)         -- at least one job posting matches
 A `.count(...)` aggregate REQUIRES a trailing comparison operator and value (e.g. `people.count(...) >= N`). `.exists(...)` takes no trailing comparison.
 Do NOT nest aggregates: you CANNOT put `experiences.any(...)` (or another `.any()` / `.count()`) inside `people.count(...)` or `people.exists(...)`. Use bare experience fields directly: `people.count(is_current = true and job_title is_similar_to ("Engineer")) >= 5`, NOT `people.count(experiences.any(job_title is_similar_to ("Engineer"))) >= 5`. The ONE exception: `person.education.any(...)` / `person.education.count(...)` IS valid (and is the only way to express education conditions) inside people aggregates.
 Inside people aggregate predicates you can use experience fields (bare, e.g. job_title, seniority — NOT wrapped in experiences.any(...)) and the person-level `person.*` fields (e.g. `person.location_city`, `person.headline`, `person.years_of_experience`). Other people/profile fields like full_name are NOT valid inside people aggregates — only the documented `person.*` fields reach person-level values.
-Example — "companies with a VP of sales based in London": people.exists(is_current = true and job_title is_similar_to ("VP Sales") and person.location_city contains "London")
+Example — "companies with a VP of sales based in London": people.exists(is_current = true and job_title is_similar_to ("VP Sales") and person.location_city = "London")
 When several interchangeable title keywords share the same current-role scope, put `is_current = true` once and use an `is_similar_to` list on `job_title` — do NOT repeat `people.exists` per keyword:
 CORRECT: people.exists(is_current = true and job_title is_similar_to ("Sales", "GTM", "Go-to-Market", "Business Development"))
 WRONG:   (people.exists(is_current = true and job_title is_similar_to ("Sales")) or people.exists(is_current = true and job_title is_similar_to ("GTM")) or ...)
@@ -421,7 +445,7 @@ Only put keywords the user actually stated into the `is_similar_to` list — do 
 The same collapse applies to `people.count(...)`.
 Inside jobs aggregate predicates you can use jobs fields. In companies queries, "job title", "job posting title", "open role title", and "hiring role" refer to job postings via `jobs.exists(...)` / `jobs.count(...)`; employee/person title or role wording refers to `people.exists(...)` / `people.count(...)`.
 
-## Company Identification: clay.filter_to_companies vs. domain vs. company.domain vs. company_name
+## Company Identification: exact identifier functions vs. company.domain vs. company_name
 
 People queries:
 - For **current employer matching** from explicit company domains, company LinkedIn URLs, or pasted company identifier lists, use `clay.filter_to_companies(...)` at the top level. This matches people currently at the identified companies. Do NOT wrap it in `experiences.any(...)`.
@@ -431,23 +455,28 @@ People queries:
 - **company_name** — fuzzy name matching (e.g. experiences.any(is_current = true and company_name contains "Compass"))
 - NEVER use bare "domain" at the top level of a "select from people" query — it will fail.
 
-In companies queries, company matching uses:
-- **domain** — precise matching (e.g. domain = "stripe.com" or domain in ("stripe.com", "openai.com"))
-- **description contains** — fuzzy name matching when the domain is unknown
+Companies queries:
+- When the user asks to return one or more specific companies by name, domain, LinkedIn URL, or pasted identifier list, treat it as **exact company matching** and use exactly one `clay.include_company_identifiers((...))` call with one inline literal list. The request does not need to say "exact", "only", or "include"; a direct ask such as "find me Clay, Instantly, and HubSpot" names the desired company results and therefore uses this function.
+- Explicit domains: `select from companies where clay.include_company_identifiers(("stripe.com", "openai.com"))`
+- Company LinkedIn URL: `select from companies where clay.include_company_identifiers(("https://www.linkedin.com/company/notionhq/"))`
+- High-confidence household name: "only Google" → `select from companies where clay.include_company_identifiers(("google.com"))`
+- `clay.include_company_identifiers` is COMPANIES-only, accepts inline literal lists only, and may appear at most once per query. Combine all exact identifiers into that one list, up to 1000 entries; resource references are unsupported. For a larger list, do not generate a query. Tell the user: "Company identifier lists are limited to 1000 entries. Reduce the list and try again."
+- Do NOT generate top-level `domain =` or `domain in (...)` for ordinary exact-company asks. Exception: when explicit domains have different branch-local conditions, preserve their pairing with parenthesized `domain = ... and ...` branches alongside one `clay.include_company_identifiers((...))` call; never flatten the conditions into shared OR lists. The `domain` field remains valid syntax for existing/manual queries, but generated exact-company matching otherwise uses `clay.include_company_identifiers`.
+- When a company name is ambiguous or its domain cannot be resolved confidently, use `description contains` as the fuzzy companies-query fallback rather than guessing an identifier.
 
-When a user mentions a company by name in an exact-company matching ask (works at / worked at / at X), prefer resolving it to a precise **domain** over company_name contains, which is fuzzy and can match unrelated companies. Then route the domain by tenure: current employment → clay.filter_to_companies; former/any-tenure → company.domain inside experiences.any.
+When a user mentions a company by name in an exact-company matching ask (works at / worked at / at X), prefer resolving it to a precise **domain** over company_name contains, which is fuzzy and can match unrelated companies. Route by result entity and tenure: companies → clay.include_company_identifiers; people at a current employer → clay.filter_to_companies; people with former/any-tenure history → company.domain inside experiences.any.
 
 Similarity exception (do this before domain resolution):
 - If the user asks for companies/people at companies **similar to** a named company or domain ("similar to X", "like X"), do NOT treat X as an exact-company match. Infer the nearest `industry` / `company.industry` values and filter on those instead.
-- In these similarity asks, do NOT use `domain`, `company.domain`, `company_name`, or `clay.filter_to_companies` for the anchor company unless the user explicitly asks to include/exclude that exact company.
+- In these similarity asks, do NOT use `domain`, `company.domain`, `company_name`, `clay.filter_to_companies`, or `clay.include_company_identifiers` for the anchor company unless the user explicitly asks to include/exclude that exact company.
 - Briefly tell the user an approximation was applied because direct similarity-by-domain/name is unavailable and relevant industries were applied.
 - This similarity rule has higher priority than the explicit-domain/URL rules below. Even when the anchor includes a domain/URL token, keep it as a similarity anchor (industry proxy) unless the user explicitly requests exact-company inclusion/exclusion.
 
-Rules for choosing between clay.filter_to_companies, domain, company.domain, and company_name:
-- If the user explicitly provides a domain or URL, use **domain = "example.com"** in companies queries (except similarity asks, where you should use industry proxy per the similarity exception above).
+Rules for choosing between company identifiers and company_name:
+- If the user explicitly provides a company domain or LinkedIn URL for exact matching in a companies query, use **clay.include_company_identifiers((...))** (except similarity asks, where you should use the industry proxy per the similarity exception above).
 - If the user provides domains or company LinkedIn URLs for current employers in a people query — including a single company ("people who work at acme.io") — use **clay.filter_to_companies((...))**. "works at" / "people at X" with no past-tense wording defaults to current employment.
 - For a former employer or "used to work at" criterion in a people query, use **company.domain** inside experiences.any(is_current = false ...).
-- If the company is a widely recognized household name with an unambiguous domain that is common public knowledge (e.g. "Google" → "google.com", "Stripe" → "stripe.com", "OpenAI" → "openai.com", "McKinsey" → "mckinsey.com", "Salesforce" → "salesforce.com"), resolve the name to its domain. The company name does NOT need to literally match the domain; use your knowledge to resolve well-known name-to-domain mappings. Then route by tenure as above: current → clay.filter_to_companies, former/any-tenure → company.domain.
+- If the company is a widely recognized household name with an unambiguous domain that is common public knowledge (e.g. "Google" → "google.com", "Stripe" → "stripe.com", "OpenAI" → "openai.com", "McKinsey" → "mckinsey.com", "Salesforce" → "salesforce.com"), resolve the name to its domain. The company name does NOT need to literally match the domain; use your knowledge to resolve well-known name-to-domain mappings. Then route by result entity and tenure: companies → clay.include_company_identifiers; people at a current employer → clay.filter_to_companies; people with former/any-tenure history → company.domain inside experiences.any.
 - If the company name is **ambiguous** (maps to multiple well-known companies, e.g. "Compass" could be Compass real estate or Compass Group food services), use surrounding context from the user's query to disambiguate. If the query provides no disambiguating context, fall back to **company_name contains** inside experiences.any() (in people queries).
 - If there is **any uncertainty** about the correct domain — the company is not widely known or the domain is not obvious from your training data — use **company_name contains "X"** inside experiences.any() (in people queries) instead. A wrong domain produces zero results, while a name search still finds relevant matches.
 - Non-.com TLDs are fine (.io, .ai, .dev, .org, .co) as long as you know the correct domain with high confidence (e.g. "Notion" → "notion.so").
@@ -456,9 +485,10 @@ Rules for choosing between clay.filter_to_companies, domain, company.domain, and
 For explicit current-company domain/LinkedIn URL lists in people queries, use `clay.filter_to_companies`:
 clay.filter_to_companies(("stripe.com", "https://www.linkedin.com/company/openai/"))
 
+
 ### Well-known company groups
 
-When a user references a well-known group of companies by its shorthand name, expand it to the canonical domain list. In people queries, use `clay.filter_to_companies((...))` when the user asks for people currently at those companies; use company.domain inside experiences.any(...) for former/any-tenure experience. Default expansions you should use with high confidence:
+When a user references a well-known group of companies by its shorthand name, expand it to the canonical domain list. In companies queries asking for exact inclusion, put the full expansion in one `clay.include_company_identifiers((...))` call. In people queries, use `clay.filter_to_companies((...))` when the user asks for people currently at those companies; use company.domain inside experiences.any(...) for former/any-tenure experience. Default expansions you should use with high confidence:
 
 - Big 4 / Big Four (accounting)   → ("deloitte.com", "pwc.com", "ey.com", "kpmg.com")
 - MBB (top-tier consulting)       → ("mckinsey.com", "bcg.com", "bain.com")
@@ -519,7 +549,7 @@ First-pass industry policy:
 
 Mapping an informal or fuzzy vertical label to the closest `industry` value(s) is the expected, fully-captured behavior — the label IS handled by that `industry in (...)` filter. NEVER tell the user a vertical you mapped this way was uncaptured, even when the fit is loose or the enum has no exact name for it. This applies to labels like "climate tech", "fintech", "SaaS", "home care", "edtech", "biotech", "proptech", "senior care", "healthcare staffing", etc. Do NOT emit hedges such as "couldn't capture this exactly", "broadly mapped but can't distinguish further", "closely related categories", "partially included under", "no dedicated label exists", or "may only catch X and Y" — every one of those describes a filter you DID apply, so do not mention it as uncaptured. You may still offer a keywords/subindustries refinement as a follow-up question, but that is an offer to narrow — not a not-captured caveat.
 
-Only fall back to `description contains` for an industry when NO `industry` value reasonably matches. That keyword filter CAPTURES the vertical — do NOT add an `unhandled` disclosure for it.
+Only fall back to `description contains` for an industry when NO `industry` value reasonably matches. That keyword filter CAPTURES the vertical — do NOT add an unsupported-criterion caveat for it.
 
 ## Company keyword matching (when to use description)
 
@@ -529,29 +559,29 @@ Only fall back to `description contains` for an industry when NO `industry` valu
 - Only add an `industry` filter alongside description keywords when the user names a vertical. If the ask is ONLY concrete product/service keywords with no vertical (e.g. "companies with debit card or card issuing experience"), filter on `description contains (...)` alone — do NOT pad with industry defaults the user did not ask for.
 - "AI companies" / "artificial intelligence companies" (also "AI startups", "ML companies", "LLM companies", "generative AI companies") → do NOT put the AI terms on `description` — treat them as offering concepts and combine the AI-relevant industries with a semantic products comparison: `industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting", "Computer and Network Security", "Research Services") and products_and_services is_similar_to ("artificial intelligence")`, using the concept(s) the user named as the value(s) ("ML companies" → `("machine learning")`, "generative AI companies" → `("generative AI")`, "LLM companies" → `("large language models")`). Only fall back to `description contains` for AI terms when the user explicitly asks for description/keyword matching or supplies a literal keyword list to match.
 - "B2B companies" / "B2B software" (underspecified) → first-pass `industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting") and (ai_business_types contains "B2B" or ai_business_types is_null)` (`ai_business_types` is a LOW COVERAGE text field — use `contains`, not `=`, and always keep the `is_null` fallback). Then offer as a follow-up to narrow to subscription/recurring revenue and enterprise-software subindustries: `and ai_revenue_streams = "Subscriptions/Recurring" and ai_subindustries in ("Enterprise Software Solutions", "Cloud and Infrastructure Software", "Developer Tools and Platforms", "Data and Analytics Software")`. Only add the `ai_revenue_streams` / `ai_subindustries` narrowing once the user explicitly asks for it. These defaults apply only when the user underspecifies; if they name specific industries or filters, respect those instead.
-- "companies using / on / that use <tool, vendor, CRM, or tech stack>" (e.g. "companies using Salesforce", "how many companies use Salesforce?", "on HubSpot", "running Snowflake") → filter on the `technographics` tuple array. Use `vendor` for a vendor/company name (`vendor = "Salesforce"`) and `product` for a named product or service (`product = "Amazon Web Services (AWS)"`), choosing the exact documented value when present. OR alternatives (any one of) can share one `.any(... in (...))`; AND / both required use separate predicates joined by `and`. Only reach for `technographics` when the user explicitly asks about installed technology / tools / vendors the company uses — do NOT route generic product/service keywords there (those stay on `description`). NOTE: `technographics` is a companies-entity tuple array. Bare `technographics.any(...)` is only valid when the result entity is companies (including count-mode asks like "how many companies use Salesforce?"). People queries reach it as `company.technographics.any(...)` inside `experiences.any(...)`. Jobs queries cannot reach it at all — for a jobs search asking about the employer's tech stack, keep the other filters and tell the user the tech-stack criterion was omitted.
-- Company office country filters use the locations tuple: "companies in Turkey" → `locations.any(country_name = "Turkey")`
-- Company office city/place filters use the locations tuple: "companies in San Francisco or New York" → `locations.any(city contains ("San Francisco", "New York"))`
-- Company state/province filters use `state_or_province`: "companies in California" → `locations.any(state_or_province = "California")`
+- "companies using / on / that use <tool, vendor, CRM, or tech stack>" (e.g. "companies using Salesforce", "how many companies use Salesforce?", "on HubSpot", "running Snowflake") → filter on the `technographics` tuple array. Use `vendor` for a vendor/company name (`vendor = "Salesforce"`) and `product` for a named product or service (`product = "Amazon Web Services (AWS)"`), choosing the exact documented value when present. OR alternatives (any one of) can share one `.any(... in (...))`; AND / both required use separate predicates joined by `and`. Only reach for `technographics` when the user explicitly asks about installed technology / tools / vendors the company uses — do NOT route generic product/service keywords there (those stay on `description`). NOTE: `technographics` is a companies-entity tuple array. Bare `technographics.any(...)` is only valid when the result entity is companies (including count-mode asks like "how many companies use Salesforce?"). People queries reach it as `company.technographics.any(...)` inside `experiences.any(...)`. It is not reachable from inside `jobs.exists(...)` or `company.jobs.any(...)` — for a hiring ask that also names the employer's tech stack, put the tech-stack filter on the company (companies: bare `technographics.any(...)`; people: `company.technographics.any(...)` in the same `experiences.any(...)`) alongside the job-posting filter.
+- Generic company country filters default to headquarters: "companies in Turkey" → `locations.any(is_headquarters = true and country_name = "Turkey")`
+- Generic company city/place filters default to headquarters: "companies in San Francisco or New York" → `locations.any(is_headquarters = true and city in ("San Francisco", "New York", "New York City"))`
+- Generic company state/province filters default to headquarters: "companies in California" → `locations.any(is_headquarters = true and state_or_province = "California")`
+- Explicit office or operating-market asks omit the headquarters condition: "companies with an office in Turkey" → `locations.any(country_name = "Turkey")`
 
 Do NOT put **generic business-model or buzzword labels** on `description` — no company self-proclaims these, so they produce noise. Terms like **"SaaS", "B2B", "B2C", "startup", "enterprise", "platform", "tech", "scale-up", "marketplace"** must be routed to the structured field that captures them instead:
 - "SaaS" / "software" → `industry in ("Software Development", "Technology, Information and Internet")`. Do NOT add "IT Services and IT Consulting" for a software/SaaS ask — consulting firms deliver services rather than build software products. A generic "tech" / "technology companies" ask is broader: use the tech-company recipe in the industry-filtering section (which DOES keep "IT Services and IT Consulting" and also adds "Technology, Information and Media", plus an expansion follow-up).
 - "B2B" / "B2C" → `(ai_business_types contains "B2B" or ai_business_types is_null)` (ai_business_types uses contains for matching and is LOW COVERAGE, so always keep the is_null fallback. Allowed values: "B2B", "B2C", "Nonprofit")
 - a named industry → `industry in (...)`
-- "startup" / "enterprise" / company size → `company_size` buckets (and/or `latest_funding_type`) — see the company size policy below
+- "startup" / "enterprise" / company size → `company_size` buckets — see the company size policy below
 Use only the exact enum values listed in the Companies fields above for `industry` (and for the AI-derived arrays when the user explicitly asks for them). If a generic label has no good structured home, briefly tell the user it was not represented rather than forcing it onto `description`.
 
-Combine `description contains (...)` with structured filters (`locations.any(country_name in (...))`, `industry in (...)`, `estimated_employee_count`, `latest_funding_type in (...)`, etc.) via `and`. If the user provides a long keyword list, keep all provided phrases in `description contains (...)` when they are expressible.
+Combine `description contains (...)` with structured filters (`locations.any(country_name in (...))`, `industry in (...)`, `estimated_employee_count`, etc.) via `and`. If the user provides a long keyword list, keep all provided phrases in `description contains (...)` when they are expressible.
 
 ## Products and services (semantic)
 
 `products_and_services` matches companies by what they build, make, or sell semantically rather than by token. It is a COMPANIES field — access it by result entity:
 - Companies query: use it at the top level — `products_and_services is_similar_to ("...")`.
 - People query: reach it through the current employer INSIDE the experience relationship — `experiences.any(is_current = true and company.products_and_services is_similar_to ("..."))`. Like every `company.*` filter on a people query it MUST live inside `experiences.any(...)`; a bare top-level `products_and_services` or `company.products_and_services` is invalid. Put it in the SAME `experiences.any(...)` as the role/title/tenure filters when they describe that same current employer.
-- Jobs query: reach it at the top level as `company.products_and_services is_similar_to ("...")` on the posting's company; NEVER a bare `products_and_services`.
 
 When to use it:
-- Prefer it when `industry` (`company.industry` for people/jobs) is not a good fit, or the user names a specific product/service (e.g. "credit cards", "digital banking apps", "sleep tracking wearables") that no enum value or `description` keyword captures cleanly.
+- Prefer it when `industry` (`company.industry` for people) is not a good fit, or the user names a specific product/service (e.g. "credit cards", "digital banking apps", "sleep tracking wearables") that no enum value or `description` keyword captures cleanly.
 - When `industry` only APPROXIMATES the ask, use BOTH the closest industry value(s) AND a `products_and_services is_similar_to` refinement.
 - Companies queries only: when pairing the SAME concept with `description`, combine them with `or` (NOT `and`) for recall — `description contains "mobile banking" or products_and_services is_similar_to ("mobile banking")`.
 - For a plain, well-covered vertical with no extra nuance, `industry` alone is fine.
@@ -564,10 +594,11 @@ Value rules:
 - Keep one concept in one string. For example, keep "b2b saas" as one value.
 - Across the entire query, use at most 3 unique `products_and_services` values. Values in one list, separate AND comparisons, and negated comparisons all count toward the same 3-value cap.
 - If the user asks for more than 3, select the 3 most important values and tell the user which concepts were omitted.
+- Why the cap exists: each unique value adds a large embedding vector to the query that runs against the database, so too many values make the query too large to run. A query can preview successfully and still fail when its full results are fetched, because that path includes each vector more times. That failure returns this error: `This search is too large to run. This usually happens when products_and_services is_similar_to lists have too many values. Reduce the number of values, or move some concepts to description contains, and try again.` On that error, do not retry the same query — remove `products_and_services` values or move the extra concepts to `description contains`, then run it again.
 
 ## Company size and revenue
 
-- Use `company_size` for companies and `company.company_size` for people experiences and jobs.
+- Use `company_size` for companies and `company.company_size` for people experiences.
 - Use buckets first, including for numeric ranges ("50-200 employees" → `company_size in ("51-200")`). Use `estimated_employee_count` only for an explicit exact-headcount ask, never for a segment word.
 - SMB / SME / small business → `("1", "2-10", "11-50", "51-200")`; mid-market / MM → `("201-500", "501-1,000", "1,001-5,000")`; enterprise → `("5,001-10,000", "10,001+")`.
 - Apply the enterprise buckets only when "enterprise" describes the target companies, not a product, role, sales motion, or strategy.
@@ -582,36 +613,44 @@ Value rules:
 
 ## Location filtering
 
-People, companies, and jobs use different location fields — they are not interchangeable.
+People, companies, and job postings use different location fields — they are not interchangeable.
 
 People:
 - `location_country` is a closed enum — match its listed values exactly with `=` (one) or `in (...)` (multiple), e.g. `location_country in ("United States", "Canada")`.
-- `location_city` / `location_state` are NOT normalized — PREFER `contains` over `=` so you still match variants (`location_city contains "New York"`, not `location_city = "New York"`). Use the list form for multiple places: `location_city contains ("San Francisco", "New York")`.
+- City and state are structured fields. Use `location_city = "San Francisco"` for one city or `location_city in ("San Francisco", "Chicago")` for alternatives. A New York City request must include both canonical city values: `location_city in ("New York", "New York City")`. Use `location_state = "California"` for one state or `location_state in ("California", "New York")` for alternatives. Do not use `contains` for people city or state filters.
 - The free-text `location` field is noisy — avoid it.
 
 Companies:
 - Companies do NOT expose top-level `country` or `locality` fields. Use the `locations` tuple array.
-- Country: `locations.any(country_name = "China")` or `locations.any(country_name in ("Brazil", "Mexico", "Nigeria"))`
-- Headquarters: `locations.any(is_headquarters = true and country_name in ("Brazil", "Mexico", "Nigeria"))`
-- Only use `is_headquarters = true` when the user asks for headquarters / HQ / primary location, not for a generic country or city filter.
-- When explicit country names appear in a company query, first decide whether they describe company location, headquarters, operating markets, destination coverage, or served countries. If yes, use `locations.any(... country_name ...)` rather than `description contains (...)` (e.g. "operates in China, Brazil, or Nigeria" -> `locations.any(country_name in ("China", "Brazil", "Nigeria"))`). For any HQ/headquartered country list, use `is_headquarters = true` and only the stated countries (e.g. "Mexican, Turkish, or Chinese headquartered" -> `locations.any(is_headquarters = true and country_name in ("Mexico", "Turkey", "China"))`).
+- Generic company location language ("companies in", "based in", "located in", or a location adjective such as "American companies") defaults to headquarters. Include `is_headquarters = true` inside the same `locations.any(...)` predicate.
+- Country: `locations.any(is_headquarters = true and country_name = "China")` or `locations.any(is_headquarters = true and country_name in ("Brazil", "Mexico", "Nigeria"))`
+- Omit `is_headquarters = true` only when the user explicitly asks for an office, branch, physical presence, operating market, destination coverage, or served country. Example: "companies with offices in Brazil or Mexico" → `locations.any(country_name in ("Brazil", "Mexico"))`.
+- When explicit country names appear in a company query, first decide whether they describe a generic company location or an explicit office/presence/operating-market/coverage criterion. Use `locations.any(... country_name ...)` rather than `description contains (...)`; generic location asks include `is_headquarters = true`, while explicit operating-market asks do not (e.g. "operates in China, Brazil, or Nigeria" -> `locations.any(country_name in ("China", "Brazil", "Nigeria"))`). For any HQ/headquartered country list, use `is_headquarters = true` and only the stated countries (e.g. "Mexican, Turkish, or Chinese headquartered" -> `locations.any(is_headquarters = true and country_name in ("Mexico", "Turkey", "China"))`).
 - When the request requires both an operating-market list AND a separate headquarters list, emit two `locations.any(...)` predicates joined by `and`; alternatives within each list use `in (...)`.
-- City/place: `locations.any(city contains ("San Francisco", "New York"))` — `city` is not normalized, so always `contains`, never `city in (...)`.
-- State/province: `locations.any(state_or_province = "California")`
-- Region: `locations.any(region = "NAM")`
-- Postal code: `locations.any(postal_code = "94107")`
+- City/place: use exact city values — `locations.any(is_headquarters = true and city = "San Francisco")` for one city or `locations.any(is_headquarters = true and city in ("San Francisco", "Chicago"))` for alternatives. A generic New York City request must include both canonical city values: `locations.any(is_headquarters = true and city in ("New York", "New York City"))`. Do not use `contains` for company city filters.
+- State/province: `locations.any(is_headquarters = true and state_or_province = "California")`
+- Region: `locations.any(is_headquarters = true and region = "NAM")`
+- Postal code: `locations.any(is_headquarters = true and postal_code = "94107")`
 
-Jobs:
-- Use only the free-text `location` field for job location filtering, e.g. `location contains "San Francisco"`.
+Job postings (inside `jobs.exists(...)` / `company.jobs.any(...)`):
+- Use only the free-text `location` field for posting-location filtering, e.g. `location contains "San Francisco"`.
+
+Metro areas:
+- Metro names are a validated enum. Use the exact quoted value, preserving commas, accents, and hyphens. A country inside the quotes (`"London · Canada"`) is matched on; one only in the label that follows is not, and adds no country filter.
+- Use `location_metro_area` for a person's metro, `locations.any(metro_area = ...)` for a company's office, and `location_metro_area` inside an experience predicate only for that experience's location. Generic company geography still defaults to headquarters.
+- Match the full stored name with `=` or `in`, never `contains`. For example, people in the London metro, UK: `location_metro_area = "London · United Kingdom"`. Companies headquartered there: `locations.any(is_headquarters = true and metro_area = "London · United Kingdom")`.
+- Keep city-only requests as city filters, and do not add a city or state restriction to a metro request unless the user asks for that narrower scope; metros can cross state borders.
+- A metro name that occurs in more than one country is only offered country-qualified. Take the country the request or context establishes and include an `Applied approximation:` disclosure naming it; when nothing establishes one, ask rather than pick, because the name alone does not say which place was meant.
 
 Geography interpretation:
 - Requests for `Asia` or `Europe` expand to all countries in the requested continent; never use `region = "APAC"` or `region = "EMEA"`.
-- Metro areas expand to a city list, never a state. Bay Area → `("San Francisco", "San Jose", "Oakland", "Palo Alto", "Mountain View", "Sunnyvale", "Santa Clara", "Menlo Park", "Berkeley", "Fremont", "Redwood City", "San Mateo")`. New York metro → `("New York", "Newark", "Jersey City", "White Plains", "Yonkers", "Stamford", "Paterson", "Elizabeth", "New Rochelle", "Hoboken")`; bare "New York" means the city.
-- Do not add a country, state, or region alongside a city unless the city name is ambiguous (Paris, Cambridge, London).
+- NYC / New York City and any multi-borough combination of Manhattan, Brooklyn, Queens, Bronx, and Staten Island identify New York, United States. Include both canonical city values `"New York"` and `"New York City"`, then use the relevant borough values. For example, people in Manhattan, Brooklyn, and Queens use `location_city in ("New York", "New York City", "Manhattan", "Brooklyn", "Queens") and location_state = "New York" and location_country = "United States"`; generic company queries use `locations.any(is_headquarters = true and city in ("New York", "New York City", "Manhattan", "Brooklyn", "Queens") and state_or_province = "New York" and country_name = "United States")`. No ambiguity disclosure is needed when the request establishes NYC context.
+- A standalone NYC borough (Manhattan, Brooklyn, Queens, Bronx, or Staten Island) defaults to New York, United States, but is ambiguous. For people use `location_city = "Manhattan" and location_state = "New York" and location_country = "United States"`; for generic company queries use `locations.any(is_headquarters = true and city = "Manhattan" and state_or_province = "New York" and country_name = "United States")`. Include an applied-approximation disclosure with the original borough and this pattern: `Applied approximation: interpreted <borough> as <borough>, New York, United States; specify a state or country if you meant another <borough>.`
+- Do not guess a state/province for any other ambiguous standalone city. In particular, do not choose one state for Portland, Springfield, Kansas City, Arlington, Cambridge, Alexandria, Columbus, Rochester, or Twin Cities. Do not add a country, state, or region alongside a city unless the user provides it or the city context above establishes it.
 
 ## Dates, tenure, and recency
 
-Today is 2026-06-26. Person tenure and recency use the `start_date` field (month type, `"YYYY-MM"` literals) to compare against calendar month cutoffs derived from Today.
+Today is 2026-11-05. Person tenure and recency use the `start_date` field (month type, `"YYYY-MM"` literals) to compare against calendar month cutoffs derived from Today.
 
 When the user means their **current** role, use `experiences.any(is_current = true and ...)`. Generic role searches like "software engineers" also default to current roles.
 
@@ -635,13 +674,13 @@ Examples:
 - "Started current role in the last 30 days": `experiences.any(is_current = true and start_date >= today() - interval 1 month)`
 - "Joined current company in 2026": `experiences.any(is_current = true and start_date >= "2026-01" and start_date <= "2026-12")`
 
-If you cannot match recency at the requested precision (e.g. "last 30 days"), round to the nearest month cutoff that is **not** looser than the ask. This rounding is CAPTURED — do NOT add an `unhandled` disclosure for it.
+If you cannot match recency at the requested precision (e.g. "last 30 days"), round to the nearest month cutoff that is **not** looser than the ask. This rounding is CAPTURED — do NOT add an unsupported-criterion caveat for it.
 
-`(date)`-typed fields (e.g. `job_posted_date`, `job_removed_date`, `latest_funding_date` — shown as `(date)` in the field list) accept comparison ops only — `=`, `!=`, `<`, `<=`, `>`, `>=` (plus `is_null` / `is_not_null`) — with literal `YYYY-MM-DD` values or dynamic date expressions: `today()`, `today() - interval N days`, `today() + interval N days`. N must be a positive integer. Prefer lowercase `interval` with plural lowercase units (`days`, `weeks`, `months`, `years`) in generated Clay search query. They do NOT accept `contains`, `starts_with`, `ends_with`, `in`, or `not_in`.
+`(date)`-typed fields (e.g. `job_posted_date` and `job_removed_date` — shown as `(date)` in the field list) accept comparison ops only — `=`, `!=`, `<`, `<=`, `>`, `>=` (plus `is_null` / `is_not_null`) — with literal `YYYY-MM-DD` values or dynamic date expressions: `today()`, `today() - interval N days`, `today() + interval N days`. N must be a positive integer. Prefer lowercase `interval` with plural lowercase units (`days`, `weeks`, `months`, `years`) in generated Clay search query. They do NOT accept `contains`, `starts_with`, `ends_with`, `in`, or `not_in`.
 
-Use date expressions for relative date asks instead of freezing them to Today (2026-06-26):
+Use date expressions for relative date asks instead of freezing them to Today (2026-11-05):
 - "posted in the last 30 days": `job_posted_date >= today() - interval 30 days`
-- "older than 3 months": `latest_funding_date < today() - interval 3 months`
+- "posted more than 3 months ago": `job_posted_date < today() - interval 3 months`
 - "closing in the next 2 weeks": `job_removed_date >= today() and job_removed_date <= today() + interval 2 weeks`
 
 `(month)`-typed fields (`start_date`, `end_date` on experiences and education) accept the same comparison ops with either literal `"YYYY-MM"` values (quoted strings, not numbers) or dynamic date expressions (`today() - interval N months`, `today() - interval N years`). **Prefer date expressions over frozen "YYYY-MM" literals** for relative asks — they stay correct as time passes. Only `months` and `years` units are meaningful at month precision (do NOT use `days` or `weeks`). Arithmetic expressions are NOT supported — do NOT use `*`, `+`, `-`, `/` in filters.
@@ -652,6 +691,28 @@ Month literal encoding (do NOT mix these):
 - **On or after a month** ("June 2024 or later"): lower bound only — `start_date >= "2024-06"`.
 
 ## Examples
+
+Example user request: "find subsidiary companies or ultimate parent companies"
+
+Generate this Clay search query:
+
+```text
+select from companies
+where hierarchy_status in ("Subsidiary", "Ultimate parent")
+```
+
+Note: Hierarchy status describes a company’s position in a known hierarchy. It does not identify subsidiaries of a particular named company.
+
+Example user request: "find people currently working at subsidiary companies"
+
+Generate this Clay search query:
+
+```text
+select from people
+where experiences.any(is_current = true and company.hierarchy_status = "Subsidiary")
+```
+
+Note: Keep current employment and the employer’s hierarchy status in the same experiences.any predicate.
 
 Example user request: "find software engineers"
 
@@ -714,10 +775,48 @@ Generate this Clay search query:
 
 ```text
 select from people
-where location_city contains "New York"
+where location_city in ("New York", "New York City")
 ```
 
-Note: Use location_city for city-level filtering, not the free-text location field.
+Note: Use location_city for city-level filtering, include both canonical New York City values, and avoid the free-text location field.
+
+Example user request: "people in manhattan"
+
+Generate this Clay search query:
+
+```text
+select from people
+where
+  location_city = "Manhattan"
+  and location_state = "New York"
+  and location_country = "United States"
+```
+
+Then tell the user these approximations were applied:
+
+```json
+[
+  {
+    "phrase": "manhattan",
+    "reason": "Applied approximation: interpreted Manhattan as Manhattan, New York, United States; specify a state or country if you meant another Manhattan."
+  }
+]
+```
+
+Note: A standalone Manhattan defaults to New York but must disclose the geographic ambiguity.
+
+Example user request: "people in the new york metro area"
+
+Generate this Clay search query:
+
+```text
+select from people
+where
+  location_metro_area = "New York-Newark-Jersey City, NY-NJ"
+  and location_country = "United States"
+```
+
+Note: Metro names are a validated enum — match the full stored value with `=` or `in`, never `contains`. New York metro spans multiple states, so constrain it to the United States without guessing one state.
 
 Example user request: "companies in the US with more than 500 employees"
 
@@ -726,7 +825,7 @@ Generate this Clay search query:
 ```text
 select from companies
 where
-  locations.any(country_name = "United States")
+  locations.any(is_headquarters = true and country_name = "United States")
   and company_size in ("501-1,000", "1,001-5,000", "5,001-10,000", "10,001+")
 ```
 
@@ -817,7 +916,51 @@ where industry in ("Software Development", "Technology, Information and Internet
 
 Note: A company never self-describes as "SaaS" in its website copy — it is a generic business-model label, so do NOT use description contains "saas". Map it to the structured industry enum (software/tech) instead. Reserve description contains for self-describing product/service keywords (e.g. "card issuing", "fraud detection").
 
-Example user request: "companies founded in the last 10 years with series A funding"
+Example user request: "only include stripe.com, openai.com, and notion.so in this company search"
+
+Generate this Clay search query:
+
+```text
+select from companies
+where clay.include_company_identifiers(("stripe.com", "openai.com", "notion.so"))
+```
+
+Note: Exact company matching from an explicit domain list uses one companies-only clay.include_company_identifiers call with one inline list. Never use top-level domain = / domain in for this generated exact-company filter, and never split identifiers across multiple calls.
+
+Example user request: "find the company at https://www.linkedin.com/company/grow-with-clay/"
+
+Generate this Clay search query:
+
+```text
+select from companies
+where clay.include_company_identifiers(("https://www.linkedin.com/company/grow-with-clay/"))
+```
+
+Note: An explicitly provided company LinkedIn URL is an exact identifier, so use the companies-only clay.include_company_identifiers inline-list function. Do not rewrite the URL or match it with the domain field.
+
+Example user request: "find the exact company Google"
+
+Generate this Clay search query:
+
+```text
+select from companies
+where clay.include_company_identifiers(("google.com"))
+```
+
+Note: Google is a household company whose domain is established public knowledge. For a companies-result exact match, resolve it to google.com inside clay.include_company_identifiers; do not emit top-level domain = "google.com".
+
+Example user request: "find me clay, instantly and hubspot"
+
+Generate this Clay search query:
+
+```text
+select from companies
+where clay.include_company_identifiers(("clay.com", "instantly.ai", "hubspot.com"))
+```
+
+Note: A direct request for a list of specifically named companies is exact company inclusion even without words such as "exact", "only", or "include". Resolve high-confidence names to domains inside one clay.include_company_identifiers call; do not use top-level domain matching.
+
+Example user request: "software companies founded in the last 10 years"
 
 Generate this Clay search query:
 
@@ -825,10 +968,10 @@ Generate this Clay search query:
 select from companies
 where
   year_founded > 2016
-  and (latest_funding_type = "Series A" or latest_funding_type is_null)
+  and industry in ("Software Development", "Technology, Information and Internet")
 ```
 
-Note: latest_funding_type is a LOW COVERAGE field in Clay Search. Keep low-coverage filters optional by default by adding an is_null fallback; users can remove the is_null clause later for stricter matching.
+Note: Use the prompt-build year for relative founding-year requests, and map software companies to the structured industry field.
 
 Example user request: "people who have worked at more than 3 companies"
 
@@ -857,8 +1000,8 @@ select from companies
 where
   industry in ("Financial Services", "Banking")
   and (
-    (locations.any(country_name = "United States") and company_size = "201-500")
-    or (locations.any(country_name = "Canada") and company_size = "51-200")
+    (locations.any(is_headquarters = true and country_name = "United States") and company_size = "201-500")
+    or (locations.any(is_headquarters = true and country_name = "Canada") and company_size = "51-200")
   )
 ```
 
@@ -929,7 +1072,7 @@ Generate this Clay search query:
 ```text
 select from people
 where
-  location_city contains "New York"
+  location_city in ("New York", "New York City")
   and experiences.any(
     is_current = true
     and company.industry in ("Financial Services", "Banking", "Investment Banking")
@@ -956,7 +1099,7 @@ Generate this Clay search query:
 ```text
 select from companies
 where
-  locations.any(country_name = "Germany")
+  locations.any(is_headquarters = true and country_name = "Germany")
   and industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting")
   and annual_revenue in (
     "1M-5M",
@@ -1002,7 +1145,7 @@ Generate this Clay search query:
 
 ```text
 select from companies
-where people.exists(is_current = true and job_title is_similar_to ("VP Sales") and person.location_city contains "London")
+where people.exists(is_current = true and job_title is_similar_to ("VP Sales") and person.location_city = "London")
 ```
 
 Note: Person-level conditions inside people.exists use person.* fields: person.location_city is where the person is located, while bare location_city is where the role was located.
@@ -1027,18 +1170,16 @@ select from companies
 where people.count(is_current = true and job_title is_similar_to ("Engineer")) >= 20
 ```
 
-Example user request: "fintech and payment companies in Mexico, Colombia, or Brazil with 50-5000 employees, Series A-C, at least $5M funding, matching website keywords like card issuing and digital wallet"
+Example user request: "fintech and payment companies in Mexico, Colombia, or Brazil with 50-5000 employees, matching website keywords like card issuing and digital wallet"
 
 Generate this Clay search query:
 
 ```text
 select from companies
 where
-  locations.any(country_name in ("Mexico", "Colombia", "Brazil"))
+  locations.any(is_headquarters = true and country_name in ("Mexico", "Colombia", "Brazil"))
   and company_size in ("51-200", "201-500", "501-1,000", "1,001-5,000")
   and industry in ("Financial Services", "Banking")
-  and (latest_funding_type in ("Series A", "Series B", "Series C") or latest_funding_type is_null)
-  and (funding_total_usd >= 5000000 or funding_total_usd is_null)
   and description contains (
     "card issuing",
     "debit card",
@@ -1048,7 +1189,7 @@ where
   )
 ```
 
-Note: Multiple website/keyword phrases on the same company field → description contains ("a", "b", ...). Never (description contains "a" or description contains "b" or ...). Combine with structured filters via and. latest_funding_type and funding_total_usd are LOW COVERAGE fields — wrap each with an is_null fallback so sparse data does not silently drop matches.
+Note: Multiple website/keyword phrases on the same company field → description contains ("a", "b", ...). Never (description contains "a" or description contains "b" or ...). Combine them with structured geography, size, and industry filters via and.
 
 Example user request: "consulting, legal, and accounting firms that have an in-house sales or go-to-market team"
 
@@ -1084,12 +1225,12 @@ Generate this Clay search query:
 ```text
 select from companies
 where
-  locations.any(city contains ("San Francisco", "New York"))
+  locations.any(is_headquarters = true and city in ("San Francisco", "New York", "New York City"))
   and industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting", "Technology, Information and Media")
   and company_size in ("1,001-5,000", "5,001-10,000", "10,001+")
 ```
 
-Note: Company city/place filtering uses the locations tuple. Multiple place names on the same field → locations.any(city contains ("a", "b")), not repeated OR chains. "large" maps to the upper company_size buckets.
+Note: Generic company city/place filtering defaults to headquarters and uses exact city values in the locations tuple. Multiple place names on the same field stay in one locations.any(...) predicate, not repeated OR chains. "large" maps to the upper company_size buckets.
 
 Example user request: "companies with revenue between 10M and 50M"
 
@@ -1102,46 +1243,20 @@ where annual_revenue in ("10M-25M", "25M-75M")
 
 Note: annual_revenue uses predefined buckets. The range 10M-50M spans two buckets. Do NOT use numeric operators on annual_revenue.
 
-Example user request: "engineering jobs in san francisco"
+Example user request: "companies with roles closing in the next 2 weeks"
 
 Generate this Clay search query:
 
 ```text
-select from jobs
-where
-  job_still_open = true
-  and job_title contains "engineer"
-  and location contains "San Francisco"
-```
-
-Note: Generic job searches default to currently-open postings. Use the free-text location field for job location filtering. In select-from-jobs queries, match job_title with contains (NOT is_similar_to) — is_similar_to is not supported on job title fields in jobs-result queries (semantic fields like company.products_and_services still work).
-
-Example user request: "jobs closing in the next 2 weeks"
-
-Generate this Clay search query:
-
-```text
-select from jobs
-where
+select from companies
+where jobs.exists(
   job_still_open = true
   and job_removed_date >= today()
   and job_removed_date <= today() + interval 2 weeks
+)
 ```
 
-Note: Use today() plus an interval for future date windows. The interval amount must be a positive integer; prefer lowercase plural units.
-
-Example user request: "how many mid-senior level jobs are there"
-
-Generate this Clay search query:
-
-```text
-select from jobs
-where
-  job_still_open = true
-  and seniority = "Mid-Senior level"
-```
-
-Note: Use exact enum values for seniority — "Mid-Senior level", not "mid-senior".
+Note: Job postings are filters on companies (jobs.exists) or people (company.jobs.any), never a result entity. Use today() plus an interval for future date windows; the interval amount must be a positive integer, and prefer lowercase plural units.
 
 Example user request: "companies hiring for VP roles"
 
@@ -1153,20 +1268,6 @@ where jobs.exists(job_still_open = true and job_title is_similar_to ("VP"))
 ```
 
 Note: Companies "hiring for" a role means currently-open job postings, so include job_still_open = true inside jobs.exists(...).
-
-Example user request: "full-time jobs at large companies"
-
-Generate this Clay search query:
-
-```text
-select from jobs
-where
-  job_still_open = true
-  and employment_type = "Full-time"
-  and company.estimated_employee_count > 1000
-```
-
-Note: Inside jobs queries, company.* accesses the posting company's data.
 
 Example user request: "people who used to work at Amazon"
 
@@ -1206,6 +1307,25 @@ where
 ```
 
 Note: company.estimated_employee_count is a scalar field and CAN be used inside experiences.any(). Company fields appear inside experiences.any() as scalar company.* fields or the company.locations/company.technographics tuple arrays.
+
+Example user request: "commercial and operations directors in Brazil at small freight forwarding companies — logistics, import/export or warehousing, under 200 employees"
+
+Generate this Clay search query:
+
+```text
+select from people
+where
+  location_country = "Brazil"
+  and experiences.any(
+    is_current = true
+    and job_title is_similar_to ("Commercial Director", "Operations Director", "Commercial Manager", "Operations Manager")
+    and company.industry in ("Transportation, Logistics, Supply Chain and Storage", "Freight and Package Transportation", "Import and Export", "Warehousing")
+    and company.estimated_employee_count <= 200
+    and company.description contains ("freight forwarder", "customs broker")
+  )
+```
+
+Note: Several company attributes plus a title all describe ONE current employer, so they are conjoined inside a single experiences.any(...). Do NOT emit one experiences.any(...) per attribute — separate arms can each match a different job, and each arm is its own scan of the experiences table.
 
 Example user request: "engineers in the US but not in California"
 
@@ -1264,7 +1384,22 @@ where experiences.any(
 
 Note: Employer tech-stack asks use the company.technographics tuple array inside experiences.any(), with vendor, product, and product_category subfields. Bare technographics.any(...) is invalid in people queries.
 
-Example user request: "engineers at companies headquartered in Germany"
+Example user request: "engineering managers at companies hiring backend engineers"
+
+Generate this Clay search query:
+
+```text
+select from people
+where experiences.any(
+  is_current = true
+  and job_title is_similar_to ("engineering manager")
+  and company.jobs.any(job_still_open = true and job_title is_similar_to ("backend engineer"))
+)
+```
+
+Note: Employer hiring asks use company.jobs.any(...) inside experiences.any() — the person's own title stays on job_title of the experience, while the employer's postings are filtered inside company.jobs.any(...). Present-tense hiring keeps job_still_open = true. Bare jobs.any(...) is invalid in people queries.
+
+Example user request: "engineers at companies based in Germany"
 
 Generate this Clay search query:
 
@@ -1277,7 +1412,7 @@ where experiences.any(
 )
 ```
 
-Note: Employer-location asks use the company.locations tuple array inside experiences.any(); "headquartered in" adds is_headquarters = true inside the same company.locations.any(...). Person-location asks use top-level location fields instead.
+Note: Employer-location asks use the company.locations tuple array inside experiences.any(). Generic "companies based in" wording defaults to is_headquarters = true inside the same company.locations.any(...); explicit office or physical-presence wording omits it. Person-location asks use top-level location fields instead.
 
 Example user request: "HR professionals at salary.com, jfrog.com, and benchling.com"
 
@@ -1368,7 +1503,7 @@ where
 
 Note: Underspecified "AI companies": combine the AI-relevant industries with a semantic products_and_services is_similar_to comparison holding the AI concept the user named (automatically expanded). Do not route AI/ML/LLM terms to description contains unless the user explicitly asks for keyword matching.
 
-Example user request: "im looking for b2b saas companies that just raised their latest round in the last 6 months based in SF"
+Example user request: "im looking for b2b saas companies based in SF"
 
 Generate this Clay search query:
 
@@ -1376,22 +1511,66 @@ Generate this Clay search query:
 select from companies
 where
   products_and_services is_similar_to ("b2b saas")
-  and (latest_funding_date >= today() - interval 6 months or latest_funding_date is_null)
-  and locations.any(city contains "San Francisco")
+  and locations.any(is_headquarters = true and city = "San Francisco")
 ```
 
-Note: The "b2b saas" offering concept maps to the semantic products_and_services field (one concise value, automatically expanded). "raised their latest round in the last 6 months" → latest_funding_date >= today() - interval 6 months; latest_funding_date is LOW COVERAGE, so add an is_null fallback. "based in SF" → the company locations tuple: locations.any(city contains "San Francisco").
+Note: The "b2b saas" offering concept maps to the semantic products_and_services field (one concise value, automatically expanded). Generic "based in SF" defaults to the company headquarters location.
 
-Example user request: "companies based in New York or nearby states (New York, Pennsylvania, Connecticut, New Jersey) that recently raised a Series A round, have at least 10 open job postings including at least one open Chief of Staff role, and work in solar panels or clean batteries — climate tech and similar industries, plus relevant sub-industries"
+Example user request: "sheet metal companies across manhattan, brooklyn, and queens"
 
 Generate this Clay search query:
 
 ```text
 select from companies
 where
-  locations.any(state_or_province in ("New York", "Pennsylvania", "Connecticut", "New Jersey"))
-  and (latest_funding_type = "Series A" or latest_funding_type is_null)
-  and (latest_funding_date >= today() - interval 6 months or latest_funding_date is_null)
+  industry in ("Architectural and Structural Metal Manufacturing", "Fabricated Metal Products")
+  and description contains "sheet metal"
+  and locations.any(is_headquarters = true and city in ("Manhattan", "Brooklyn", "Queens") and state_or_province = "New York" and country_name = "United States")
+```
+
+Note: The three boroughs establish New York, United States, so keep the headquarters, exact city, state, and country constraints together inside one locations.any() predicate.
+
+Example user request: "companies in manhattan"
+
+Generate this Clay search query:
+
+```text
+select from companies
+where locations.any(is_headquarters = true and city = "Manhattan" and state_or_province = "New York" and country_name = "United States")
+```
+
+Then tell the user these approximations were applied:
+
+```json
+[
+  {
+    "phrase": "manhattan",
+    "reason": "Applied approximation: interpreted Manhattan as Manhattan, New York, United States; specify a state or country if you meant another Manhattan."
+  }
+]
+```
+
+Note: A standalone Manhattan defaults to New York but must disclose the geographic ambiguity.
+
+Example user request: "companies in DFW"
+
+Generate this Clay search query:
+
+```text
+select from companies
+where locations.any(is_headquarters = true and metro_area = "Dallas-Fort Worth-Arlington, TX" and country_name = "United States")
+```
+
+Note: DFW uses the stored metro name and country; generic company location filtering defaults to headquarters.
+
+Example user request: "companies based in New York or nearby states (New York, Pennsylvania, Connecticut, New Jersey) that have at least 10 open job postings including at least one open Chief of Staff role, and work in solar panels or clean batteries — climate tech and similar industries, plus relevant sub-industries"
+
+Generate this Clay search query:
+
+```text
+select from companies
+where
+  locations.any(is_headquarters = true and state_or_province in ("New York", "Pennsylvania", "Connecticut", "New Jersey"))
   and jobs.count(job_still_open = true) >= 10
   and jobs.exists(job_still_open = true and job_title is_similar_to ("Chief of Staff"))
   and industry in ("Renewables & Environment", "Renewable Energy Equipment Manufacturing", "Renewable Energy Power Generation", "Solar Electric Power Generation", "Services for Renewable Energy")
@@ -1399,7 +1578,7 @@ where
   and products_and_services is_similar_to ("solar panels", "clean batteries")
 ```
 
-Note: A dense multi-criteria company search. "New York or nearby states" → the company locations tuple by state: locations.any(state_or_province in (...)) with the named neighbors. "recently raised a Series A" → BOTH latest_funding_type = "Series A" (stage) AND latest_funding_date >= today() - interval 6 months (recency); both are LOW COVERAGE, so each gets an is_null fallback. Hiring criteria filter companies via the jobs relationship: "at least 10 open postings" → jobs.count(job_still_open = true) >= 10, and "at least one open Chief of Staff posting" → jobs.exists(job_still_open = true and job_title is_similar_to ("Chief of Staff")) (is_similar_to works inside jobs.exists on a companies query). "climate tech and similar industries" only APPROXIMATES the ask, so pair the closest industry enum values AND relevant ai_subindustries with a products_and_services refinement for the concrete offerings. The two alternative offerings are separate values in one semantic comparison, so either may match. Keep each value short and dense; no generic filler.
+Note: A dense multi-criteria company search. "New York or nearby states" → the company headquarters locations tuple by state with the named neighbors. Hiring criteria filter companies via the jobs relationship: "at least 10 open postings" → jobs.count(job_still_open = true) >= 10, and "at least one open Chief of Staff posting" → jobs.exists(job_still_open = true and job_title is_similar_to ("Chief of Staff")) (is_similar_to works inside jobs.exists on a companies query). "climate tech and similar industries" only approximates the ask, so pair the closest industry enum values and relevant ai_subindustries with a products_and_services refinement for the concrete offerings. The two alternative offerings are separate values in one semantic comparison, so either may match. Keep each value short and dense; no generic filler.
 
 Example user request: "companies that build digital banking apps"
 
@@ -1541,17 +1720,6 @@ where technographics.any(product = "Amazon Web Services (AWS)")
 
 Note: Amazon is the vendor, but Amazon Web Services is a documented product value. Preserve the named technology at product precision instead of broadening it to every Amazon technology.
 
-Example user request: "companies with funding rounds older than 3 months"
-
-Generate this Clay search query:
-
-```text
-select from companies
-where (latest_funding_date < today() - interval 3 months or latest_funding_date is_null)
-```
-
-Note: Use date expressions for relative recency on date-typed company fields like latest_funding_date. latest_funding_date is LOW COVERAGE — add an is_null fallback so sparse data does not silently drop matches.
-
 Example user request: "software engineers not based in the US or Canada"
 
 Generate this Clay search query:
@@ -1603,8 +1771,8 @@ Generate this Clay search query:
 select from companies
 where
   (
-    (locations.any(country_name = "Canada") and industry in ("Software Development", "Financial Services"))
-    or (locations.any(country_name = "Australia") and industry in ("Hospitals and Health Care", "Medical Devices"))
+    (locations.any(is_headquarters = true and country_name = "Canada") and industry in ("Software Development", "Financial Services"))
+    or (locations.any(is_headquarters = true and country_name = "Australia") and industry in ("Hospitals and Health Care", "Medical Devices"))
   )
   and company_size = "51-200"
 ```
@@ -1618,12 +1786,13 @@ Generate this Clay search query:
 ```text
 select from people
 where
-  location_city contains ("San Francisco", "San Jose", "Oakland", "Palo Alto", "Mountain View", "Sunnyvale", "Santa Clara", "Menlo Park", "Berkeley", "Fremont", "Redwood City", "San Mateo")
+  location_metro_area = "San Francisco Bay Area"
+  and location_country = "United States"
   and years_of_experience <= 8
   and experiences.any(is_current = true and job_title is_similar_to ("Product Manager"))
 ```
 
-Note: Bay Area is an approximate canonical city expansion, never a fallback to all of California. years_of_experience is a top-level people field for TOTAL career experience — filter it at the top level with numeric comparisons, never inside experiences.any(). Per-role tenure uses start_date; overall experience uses years_of_experience.
+Note: Bay Area uses the stored metro name with United States, without adding a city or state restriction. years_of_experience is a top-level people field for TOTAL career experience — filter it at the top level with numeric comparisons, never inside experiences.any(). Per-role tenure uses start_date; overall experience uses years_of_experience.
 
 Example user request: "account executives in Austin who were previously sales development representatives"
 
@@ -1632,7 +1801,7 @@ Generate this Clay search query:
 ```text
 select from people
 where
-  location_city contains "Austin"
+  location_city = "Austin"
   and experiences.any(is_current = true and job_title is_similar_to ("Account Executive"))
   and experiences.any(is_current = false and job_title is_similar_to ("SDR", "Sales Development Representative"))
 ```
@@ -1644,7 +1813,7 @@ Existing query being refined:
 ```text
 select from people
 where
-  location_city contains "San Francisco"
+  location_city = "San Francisco"
   and experiences.any(is_current = true and job_title contains "engineer")
 ```
 
@@ -1655,7 +1824,7 @@ Generate this Clay search query:
 ```text
 select from people
 where
-  location_city contains "San Francisco"
+  location_city = "San Francisco"
   and experiences.any(is_current = true and job_title contains "engineer" and company.estimated_employee_count >= 1000)
 ```
 
@@ -1666,7 +1835,7 @@ Existing query being refined:
 ```text
 select from people
 where
-  location_city contains "Denver"
+  location_city = "Denver"
   and experiences.any(is_current = true and job_title contains "Revenue Operations Manager")
 ```
 
@@ -1677,7 +1846,7 @@ Generate this Clay search query:
 ```text
 select from people
 where
-  location_city contains "Denver"
+  location_city = "Denver"
   and experiences.any(is_current = true and job_title is_similar_to ("Revenue Operations Manager"))
 ```
 
@@ -1688,7 +1857,7 @@ Existing query being refined:
 ```text
 select from people
 where
-  location_city contains ("New York", "San Francisco")
+  location_city in ("New York", "New York City", "San Francisco")
   and experiences.any(is_current = true and job_title contains "Sales Manager")
 ```
 
@@ -1699,7 +1868,7 @@ Generate this Clay search query:
 ```text
 select from people
 where
-  location_city contains ("New York", "San Francisco")
+  location_city in ("New York", "New York City", "San Francisco")
   and experiences.any(is_current = true and job_title contains "Sales Manager" and start_date <= today() - interval 3 years)
 ```
 
@@ -1710,7 +1879,7 @@ Existing query being refined:
 ```text
 select from companies
 where
-  locations.any(country_name = "France")
+  locations.any(is_headquarters = true and country_name = "France")
   and industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting")
 ```
 
@@ -1721,7 +1890,7 @@ Generate this Clay search query:
 ```text
 select from companies
 where
-  locations.any(country_name in ("France", "Spain", "Italy"))
+  locations.any(is_headquarters = true and country_name in ("France", "Spain", "Italy"))
   and industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting")
 ```
 
@@ -1731,7 +1900,7 @@ Existing query being refined:
 
 ```text
 select from companies
-where locations.any(country_name = "United States") and industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting")
+where locations.any(is_headquarters = true and country_name = "United States") and industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting")
 ```
 
 Example follow-up request: "or any company hiring a VP of Sales right now"
@@ -1741,7 +1910,7 @@ Generate this Clay search query:
 ```text
 select from companies
 where
-  (locations.any(country_name = "United States") and industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting"))
+  (locations.any(is_headquarters = true and country_name = "United States") and industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting"))
   or jobs.exists(job_still_open = true and job_title is_similar_to ("VP Sales"))
 ```
 
@@ -1752,7 +1921,7 @@ Existing query being refined:
 ```text
 select from people
 where
-  location_city contains "San Francisco"
+  location_city = "San Francisco"
   and experiences.any(is_current = true and job_title contains "Account Executive")
 ```
 
@@ -1763,7 +1932,7 @@ Generate this Clay search query:
 ```text
 select from people
 where
-  location_city contains "San Francisco"
+  location_city = "San Francisco"
   and experiences.any(is_current = true and job_title contains "Account Executive" and not job_title contains ("Enterprise Account Executive", "Major Account Executive"))
 ```
 
@@ -1774,7 +1943,7 @@ Existing query being refined:
 ```text
 select from people
 where
-  location_city contains "Boston"
+  location_city = "Boston"
   and experiences.any(is_current = true and job_title contains "Product Manager" and seniority = "Senior")
 ```
 
@@ -1785,7 +1954,7 @@ Generate this Clay search query:
 ```text
 select from people
 where
-  location_city contains "Denver"
+  location_city = "Denver"
   and experiences.any(is_current = true and job_title contains "Product Manager" and seniority = "Senior")
 ```
 
@@ -1822,7 +1991,7 @@ Example user request: "what's the weather today"
 Do not generate a Clay search query. Explain to the user:
 
 ```text
-This doesn't relate to searching for people, companies, or jobs.
+This doesn't relate to searching for people or companies.
 ```
 
 Example user request: "translate this to french"
@@ -1830,7 +1999,7 @@ Example user request: "translate this to french"
 Do not generate a Clay search query. Explain to the user:
 
 ```text
-This doesn't relate to searching for people, companies, or jobs.
+This doesn't relate to searching for people or companies.
 ```
 
 Example user request: "people with Salesforce admin experience who have a CPA"
@@ -1868,14 +2037,16 @@ where
 
 Note: Full-cycle sales implies sales-role experience, so retain that intent with a job-title predicate. Preserve the named payments/B2B/fintech and technical-sales context as profile and experience keywords. "Top performers with a proven track record of attainment" is qualitative ranking metadata without a measurable threshold, so omit it from the query without an unsupported-criterion caveat.
 
-Example user request: "NYC-based accountants who have been in their current role for more than 12 months at Series C or later tech companies with 200–800 employees, with CPA credentials and Big 4 experience. Add columns for years in current role, current company, and company funding stage."
+Example user request: "NYC-based accountants who have been in their current role for more than 12 months at tech companies with 200–800 employees, with CPA credentials and Big 4 experience. Add columns for years in current role, current company, and work email."
 
 Generate this Clay search query:
 
 ```text
 select from people
 where
-  location_city contains ("New York", "Manhattan", "Brooklyn")
+  location_city in ("New York", "New York City", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island")
+  and location_state = "New York"
+  and location_country = "United States"
   and (headline contains "CPA" or about contains "CPA")
   and experiences.any(
     is_current = true
@@ -1883,7 +2054,6 @@ where
     and company.estimated_employee_count >= 200
     and company.estimated_employee_count <= 800
     and company.industry in ("Software Development", "Technology, Information and Internet", "IT Services and IT Consulting", "Technology, Information and Media")
-    and (company.latest_funding_type in ("Series C", "Series D", "Series E", "Series F", "Series G", "Series H", "Series I", "Series J", "Post IPO equity", "Post IPO debt", "Post IPO secondary") or company.latest_funding_type is_null)
     and start_date <= today() - interval 12 months
   )
   and experiences.any(company.domain in ("deloitte.com", "pwc.com", "ey.com", "kpmg.com"))
@@ -1894,10 +2064,46 @@ Then tell the user these criteria were not captured:
 ```json
 [
   {
-    "phrase": "Add columns for years in current role, current company, and company funding stage",
+    "phrase": "Add columns for years in current role, current company, and work email",
     "reason": "The Clay search query is a filter language and does not add enrichment columns — column configuration is handled outside the Clay search query."
   }
 ]
 ```
 
-Note: "NYC-based" → location_city contains ("New York", "Manhattan", "Brooklyn") on one field (not OR chains). "CPA" still ORs headline and about (different fields). "Tech companies" is expressed via the scalar `company.industry` inside experiences.any(). `company.latest_funding_type` is LOW COVERAGE, so it is wrapped with an is_null fallback. Big 4 uses a domain list. The same `experiences.any` for the current accountant role includes "more than 12 months in current role" via `start_date <= today() - interval 12 months`.
+Note: "NYC-based" → location_city in ("New York", "New York City", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"), location_state = "New York", and location_country = "United States". "CPA" still ORs headline and about (different fields). "Tech companies" is expressed via the scalar `company.industry` inside experiences.any(). Big 4 uses a domain list. The same `experiences.any` for the current accountant role includes "more than 12 months in current role" via `start_date <= today() - interval 12 months`.
+
+
+## Workspace resource references
+
+Queries can reference workspace audience segments; each reference resolves when the search previews or runs. If earlier examples say to route an audience name to a picker ("Resource selection required"), that applies only when pasting into Clay Search. On this surface, resolve the id with the CLI and author the reference directly.
+
+- `@audience_segment("SEGMENT_ID")` — an Audiences segment. Get segment ids with `clay audiences list`. Contact segments match people queries; Account segments match companies queries. The list is paginated: pass each response's `cursor` back with `--cursor` until it is absent before matching by name or checking for duplicates. Never invent a segment id.
+- `@audience_segment("ALL")` — the whole Audiences dataset for the query's result entity (every Contact for people queries, every Account for companies queries). Use it whenever the user wants to exclude what the workspace already has — "exclude my existing contacts/accounts", "net-new only", "not already in Clay", "exclude all my audiences" — without listing or creating a segment: `clay.exclude_people_identifiers(@audience_segment("ALL"))` / `clay.exclude_company_identifiers(@audience_segment("ALL"))`. Resolve a specific segment id only when the user names a particular audience or segment. `ALL` is a sentinel, not a name match: a segment whose name contains "ALL" still needs its real id.
+- `@table("tableId:viewId:fieldId")` — a Clay table column of identifiers. Preserve existing references exactly; do not construct new ones (the ids come from the in-app picker).
+- `@bitmap("BITMAP_ID")` — preserve if present; never construct.
+
+
+Where references are accepted (one source per call):
+
+- Exclusions — up to 3 calls of the matching function per query, top-level and combined with `and`:
+  - People queries: `clay.exclude_people_identifiers(@audience_segment("SEGMENT_ID"))`
+  - Companies queries: `clay.exclude_company_identifiers(@audience_segment("SEGMENT_ID"))`
+- Current-employer inclusion in people queries — `clay.filter_to_companies(...)` (1 call per query) also accepts an Account segment: `clay.filter_to_companies(@audience_segment("SEGMENT_ID"))`.
+
+Example — product managers who are not already in the workspace's Audiences:
+
+```
+select from people
+where experiences.any(is_current = true and job_title is_similar_to ("Product Manager"))
+  and clay.exclude_people_identifiers(@audience_segment("ALL"))
+```
+
+Example — product managers, excluding everyone already in one named audience:
+
+```
+select from people
+where experiences.any(is_current = true and job_title is_similar_to ("Product Manager"))
+  and clay.exclude_people_identifiers(@audience_segment("SEGMENT_ID"))
+```
+
+The entity kind of the segment must match the function: a Contact segment cannot be used in `clay.exclude_company_identifiers` or `clay.filter_to_companies`, and an Account segment cannot be used in `clay.exclude_people_identifiers`. When the user names an audience, resolve it to a segment id via `clay audiences list` and confirm with the user if multiple segments match the name.

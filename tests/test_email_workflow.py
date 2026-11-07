@@ -123,6 +123,25 @@ def test_build_person_bodies():
     assert json.loads(out["blitz_body"]) == {"person_linkedin_url": "https://www.linkedin.com/in/jane"}
 
 
+@pytest.mark.parametrize("name,ok", [("Jane Doe", True), ("Dr. Nico Hamacher", True), ("José Müller-Lüdenscheid", True),
+                                     ("John O'Neil", True), ("张春阁", False), ("春阁 张", False), ("박은엽", False), ("Madonna", False)])
+def test_names_leadmagic_rejects_are_flagged(name, ok):
+    """LeadMagic errored on these (EVCharge, 2026-10-29) and the error stopped the row before Prospeo."""
+    assert run(ew.BUILD_PERSON, **{"Person Name": name, "LinkedIn URL": "u"})["lm_name_ok"] is ok
+
+
+def test_names_leadmagic_rejects_go_straight_to_prospeo():
+    nodes = ew.graph(CFG)
+    parents = {k: p for k, _, p in nodes}
+    by = {k: s_ for k, s_, _ in nodes}
+    assert ("blitz_found", "skip_lm", "No Blitz email, name LeadMagic rejects - Prospeo") in parents["prospeo"]
+    assert ("lm_found", "none", "No LeadMagic email - Prospeo") in parents["prospeo"]
+    rules = {r["id"]: r["condition"]["items"] for r in by["blitz_found"]["rulesConditionalConfig"]["rules"]}
+    assert {"type": "BinOp", "dataPath": ["lm_name_ok"], "operator": "True"} in rules["none"]          # LeadMagic only when it can
+    assert {"type": "BinOp", "dataPath": ["lm_name_ok"], "operator": "False"} in rules["skip_lm"]
+    assert by["build"]["outputSchema"]["lm_name_ok"]["type"] == "boolean"
+
+
 STORED = [{"status": "known, bad email", "email": "x@acme.com", "email_validation_status": "invalid", "mx_provider": "google"}]
 
 

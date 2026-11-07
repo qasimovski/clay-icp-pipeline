@@ -171,7 +171,11 @@ class Rules:
         return [t for t in titles if t not in self.buy_exact or t in also]
 
     def buy_excludes(self, cat):
-        return [x for x in self.buy_x if cat not in (self.allowed.get(x) or [])]
+        # icp.yaml's buy.categories.<cat>.exclude_titles too: the Clay search (ICP Mapping) and Blitz
+        # already exclude them for that category, so a row from anywhere else must be judged the same
+        # way (EVCharge buy side, 2026-11-06: "MD" is a physician in Hospitals & health, not an MD).
+        cat_x = list((self.buy_cats.get(cat) or {}).get("exclude_titles") or [])
+        return [x for x in self.buy_x if cat not in (self.allowed.get(x) or [])] + cat_x
 
     def judge(self, side, cat, title, country, headline=""):
         """-> (reason or "", fields to set). An empty reason means keep."""

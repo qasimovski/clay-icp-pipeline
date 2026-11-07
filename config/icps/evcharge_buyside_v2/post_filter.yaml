@@ -1,0 +1,37 @@
+# DRAFT 2026-11-06. EVCharge BUY SIDE: rules applied to the people Find People / Blitz return, because the
+# Clay search can't express them (shape: .claude/skills/event-icp-clay-workflow/assets/post_filter.example.yaml).
+# Source: "BuySide ICP v2" + "Geo_Scope v2" tabs of scrapers_evcharge/EV Charge Playbook ICP v3.xlsx.
+#
+# Matching: `exact` = the whole title, or one part of a compound title ("CEO & Founder" passes CEO).
+# Contains keywords are the category's icp.yaml titles. Near-exact ("Group CEO") and non-English titles
+# are kept and FLAGGED in "Title Check" for the marketing manager, never dropped.
+
+buy:
+  # The cross-cutting titles the sheet marks "Exact" (rows 67, 69, 71). Everything else is Contains.
+  exact: [CEO, COO, MD]
+  # EXCLUDE row + the seniority exclusions + Product Owner (Owner is a contains keyword).
+  exclude: [Intern, Trainee, Assistant, Freelance, Entry, Student, Researcher, Research Fellow, Professor,
+            Lecturer, PhD, Product Owner]
+  # Best tier across the six BUY columns of Geo_Scope v2 (EVCS USA, EVCS Europe, EVCharge Live UK,
+  # Paris, Espana, Italia). Philippines: unparked by the user for this run (2026-11-06), tier Yes.
+  geo_tier:
+    Core: [United States, Canada, Mexico, Brazil, Chile, Colombia, United Kingdom, Ireland, Germany, France,
+           Netherlands, Belgium, Norway, Sweden, Denmark, Finland, Spain, Portugal, Italy, Poland,
+           Czech Republic, Hungary]
+    "Yes": [Luxembourg, Austria, Switzerland, Greece, Turkey, Romania, Slovakia, Bulgaria, Croatia, Slovenia,
+            Serbia, Estonia, Latvia, Lithuania, Philippines]
+    Secondary: [Argentina, Peru, Costa Rica, Uruguay, Iceland, Malta, Cyprus, Bosnia and Herzegovina,
+                North Macedonia, Albania, Montenegro, Ukraine, Moldova]
+
+# Germany: in scope on both sides, LinkedIn + phone ONLY, no email (Geo_Scope v2 row 5; memory
+# germany-linkedin-only). Its people go to the LinkedIn-only file and never to the email workflow.
+linkedin_only_countries: [Germany]
+
+# Geo_Scope v2 BUY columns, per event. A buyer belongs to every event whose column lists their country.
+editions:
+  EVCS USA: {"Core": ["United States", "Canada", "Mexico", "Brazil", "Chile", "Colombia"], "Secondary": ["Argentina", "Peru", "Costa Rica", "Uruguay", "United Kingdom", "Germany"]}
+  EVCS Europe: {"Core": ["Ireland", "Germany", "France", "Netherlands", "Belgium", "Norway", "Sweden", "Denmark", "Finland", "Spain", "Portugal", "Italy", "Poland", "Czech Republic", "Hungary"], "Yes": ["Luxembourg", "Austria", "Switzerland", "Greece", "Turkey", "Romania", "Slovakia", "Bulgaria", "Croatia", "Slovenia", "Serbia", "Estonia", "Latvia", "Lithuania"], "Secondary": ["United Kingdom", "Iceland", "Malta", "Cyprus", "Bosnia and Herzegovina", "North Macedonia", "Albania", "Montenegro", "Ukraine", "Moldova"]}
+  EVCharge Live UK: {"Core": ["United Kingdom", "Ireland"]}
+  EV Charge Live Paris: {"Core": ["France"], "Secondary": ["Belgium", "Luxembourg", "Switzerland"]}
+  EV Charge Live Espana: {"Core": ["Spain"], "Secondary": ["Portugal"]}
+  EV Charge Live Italia: {"Core": ["Italy"], "Secondary": ["Switzerland", "Malta", "Slovenia"]}

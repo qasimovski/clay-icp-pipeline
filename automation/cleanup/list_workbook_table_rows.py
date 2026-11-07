@@ -45,7 +45,11 @@ def main():
     binary = clay_bin.pick()
     cursor, found = None, []
     for _ in range(60):
-        args = ["tables", "list", "--limit", "100"]
+        # Filter server-side on the workbook (CLI 1.12 `--filter workbook.id=`). Paging the WHOLE
+        # workspace stopped finding new tables once it held more than 60 x 100 = 6,000 tables (Solar
+        # Other Sources import, 5 Nov 2026: every fresh table "could not confirm"), and cost up to 60
+        # CLI calls per check. The client-side workbook match below stays as a guard.
+        args = ["tables", "list", "--limit", "100", "--filter", f"workbook.id={wb}"]
         if cursor:
             args += ["--cursor", cursor]
         ok, d, err = clay_bin.run(binary, args)
