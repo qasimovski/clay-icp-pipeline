@@ -51,8 +51,10 @@ import collections
 import io
 import json
 import os
+import re
 import subprocess
 import sys
+import time
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 AUTO_DIR = os.path.dirname(SCRIPT_DIR)
@@ -460,6 +462,31 @@ def main():
                 if got is None:
                     print(f"     !! could not confirm {r['table']} — left pending")
                     continue
+                # BIG TABLES LOAD SLOWLY (Solar buy side, 6 Nov 2026: a 13,821-row
+                # table read 0 and a 9,780-row one 5,600 after ~35 s, both complete
+                # minutes later). Leaving them pending sent the next run to "needs
+                # repair", and the repair deletes 0-row tables — i.e. one that is
+                # still loading. Keep polling while Clay is still short and the
+                # count moves (or is 0); stop after 90 s without growth or 20 min.
+                #
+                # EXCEPT when the rows went to a numbered duplicate (EVCharge Other
+                # Sources, 6 Nov 2026: three times the first attempt left an empty
+                # `Sellside People` and the retry put every row in `Sellside People
+                # (2)`). The empty original never fills, so the 0-row case above
+                # polled the full 20 min for nothing. A full `Name (N)` beside a
+                # 0-row `Name` is that case: stop and leave it to the repair pass.
+                still, t0 = 0, time.time()
+                while got is not None and got < r["rows"] and still < 90 and time.time() - t0 < 1200:
+                    page.wait_for_timeout(15000)
+                    live_now = live_tables(wid) or {}
+                    now = live_now.get(r["table"])
+                    still = still + 15 if (now == got and got) else 0
+                    got = now if now is not None else got
+                    if not got and any(re.fullmatch(re.escape(r["table"]) + r" \(\d+\)", n) and c == r["rows"]
+                                       for n, c in live_now.items()):
+                        print(f"     .. {r['table']} is empty and a numbered copy holds all "
+                              f"{r['rows']} rows — not waiting for it")
+                        break
                 if got != r["rows"]:
                     print(f"     !! {r['table']}: Clay has {got} rows, "
                           f"the CSV has {r['rows']} — left pending")

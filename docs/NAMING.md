@@ -141,3 +141,27 @@ single-workbook operation, `*_rollout.py` remains the fleet driver.
 - Superseded files (rule 2) — Phase 3 decides retire-vs-rename.
 - `slug`, `tag`, `--only`, `w0/w1/w2`, `.premerge` — state-file adjacent; documented in the
   glossary instead of renamed.
+
+## F. Deliverable file names — the final Salesforce CSVs (user, 2026-11-07)
+
+Not a rename of anything existing: a rule for **new** exports. The final Salesforce CSV (every email and
+field, the file that goes to IT for the Salesforce load) is named by its scope and a short brand:
+
+| Scope | File |
+|---|---|
+| Competitive Events | `Competitive_<Brand>.csv` |
+| Other Sources (associations, directories, trades) | `Other_sources_<Brand>.csv` |
+| BuySide P&S (buyers found by company search) | `Buy_side_<Brand>.csv` |
+| Products & Services (sellers found by company search) | `Sell_side_<Brand>.csv` |
+
+- `<Brand>` is short, letters and digits only: `EVCharge`, `Solar`, `Mining`, `Highways`. It is set once per
+  ICP as `salesforce_brand` in `config/icps/<icp>/icp.yaml`.
+- A scope with more than one upload adds `_<Part>`: `Other_sources_EVCharge_Trades.csv`,
+  `Other_sources_EVCharge_Associations.csv`.
+- Companion files keep the base name and add ` - <label>`: `Buy_side_EVCharge - LinkedIn only.csv`,
+  `Buy_side_EVCharge - duplicates removed.csv`.
+- Enforced in code: `.claude/skills/event-icp-clay-workflow/scripts/sf_naming.py`; `deliver.py salesforce`
+  names the file from `--scope` and refuses an `--out` that breaks the rule (tests in
+  `tests/test_icp_rerun_rules.py`).
+- Files built before 2026-11-07 (Solar CE, EVCharge Other Sources, PhilEnergy) keep their names (user:
+  new exports only). A run-folder script that writes a Salesforce file by hand must use the same names.

@@ -243,7 +243,11 @@ def cmd_people(a):
             ppl = [p for h in halves for p in people_of(h[d])[0]]
             by_domain[d] = (ppl, "" if ppl else "no people")
         print(f"seniority split applied to {len(doms):,} companies")
-    accepted = {x.strip().lower() for x in (getattr(a, "accept_failed", "") or "").split(",") if x.strip()}
+    raw = getattr(a, "accept_failed", "") or ""
+    # A path = one domain per line: a scraped "domain" can itself hold a comma ("www,example.org",
+    # EVCharge buy side 2026-11-07), which the comma list would split in two.
+    parts = open(raw, encoding="utf-8").read().splitlines() if raw and os.path.isfile(raw) else raw.split(",")
+    accepted = {x.strip().lower() for x in parts if x.strip()}
     if accepted & failed:
         print(f"accepted as permanently failed (not searchable): {sorted(accepted & failed)}")
     failed -= accepted
@@ -371,7 +375,8 @@ def main():
     p.add_argument("--icp", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--accept-failed", default="",
-                   help="comma list of domains whose search can never succeed (ERROR_INVALID_INPUT, e.g. an IP); "
+                   help="comma list (or a file, one per line) of domains whose search can never succeed "
+                        "(ERROR_INVALID_INPUT, e.g. an IP); "
                         "they are reported, not exported, instead of blocking the export")
     e = sub.add_parser("emails")
     e.add_argument("--people", required=True, help="the approved people CSV that was bulk-run")

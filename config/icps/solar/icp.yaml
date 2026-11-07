@@ -1,0 +1,704 @@
+# APPROVED by the user, 26 Oct 2026 ("yes, approved"). Competitor v2 per-event COUNTRIES column ignored: Geo Scope v2 wins (user, 26 Oct 2026).
+# Solar & Storage Live ICP: competitor-event companies -> people, for every SSL edition.
+# Read by .claude/skills/event-icp-clay-workflow/scripts/icp_mapping.py (the people workflow's
+# ICP Mapping node). Source: "Solar___Storage_Live_ICP_-_Tiered.xlsx" (Downloads, 26 Oct 2026),
+# V2 tabs only (V2 always beats V1): Products_Services v2, Seller JTs v2, BuySide ICP v2,
+# Geo Scope v2, Brief v2. Rules the Clay search can't express (exact match, per-keyword exclusions,
+# personas, geo tier, the Germany split) are in post_filter.yaml beside this file.
+#
+# Decisions behind this file (user, 26 Oct 2026, "go with your recommendations"):
+# - Person location only. The countries below filter where the PERSON is, not the company HQ.
+# - Germany: searched, LinkedIn URL only. No phone and no email are ever looked up
+#   (post_filter.yaml linkedin_only_countries; Brief v2 beats Geo Scope v2's "Email + LinkedIn").
+# - Sudan, Libya, Iraq, Lebanon and Myanmar are removed everywhere (Brief v2, 23 Oct 2026), even
+#   though Geo Scope v2 (15 Oct) still lists them.
+# - Sell side: Bookers and Stand staff in ONE contains search (the lists share keywords, so two
+#   searches would pay twice); post_filter.yaml tags the persona (Booker wins on overlap).
+# - Exact titles that are safe in contains mode (CEO, MD, CMO...) are in `titles` and judged exactly
+#   by post_filter.yaml. Exact titles that contains mode would flood (VP, bare Director / Owner /
+#   President on the buy side) are in `exact_titles`, searched only by a separate exact-mode pass if
+#   it's approved after the draft test.
+# - "Run these lists only against companies that pass Products_Services v2" (Seller JTs v2): every
+#   sell company in the feed has a Products_Services v2 label, so this holds by construction.
+#
+# Seniority, every V2 tab: "All except Intern/Trainee, Assistant, Entry, Freelance"
+# -> every Clay slug except entry and intern, plus the title exclusions below.
+# Short brand for the final Salesforce CSV names (Competitive_<Brand>.csv, Buy_side_<Brand>.csv ...;
+# user, 2026-11-07; .claude/skills/event-icp-clay-workflow/scripts/sf_naming.py). Letters and digits only.
+salesforce_brand: Solar
+seniority:
+- founder
+- owner
+- board-member
+- partner
+- c-suite
+- vp
+- director
+- head
+- manager
+- senior
+- mid-level
+# Same split as Mining (A, B1, B2): a company returning exactly 10 is searched once per group.
+seniority_groups:
+  A:
+  - founder
+  - owner
+  - board-member
+  - partner
+  - c-suite
+  - vp
+  - director
+  B1:
+  - head
+  - manager
+  B2:
+  - senior
+  - mid-level
+
+# Both sides. collect.py also applies this list at export to every person.
+exclude_titles:
+- Intern
+- Trainee
+- Assistant
+- Freelance
+- Freelancer                   # user, 28 Oct 2026: whole-word matching missed "Freelancer - Project Manager"
+
+sell:
+  # Seller JTs v2 per-row notes, applied in Clay where no sell keyword wants the word. Notes that
+  # only apply to one keyword (Marketing -> not Coordinator) are in post_filter.yaml.
+  exclude_titles:
+  - Product Owner                # "Owner: exclude Product Owner"
+  - Sales Coordinator            # "Sales: exclude Sales Coordinator / Support / Administrator"
+  - Sales Support
+  - Sales Administrator
+  - Head of Finance              # "Head of: exclude Head of Finance / HR / Legal / Procurement"
+  - Head of HR
+  - Head of Legal
+  - Head of Procurement
+  # User, 28 Oct 2026 (after the draft test): "International" pulled in "International Procurement";
+  # the sheet already excludes Head of Procurement / Finance, so these exclude the whole function.
+  - Procurement
+  - Purchasing
+  - Finance
+  # User, 28 Oct 2026 (after the people pilot: "Vice President of Tax" got through via "Vice President").
+  - Tax
+  - Accounting
+  - Treasury
+  - Audit
+  - HR
+  - Legal
+  # User, 28 Oct 2026 ("go with your judgment"): the spelled-out HR forms the Blitz pilot surfaced.
+  - Human Resources
+  - Recruiting
+  - Recruitment
+  - Talent Acquisition
+  titles:
+  # Bookers (sign the contract). Exact on the sheet, safe in contains mode:
+  - CMO
+  - MD
+  - GM
+  - CCO
+  # Bookers, Contains:
+  - Marketing
+  - Brand
+  - Communication
+  - Communications               # whole-word matching: the singular doesn't hit the plural
+  - Mkt
+  - Event
+  - Events
+  - Exhibition
+  - Exhibitions
+  - Trade Show
+  - Fair
+  - Fairs
+  - CEO
+  - Chief Executive Officer
+  - Founder
+  - Co-Founder
+  - Owner
+  - Managing Director
+  - General Manager
+  - President
+  - Country Manager
+  - Chairman
+  - Chief Commercial Officer
+  - Vice President
+  - Regional Director
+  - Head of
+  - Sales Director
+  - Commercial Director
+  - Business Development Director
+  # Stand staff (work the stand). Exact on the sheet, safe in contains mode:
+  - BDM
+  # Stand staff, Contains:
+  - Sales
+  - Business Development
+  - Account Manager
+  - Regional Manager
+  - Area Manager
+  - Channel
+  - Distribution
+  - Partner
+  - Partnerships
+  - Commercial
+  - Overseas
+  - International
+  - Export
+  - Exporter
+  - Product Manager
+  - Project Manager
+  - Application Engineer
+  - Applications Engineer
+  - Solution
+  - Solutions
+  - Technical Sales
+  # Exact-mode pass only (see header): "VP" and "Director" are Exact on the sheet, and contains mode
+  # would hit every "VP Finance" / "Finance Director".
+  exact_titles:
+  - VP
+  - Director
+  # Geo Scope v2 SELL SIDE: Core, Yes, Secondary and Exhibitor sourcing. Blank is left out, and so is
+  # Lebanon (removed 23 Oct). One list for every category: the sheet doesn't vary it by category.
+  categories:
+    PV cells & modules: &sell_countries
+    - United Kingdom
+    - Germany
+    - Italy
+    - Spain
+    - Turkey
+    - South Africa
+    - China
+    - Switzerland
+    - France
+    - Belgium
+    - Netherlands
+    - Portugal
+    - Poland
+    - Saudi Arabia
+    - United Arab Emirates
+    - Jordan
+    - Egypt
+    - Nigeria
+    - Philippines
+    - Vietnam
+    - Thailand
+    - Malaysia
+    - Singapore
+    - Indonesia
+    - India
+    - South Korea
+    - Taiwan
+    - Ireland
+    - Austria
+    - Greece
+    - Czech Republic
+    - Sweden
+    - Denmark
+    - Norway
+    - Finland
+    - Qatar
+    - Oman
+    - Morocco
+    - Tunisia
+    - Algeria
+    - Kenya
+    - Japan
+    - Pakistan
+    - United States
+    - Mexico
+    - Brazil
+    - Australia
+    Inverters & power electronics: *sell_countries
+    Energy storage & batteries: *sell_countries
+    Mounting, tracking & racking: *sell_countries
+    Distributors & wholesalers: *sell_countries
+    PV balance of system & electrical: *sell_countries
+    Monitoring, EMS & software: *sell_countries
+    O&M, testing & recycling: *sell_countries
+    Off-grid & hybrid systems: *sell_countries
+    BESS fire safety: *sell_countries
+    Grid connection, certification & training: *sell_countries
+
+buy:
+  # BuySide ICP v2 EXCLUDE row, minus Intern / Trainee / Assistant (in exclude_titles), plus the
+  # seniority exclusions (Entry, Freelance) and whole-word spellings of "Recruit".
+  exclude_titles:
+  - Entry
+  - Student
+  - Receptionist
+  - HR
+  - Human Resources
+  - Recruit
+  - Recruiter
+  - Recruitment
+  - Talent
+  - Legal
+  - Counsel
+  - Lawyer
+  - Accountant
+  - Payroll
+  - Teacher
+  - Nurse
+  - Customer Service
+  - Software Developer
+  - Product Owner
+  - Media Buyer                  # "Buyer must not match Media Buyer"
+  # Cross-cutting titles that are Exact on the sheet and that contains mode would flood
+  # ("Product Owner", "Vice President", every "... Director"). Exact-mode pass only.
+  exact_titles:
+  - Owner
+  - President
+  - Director
+  # Geo Scope v2 BUY columns, all 17 editions combined: Core, Yes and Secondary. Blank is left out,
+  # and so are Sudan, Libya, Iraq, Lebanon and Myanmar (removed 23 Oct). Which edition a buyer goes
+  # to is decided per person from these columns after the search (scope.yaml editions).
+  default_countries:
+  - United Kingdom
+  - Ireland
+  - Belgium
+  - Netherlands
+  - Sweden
+  - Denmark
+  - Norway
+  - Finland
+  - Switzerland
+  - Liechtenstein
+  - France
+  - Germany
+  - Austria
+  - Luxembourg
+  - Italy
+  - Greece
+  - Malta
+  - Spain
+  - Portugal
+  - Saudi Arabia
+  - United Arab Emirates
+  - Qatar
+  - Kuwait
+  - Bahrain
+  - Oman
+  - Turkey
+  - Jordan
+  - Egypt
+  - Morocco
+  - Tunisia
+  - Algeria
+  - South Africa
+  - Botswana
+  - Namibia
+  - Zimbabwe
+  - Zambia
+  - Mozambique
+  - Lesotho
+  - Swaziland                    # the sheet's "Eswatini" (Clay's spelling)
+  - Malawi
+  - Kenya
+  - Tanzania
+  - Uganda
+  - Nigeria
+  - Ghana
+  - Benin
+  - Togo
+  - Cameroon
+  - Côte d'Ivoire
+  - Philippines
+  - Vietnam
+  - Thailand
+  - Cambodia
+  - Laos
+  - Malaysia
+  - Singapore
+  - Brunei Darussalam            # the sheet's "Brunei" (Clay's spelling)
+  - Indonesia
+  # Each group = the union of its sub-segments' title keywords (col F), then the cross-cutting
+  # titles (rows 33-65) that are safe in contains mode, the same for every group:
+  #   Solar, PV, Photovoltaic, Renewable, Battery, BESS, Energy Storage, Energy Manager,
+  #   Head of Energy, Sustainability, Net Zero, Decarbonisation, ESG, Facilities, Estates, Property,
+  #   Procurement, Purchasing, Buyer, Supply Chain
+  #   + exact: CEO, Chief Executive Officer, Founder, Co-Founder, Managing Director, MD,
+  #     General Manager, COO, CTO, CFO. The spelled-out Chief Operating / Technology / Financial
+  #     Officer are added (the sheet lists only the abbreviations; Highways missed people that way).
+  categories:
+    Installers & EPCs:
+      titles:
+      - Installer
+      - Installation
+      - Design
+      - Surveyor
+      - Estimator
+      - Project Manager
+      - Project Director
+      - Contracts
+      - Engineering
+      - EPC
+      - Construction
+      - Engineering Manager
+      - Grid
+      - Commissioning
+      - Electrician
+      - Electrical
+      - Roofer
+      - Owner                    # a segment keyword for electrical contractors (contains here)
+      - Solar
+      - PV
+      - Photovoltaic
+      - Renewable
+      - Battery
+      - BESS
+      - Energy Storage
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - ESG
+      - Facilities
+      - Estates
+      - Property
+      - Procurement
+      - Purchasing
+      - Buyer
+      - Supply Chain
+      - CEO
+      - Chief Executive Officer
+      - Founder
+      - Co-Founder
+      - Managing Director
+      - MD
+      - General Manager
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technology Officer
+      - CFO
+      - Chief Financial Officer
+    Developers & IPPs:
+      titles:
+      - Development
+      - Developer
+      - Origination
+      - Project
+      - Grid
+      - Land
+      - Planning
+      - Construction
+      - Asset Manager
+      - Generation
+      - Investment
+      - Engineering
+      - Technical Director
+      - Portfolio
+      - Operations
+      - Performance
+      - Solar
+      - PV
+      - Photovoltaic
+      - Renewable
+      - Battery
+      - BESS
+      - Energy Storage
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - ESG
+      - Facilities
+      - Estates
+      - Property
+      - Procurement
+      - Purchasing
+      - Buyer
+      - Supply Chain
+      - CEO
+      - Chief Executive Officer
+      - Founder
+      - Co-Founder
+      - Managing Director
+      - MD
+      - General Manager
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technology Officer
+      - CFO
+      - Chief Financial Officer
+    Utilities & energy retailers:
+      titles:
+      - Distributed Energy
+      - Generation
+      - Storage
+      - Innovation
+      - Grid
+      - Network Planning
+      - Connections
+      - Flexibility
+      - Proposition
+      - Solar
+      - PV
+      - Photovoltaic
+      - Renewable
+      - Battery
+      - BESS
+      - Energy Storage
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - ESG
+      - Facilities
+      - Estates
+      - Property
+      - Procurement
+      - Purchasing
+      - Buyer
+      - Supply Chain
+      - CEO
+      - Chief Executive Officer
+      - Founder
+      - Co-Founder
+      - Managing Director
+      - MD
+      - General Manager
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technology Officer
+      - CFO
+      - Chief Financial Officer
+    Large energy users (C&I):
+      titles:
+      - Energy
+      - Utilities
+      - Engineering Manager
+      - Plant Manager
+      - Power                    # "Power is OK here only inside data centre / telecom companies"
+      - Critical Infrastructure
+      - Electrical Engineer
+      - Solar
+      - PV
+      - Photovoltaic
+      - Renewable
+      - Battery
+      - BESS
+      - Energy Storage
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - ESG
+      - Facilities
+      - Estates
+      - Property
+      - Procurement
+      - Purchasing
+      - Buyer
+      - Supply Chain
+      - CEO
+      - Chief Executive Officer
+      - Founder
+      - Co-Founder
+      - Managing Director
+      - MD
+      - General Manager
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technology Officer
+      - CFO
+      - Chief Financial Officer
+    Property & facilities:
+      titles:
+      - Development Director
+      - Technical Director
+      - Energy
+      - Asset Manager
+      - Asset Management
+      - Technical Services
+      - Building Services
+      - Retrofit
+      - Property Services
+      - Solar
+      - PV
+      - Photovoltaic
+      - Renewable
+      - Battery
+      - BESS
+      - Energy Storage
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - ESG
+      - Facilities
+      - Estates
+      - Property
+      - Procurement
+      - Purchasing
+      - Buyer
+      - Supply Chain
+      - CEO
+      - Chief Executive Officer
+      - Founder
+      - Co-Founder
+      - Managing Director
+      - MD
+      - General Manager
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technology Officer
+      - CFO
+      - Chief Financial Officer
+    Landowners & agriculture:
+      titles:
+      - Farm
+      - Farmer
+      - Owner                    # Contains on the segment row (farms), unlike the cross-cutting Exact
+      - Estate
+      - Partner
+      - Director                 # Contains on the segment row (farms)
+      - Land
+      - Rural
+      - Asset Manager
+      - Solar
+      - PV
+      - Photovoltaic
+      - Renewable
+      - Battery
+      - BESS
+      - Energy Storage
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - ESG
+      - Facilities
+      - Estates
+      - Property
+      - Procurement
+      - Purchasing
+      - Buyer
+      - Supply Chain
+      - CEO
+      - Chief Executive Officer
+      - Founder
+      - Co-Founder
+      - Managing Director
+      - MD
+      - General Manager
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technology Officer
+      - CFO
+      - Chief Financial Officer
+    Public sector:
+      titles:
+      - Energy
+      - Climate
+      - Policy
+      - Planning
+      - Housing
+      # GOVERNMENT BY GEO keywords (rows 72-84), searched for every public-sector company: a
+      # person in Italy titled "Energie" is rare, so one list costs nothing extra.
+      - Energie
+      - Klima
+      - Nachhaltigkeit
+      - Transition
+      - Climat
+      - Energia
+      - Transizione
+      - Sostenibilita
+      - Transicion
+      - Sostenibilidad
+      - Utilities
+      - Clean Energy
+      - Electricity
+      - Infrastructure
+      - Electrification
+      - Power Development
+      - Solar
+      - PV
+      - Photovoltaic
+      - Renewable
+      - Battery
+      - BESS
+      - Energy Storage
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - ESG
+      - Facilities
+      - Estates
+      - Property
+      - Procurement
+      - Purchasing
+      - Buyer
+      - Supply Chain
+      - CEO
+      - Chief Executive Officer
+      - Founder
+      - Co-Founder
+      - Managing Director
+      - MD
+      - General Manager
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technology Officer
+      - CFO
+      - Chief Financial Officer
+    Investors & financiers:
+      titles:
+      - Investment
+      - Infrastructure
+      - Project Finance
+      - Energy Transition
+      - Renewables
+      - PPA
+      - Origination
+      - Underwriter
+      - Solar
+      - PV
+      - Photovoltaic
+      - Renewable
+      - Battery
+      - BESS
+      - Energy Storage
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - ESG
+      - Facilities
+      - Estates
+      - Property
+      - Procurement
+      - Purchasing
+      - Buyer
+      - Supply Chain
+      - CEO
+      - Chief Executive Officer
+      - Founder
+      - Co-Founder
+      - Managing Director
+      - MD
+      - General Manager
+      - COO
+      - Chief Operating Officer
+      - CTO
+      - Chief Technology Officer
+      - CFO
+      - Chief Financial Officer
+
+# Empty on purpose (as Mining): a rescue list would bring back "Assistant General Manager".
+rescue_titles: []

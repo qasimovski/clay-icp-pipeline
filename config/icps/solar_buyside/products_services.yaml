@@ -1,0 +1,1147 @@
+# DRAFT 2026-11-05, awaiting the user's approval. Nothing has been searched with it yet.
+#
+# Solar & Storage Live: BUY SIDE company searches. Every company these searches find is net-new
+# to Solar Competitive Events and Solar Other Sources (they are deduped locally after the search;
+# see "Dedupe" below).
+#
+# Source: the "BuySide ICP v2" tab of Solar___Storage_Live_ICP_-_Tiered.xlsx (Downloads, 26 Oct
+# 2026; text copy in scrapers_solar/_run_v2/icp_tabs/BuySide_ICP_v2.txt). Only V2 is used; V2
+# always wins (memory: icp-version-precedence).
+#
+# Decisions (user, 2026-11-05):
+#   - Route: Clay's native company search, driven from the CLI (`clay searches query-mode`).
+#     Clay Workflows has no company-search action (checked against the 811-action catalog,
+#     2026-11-05); this CLI is the same query language as Find companies -> Query mode, without
+#     the UI.
+#   - The output is ONE CSV for all searches. The user imports it into Clay: one workbook per
+#     BUYER GROUP (8), in a "Buy Side ICP" folder the user creates afterwards.
+#   - All 8 buyer groups are in scope, including 7 Public sector and 8 Investors & financiers,
+#     even though the sheet marks group 8 "conference programme, not mass build".
+#   - Company location = ANY office in a buy country, not headquarters only (same as the Highways
+#     and EVCharge buy sides).
+#   - Volume is controlled by precision, not caps: the sheet's sub-segments, company keywords,
+#     example organisations, title keywords and notes are spread across Clay's filters (industry,
+#     NAICS, description, products_and_services, a solar anchor, and people.exists on the buyer
+#     persona). There is no row cap and no size floor.
+#
+# One entry per sub-segment (26). `group` is the buyer group = the workbook it lands in.
+# `priority` is the sheet's "Priority (proposed)" column; tier is A for groups 1-4, B for 5-7,
+# C for 8 (sheet note).
+#
+# Where the sheet's industry names are old LinkedIn labels, they are mapped to Clay's enum:
+#   Electrical/Electronic Manufacturing -> Appliances, Electrical, and Electronics Manufacturing
+#   Oil & Energy -> Oil and Gas (+ the power anchor, so oil-only companies are left out)
+#   Chemicals / Textiles / Plastics -> the matching "... Manufacturing" values
+#   Logistics & Supply Chain -> Transportation, Logistics, Supply Chain and Storage
+#   IT Services -> IT Services and IT Consulting;  Data Infrastructure -> Data Infrastructure and Analytics
+#   Mining & Metals -> Mining, Metal Ore Mining, Coal Mining, Nonmetallic Mineral Mining, Primary Metal Manufacturing
+#   Hospital & Health Care -> Hospitals and Health Care, Hospitals;  Agriculture -> Farming, Ranching, Forestry
+#   Manufacturing (all) -> NAICS 31-33 (all of manufacturing), OR'd with the named industries
+# Sheet-mapped values that already exist in Clay (Renewables & Environment, Renewable Energy
+# Semiconductor Manufacturing, Construction...) are kept as written. Solar-specific Clay values the
+# sheet doesn't name (Solar Electric Power Generation, Renewable Energy Power Generation, Services
+# for Renewable Energy) are added where installers and developers actually list themselves.
+#
+# people.exists (groups 4, 5, 7): for the sectors where the industry alone is millions of
+# companies (every factory, shop, hotel and council in 58 countries), the company must employ the
+# buyer persona today (Energy / Sustainability / Estates ...), and that person must be in a buy
+# country. A company without one would yield no people at the people step anyway. The titles come
+# from the sheet's "Segment title keywords" column, specific terms only: Procurement, Engineering
+# and Owner are dropped from the company filter because every company has them (sheet note:
+# "Generic words ... are not used on their own"). The full persona is applied later, at the people
+# search.
+#
+# Dedupe (user, 2026-11-05): after the search, drop every domain already in Solar Competitive Events
+# (scrapers_solar/_run_v2/final/feed_all.csv) or Solar Other Sources
+# (scrapers_solar/_other_sources/companies - final.csv), then mark the rest with the Supabase gate.
+# Clay's exclude function takes at most 1,000 ids, so the dedupe is done locally, not in the query.
+
+# Company office countries: Geo Scope v2 BUY columns, all editions (= solar/icp.yaml
+# buy.default_countries), spelled the way Clay's COMPANY enum spells them: "Ivory Coast" for
+# Côte d'Ivoire, "Brunei" for Brunei Darussalam. Sudan, Libya, Iraq, Lebanon and Myanmar are out
+# (removed 23 Oct 2026).
+countries:
+  - United Kingdom
+  - Ireland
+  - Belgium
+  - Netherlands
+  - Sweden
+  - Denmark
+  - Norway
+  - Finland
+  - Switzerland
+  - Liechtenstein
+  - France
+  - Germany
+  - Austria
+  - Luxembourg
+  - Italy
+  - Greece
+  - Malta
+  - Spain
+  - Portugal
+  - Saudi Arabia
+  - United Arab Emirates
+  - Qatar
+  - Kuwait
+  - Bahrain
+  - Oman
+  - Turkey
+  - Jordan
+  - Egypt
+  - Morocco
+  - Tunisia
+  - Algeria
+  - South Africa
+  - Botswana
+  - Namibia
+  - Zimbabwe
+  - Zambia
+  - Mozambique
+  - Lesotho
+  - Swaziland
+  - Malawi
+  - Kenya
+  - Tanzania
+  - Uganda
+  - Nigeria
+  - Ghana
+  - Benin
+  - Togo
+  - Cameroon
+  - Ivory Coast
+  - Philippines
+  - Vietnam
+  - Thailand
+  - Cambodia
+  - Laos
+  - Malaysia
+  - Singapore
+  - Brunei
+  - Indonesia
+
+# The same 58, in Clay's PEOPLE enum, for people.exists(... person.location_country ...).
+person_countries:
+  - United Kingdom
+  - Ireland
+  - Belgium
+  - Netherlands
+  - Sweden
+  - Denmark
+  - Norway
+  - Finland
+  - Switzerland
+  - Liechtenstein
+  - France
+  - Germany
+  - Austria
+  - Luxembourg
+  - Italy
+  - Greece
+  - Malta
+  - Spain
+  - Portugal
+  - Saudi Arabia
+  - United Arab Emirates
+  - Qatar
+  - Kuwait
+  - Bahrain
+  - Oman
+  - Turkey
+  - Jordan
+  - Egypt
+  - Morocco
+  - Tunisia
+  - Algeria
+  - South Africa
+  - Botswana
+  - Namibia
+  - Zimbabwe
+  - Zambia
+  - Mozambique
+  - Lesotho
+  - Swaziland
+  - Malawi
+  - Kenya
+  - Tanzania
+  - Uganda
+  - Nigeria
+  - Ghana
+  - Benin
+  - Togo
+  - Cameroon
+  - Côte d'Ivoire
+  - Philippines
+  - Vietnam
+  - Thailand
+  - Cambodia
+  - Laos
+  - Malaysia
+  - Singapore
+  - Brunei Darussalam
+  - Indonesia
+
+# ANDed onto a category's description when its keywords alone are shared with non-solar work
+# ("EPC contractor", "project development", "roofing").
+anchors:
+  solar:
+    - solar
+    - PV
+    - photovoltaic
+    - photovoltaics
+    - BESS
+    - battery storage
+    - energy storage
+    - renewable energy
+    - renewables
+  renewables:
+    - solar
+    - PV
+    - photovoltaic
+    - wind
+    - renewable
+    - renewables
+    - renewable energy
+    - clean energy
+    - green energy
+    - energy storage
+    - energy transition
+  # Electricity-specific on purpose. The first draft also had "energy", "power" and "utility":
+  # the sample (2026-11-05) then let in water utilities (Rand Water, NWC) and gas transport (Snam).
+  # Utilities & gencos only: the generic power anchor let oil-and-gas suppliers in (full run
+  # 2026-11-05), so gencos must describe generating or supplying electricity.
+  generation:
+    - power generation
+    - electricity generation
+    - power plant
+    - power plants
+    - power station
+    - power stations
+    - electric utility
+    - electricity company
+    - electricity supply
+    - generation capacity
+  power:
+    - electricity
+    - electric
+    - power generation
+    - power plant
+    - power plants
+    - power station
+    - power stations
+    - generation capacity
+    - megawatts
+    - grid
+
+categories:
+
+  # =====================================================================
+  # 1. Installers & EPCs (tier A). Keyword-pinned; no persona filter needed.
+  # Boundary (sheet, 15 Oct 2026): EPCs and installers are buy side unless they sell kit or
+  # O&M to other installers. The search can't tell those apart; the typing at review can.
+  # =====================================================================
+  - name: Residential solar & battery installers
+    group: 1. Installers & EPCs
+    priority: High
+    industry:
+      - Renewable Energy Semiconductor Manufacturing
+      - Renewables & Environment
+      - Solar Electric Power Generation
+      - Renewable Energy Power Generation
+      - Services for Renewable Energy
+      - Construction
+      - Building Construction
+      - Residential Building Construction
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Electrical Equipment Manufacturing
+      - Building Equipment Contractors
+      - Specialty Trade Contractors
+    description:
+      - solar installer
+      - solar installers
+      - solar installation
+      - solar installations
+      - solar panel installation
+      - PV installer
+      - PV installation
+      - battery installation
+      - home battery
+      - residential solar
+      - domestic solar
+      - MCS certified
+    # Sample 2026-11-05: the top of this search was equipment makers (GoodWe, SMA, Enphase,
+    # tracker and module makers) - sell side. Clay's semantic products match pulled them in, so it
+    # is dropped, and makers are excluded by their own wording.
+    description_not: &makers
+      - manufacturer
+      - manufacturers
+      - manufacturing
+      - manufactures
+      - inverter
+      - inverters
+      - trackers
+      - modules
+      - cells
+
+  - name: C&I installers & EPCs
+    group: 1. Installers & EPCs
+    priority: High
+    industry:
+      - Renewable Energy Semiconductor Manufacturing
+      - Renewables & Environment
+      - Solar Electric Power Generation
+      - Renewable Energy Power Generation
+      - Services for Renewable Energy
+      - Construction
+      - Building Construction
+      - Nonresidential Building Construction
+      - Civil Engineering
+      - Engineering Services
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Electrical Equipment Manufacturing
+      - Building Equipment Contractors
+      - Specialty Trade Contractors
+    description:
+      - commercial solar
+      - C&I solar
+      - rooftop solar
+      - industrial solar
+      - commercial and industrial solar
+      - solar EPC
+      - turnkey solar
+      - solar carport
+      - solar carports
+    # Same fix as residential (sample 2026-11-05): no semantic products match, makers excluded.
+    description_not: *makers
+
+  - name: Utility-scale EPCs
+    group: 1. Installers & EPCs
+    priority: High
+    anchor: solar
+    industry:
+      - Renewables & Environment
+      - Renewable Energy Power Generation
+      - Solar Electric Power Generation
+      - Services for Renewable Energy
+      - Construction
+      - Civil Engineering
+      - Engineering Services
+      - Utility System Construction
+      - Utilities
+      - Electric Power Transmission, Control, and Distribution
+    description:
+      - utility-scale solar
+      - utility scale solar
+      - solar farm construction
+      - solar park
+      - solar parks
+      - BESS EPC
+      - battery storage EPC
+      - balance of plant
+      - EPC contractor
+      - EPC
+    products_and_services:
+      - utility-scale solar EPC
+      - battery energy storage EPC
+
+  - name: Electrical, roofing & HVAC contractors who fit solar
+    group: 1. Installers & EPCs
+    priority: Medium
+    notes: Sheet - only with solar/renewables in the company description (the solar anchor).
+    anchor: solar
+    industry:
+      - Construction
+      - Building Construction
+      - Residential Building Construction
+      - Nonresidential Building Construction
+      - Building Equipment Contractors
+      - Building Structure and Exterior Contractors
+      - Specialty Trade Contractors
+      - Facilities Services
+      - Appliances, Electrical, and Electronics Manufacturing
+      - Electrical Equipment Manufacturing
+    description:
+      - electrical contractor
+      - electrical contractors
+      - electrician
+      - electricians
+      - electrical installation
+      - electrical installations
+      - roofing contractor
+      - roofing
+      - roofer
+      - roofers
+      - HVAC
+      - heat pump
+      - heat pumps
+    # Sample 2026-11-05: makers (Panasonic, Daikin, DEHN, a roofing-membrane maker), a
+    # certification body and a recruiter got in.
+    description_not:
+      - manufacturer
+      - manufacturers
+      - manufactures
+      - recruitment
+      - recruiter
+      - certification body
+
+  # =====================================================================
+  # 2. Developers & IPPs (tier A)
+  # =====================================================================
+  - name: Solar & BESS project developers
+    group: 2. Developers & IPPs
+    priority: High
+    anchor: solar
+    industry:
+      - Renewables & Environment
+      - Renewable Energy Power Generation
+      - Solar Electric Power Generation
+      - Services for Renewable Energy
+      - Utilities
+      - Electric Power Generation
+      - Investment Management
+    description:
+      - solar developer
+      - solar development
+      - project developer
+      - project development
+      - solar farm
+      - solar farms
+      - solar park
+      - BESS developer
+      - energy storage developer
+      - battery storage developer
+      - renewable energy developer
+      - greenfield
+    products_and_services:
+      - solar project development
+      - battery storage project development
+
+  - name: IPPs & asset owners
+    group: 2. Developers & IPPs
+    priority: High
+    anchor: renewables
+    industry:
+      - Utilities
+      - Renewables & Environment
+      - Renewable Energy Power Generation
+      - Solar Electric Power Generation
+      - Wind Electric Power Generation
+      - Electric Power Generation
+      - Investment Management
+    description:
+      - independent power producer
+      - independent power producers
+      - IPP
+      - power producer
+      - renewable generation
+      - renewable power generation
+      - asset owner
+      - owns and operates
+    products_and_services:
+      - independent power production
+
+  - name: Asset managers & O&M owners
+    group: 2. Developers & IPPs
+    priority: Medium
+    anchor: renewables
+    industry:
+      - Renewables & Environment
+      - Renewable Energy Power Generation
+      - Solar Electric Power Generation
+      - Services for Renewable Energy
+      - Investment Management
+    description:
+      - solar asset management
+      - renewable portfolio
+      - renewable energy portfolio
+      - renewable assets
+      - operational assets
+      - renewable energy fund
+      - solar fund
+      - asset management
+    products_and_services:
+      - renewable energy asset management
+
+  # =====================================================================
+  # 3. Utilities & energy retailers (tier A). The power anchor keeps water-only utilities and
+  # oil-only companies out.
+  # =====================================================================
+  - name: Utilities & gencos
+    group: 3. Utilities & energy retailers
+    priority: High
+    # Full run 2026-11-05: 7,579 kept, the tail being oil-and-gas suppliers (a fastener maker, procurement agents) via
+    # the sheet's "Oil & Energy" industry. Re-run with the buyer persona from the sheet's
+    # title-keyword column (user, 2026-11-06: "re-run those four with the persona filter").
+    anchor: generation
+    industry: &util_ind
+      - Utilities
+      - Electric Power Generation
+      - Renewable Energy Power Generation
+      - Solar Electric Power Generation
+      - Renewables & Environment
+      - Oil and Gas
+      - Utilities Administration
+    description: &util_desc
+      - utility
+      - electric utility
+      - power utility
+      - power generation
+      - electricity company
+      - electricity generation
+      - generating company
+      - electricity
+    people_titles:
+      - Renewable
+      - Distributed Energy
+      - Generation
+      - Storage
+      - Innovation
+
+  - name: Utilities & gencos (1,000+ staff)
+    subsegment: Utilities & gencos
+    group: 3. Utilities & energy retailers
+    priority: High
+    # The persona filter above lost large real targets (RWE, Vattenfall, Endesa, Nordgold,
+    # Meraas, Sobha, Ciputra...). User, 2026-11-06: keep the persona results AND add back
+    # every 1,000+ staff company the original keyword search finds. Original query, no persona.
+    anchor: power
+    industry: *util_ind
+    description: *util_desc
+    company_size:
+      - 1,001-5,000
+      - 5,001-10,000
+      - 10,001+
+  - name: T&D operators & DNOs
+    group: 3. Utilities & energy retailers
+    priority: Medium
+    notes: Sheet - grid connection is a buying constraint; Network and Power alone are too generic.
+    anchor: power
+    industry:
+      - Utilities
+      - Electric Power Transmission, Control, and Distribution
+      - Utilities Administration
+    description:
+      - transmission system operator
+      - distribution network operator
+      - distribution system operator
+      - distribution network
+      - grid operator
+      - DNO
+      - DSO
+      - TSO
+      - electricity distribution
+      - electricity transmission
+      - power distribution
+      - transmission
+
+  - name: Energy retailers, aggregators & electric co-ops
+    group: 3. Utilities & energy retailers
+    priority: Medium
+    anchor: power
+    industry:
+      - Utilities
+      - Renewables & Environment
+      - Renewable Energy Power Generation
+      - Services for Renewable Energy
+      - Electric Power Generation
+      - Electric Power Transmission, Control, and Distribution
+    description:
+      - energy supplier
+      - energy retailer
+      - electricity supplier
+      - electricity retailer
+      - aggregator
+      - energy aggregator
+      - electric cooperative
+      - electric cooperatives
+      - electric co-op
+      - virtual power plant
+      - community energy
+
+  # =====================================================================
+  # 4. Large energy users, C&I (tier A). Sectors of millions of companies, so the persona filter
+  # (people.exists) carries the precision.
+  # =====================================================================
+  - name: Manufacturing & industrial
+    group: 4. Large energy users (C&I)
+    priority: High
+    industry:
+      - Manufacturing
+      - Food & Beverages
+      - Food and Beverage Manufacturing
+      - Chemical Manufacturing
+      - Automotive
+      - Motor Vehicle Manufacturing
+      - Textile Manufacturing
+      - Plastics Manufacturing
+      - Plastics and Rubber Product Manufacturing
+      - Primary Metal Manufacturing
+      - Paper and Forest Product Manufacturing
+    naics:
+      - 31-33
+    description:
+      - factory
+      - factories
+      - manufacturing plant
+      - manufacturing plants
+      - manufacturing facility
+      - production facility
+      - production plant
+      - plant
+      - plants
+      - mill
+      - mills
+      - industrial
+      - manufacturer
+    people_titles:
+      - Energy
+      - Utilities
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+
+  - name: Retail, logistics & warehouses
+    group: 4. Large energy users (C&I)
+    priority: High
+    industry:
+      - Retail
+      - Retail Groceries
+      - Food and Beverage Retail
+      - Warehousing
+      - Warehousing and Storage
+      - Transportation, Logistics, Supply Chain and Storage
+      - Freight and Package Transportation
+      - Wholesale
+      - Wholesale Food and Beverage
+    description:
+      - warehouse
+      - warehouses
+      - warehousing
+      - distribution centre
+      - distribution centres
+      - distribution center
+      - distribution centers
+      - logistics
+      - 3PL
+      - supermarket
+      - supermarkets
+      - shopping mall
+      - shopping centre
+      - stores
+      - retail estate
+    people_titles:
+      - Energy
+      - Sustainability
+      - Net Zero
+      - Property
+      - Estates
+      - Facilities
+
+  - name: Data centres & telecoms
+    group: 4. Large energy users (C&I)
+    priority: Medium
+    notes: Sheet - "Power" is an OK title here only, inside data-centre and telecom companies.
+    industry:
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - IT System Data Services
+      - Telecommunications
+      - Telecommunications Carriers
+    # Sample 2026-11-05: bare "data centre" let in IT resellers and integrators (Insight, SHI,
+    # T-Systems, WWT), which sell INTO data centres. Operator phrasing only, plus telecom operators.
+    description:
+      - colocation
+      - hyperscale
+      - data centre operator
+      - data center operator
+      - data centre campus
+      - data center campus
+      - digital infrastructure
+      - telecom towers
+      - tower company
+      - towers
+      - mobile operator
+      - mobile network operator
+      - telecom operator
+      - telecommunications operator
+    description_not:
+      - systems integrator
+      - solutions provider
+      - reseller
+      - IT consulting
+    people_titles:
+      - Energy
+      - Power
+      - Sustainability
+      - Facilities
+      - Critical Infrastructure
+
+  - name: Mining
+    group: 4. Large energy users (C&I)
+    priority: High
+    notes: Sheet - High for SSL Africa, Nigeria and KSA; Medium elsewhere (a review/people-stage tier, not a search filter).
+    industry: &mining_ind
+      - Mining
+      - Metal Ore Mining
+      - Coal Mining
+      - Nonmetallic Mineral Mining
+      - Oil, Gas, and Mining
+      - Primary Metal Manufacturing
+    description: &mining_desc
+      - mining
+      - mine
+      - mines
+      - minerals
+      - mineral
+      - gold
+      - copper
+      - platinum
+      - quarry
+      - quarrying
+    # Full run 2026-11-05: 15,039 kept, mostly mining suppliers, small explorers and service firms rather than
+    # mine operators. Re-run with the buyer persona from the sheet's
+    # title-keyword column (user, 2026-11-06: "re-run those four with the persona filter").
+    people_titles:
+      - Energy
+      - Power
+      - Electrical Engineer
+      - Sustainability
+      - Decarbonisation
+      - Decarbonization
+
+  - name: Mining (1,000+ staff)
+    subsegment: Mining
+    group: 4. Large energy users (C&I)
+    priority: High
+    # The persona filter above lost large real targets (RWE, Vattenfall, Endesa, Nordgold,
+    # Meraas, Sobha, Ciputra...). User, 2026-11-06: keep the persona results AND add back
+    # every 1,000+ staff company the original keyword search finds. Original query, no persona.
+    industry: *mining_ind
+    description: *mining_desc
+    company_size:
+      - 1,001-5,000
+      - 5,001-10,000
+      - 10,001+
+  - name: Hospitality, healthcare & education
+    group: 4. Large energy users (C&I)
+    priority: Medium
+    industry:
+      - Hospitality
+      - Hotels and Motels
+      - Accommodation Services
+      - Hospitals and Health Care
+      - Hospitals
+      - Higher Education
+      - Education Management
+      - Primary and Secondary Education
+    description:
+      - hotel
+      - hotels
+      - resort
+      - resorts
+      - hotel group
+      - hospital
+      - hospitals
+      - healthcare group
+      - university
+      - universities
+      - campus
+      - school group
+      - schools
+    people_titles:
+      - Energy
+      - Estates
+      - Facilities
+      - Sustainability
+      - Net Zero
+
+  # =====================================================================
+  # 5. Property & facilities (tier B)
+  # =====================================================================
+  - name: Property developers & housebuilders
+    group: 5. Property & facilities
+    priority: Medium
+    industry: &prop_ind
+      - Real Estate
+      - Construction
+      - Building Construction
+      - Residential Building Construction
+      - Nonresidential Building Construction
+      - Leasing Residential Real Estate
+    description: &prop_desc
+      - property developer
+      - property developers
+      - property development
+      - housebuilder
+      - housebuilders
+      - homebuilder
+      - homebuilders
+      - real estate development
+      - real estate developer
+      - master developer
+      - mixed-use development
+    # Full run 2026-11-05: 23,941 kept, 77% with 50 staff or fewer: estate agents, property managers and small
+    # builders; the sheet's examples are Barratt, Emaar, Ayala Land. Re-run with the buyer persona from the sheet's
+    # title-keyword column (user, 2026-11-06: "re-run those four with the persona filter").
+    people_titles:
+      - Development Director
+      - Technical Director
+      - Sustainability
+      - Energy
+
+  - name: Property developers & housebuilders (1,000+ staff)
+    subsegment: Property developers & housebuilders
+    group: 5. Property & facilities
+    priority: Medium
+    # The persona filter above lost large real targets (RWE, Vattenfall, Endesa, Nordgold,
+    # Meraas, Sobha, Ciputra...). User, 2026-11-06: keep the persona results AND add back
+    # every 1,000+ staff company the original keyword search finds. Original query, no persona.
+    industry: *prop_ind
+    description: *prop_desc
+    company_size:
+      - 1,001-5,000
+      - 5,001-10,000
+      - 10,001+
+  - name: Commercial landlords & property managers
+    group: 5. Property & facilities
+    priority: Medium
+    notes: '"property management" alone is every letting agent; the persona filter keeps landlords with a sustainability/energy team.'
+    industry:
+      - Real Estate
+      - Commercial Real Estate
+      - Leasing Non-residential Real Estate
+      - Real Estate and Equipment Rental Services
+    description:
+      - property management
+      - commercial property
+      - commercial real estate
+      - REIT
+      - real estate investment trust
+      - property portfolio
+      - landlord
+      - industrial property
+      - logistics property
+      - retail property
+    people_titles:
+      - Sustainability
+      - Energy
+      - ESG
+      - Net Zero
+
+  - name: Facilities management companies
+    group: 5. Property & facilities
+    priority: Medium
+    industry:
+      - Facilities Services
+    description:
+      - facilities management
+      - facility management
+      - FM services
+      - integrated facilities management
+      - total facilities management
+      - building services
+      - hard FM
+    people_titles:
+      - Energy
+      - Sustainability
+      - Technical Services
+      - Building Services
+
+  - name: Social housing & housing associations
+    group: 5. Property & facilities
+    priority: Medium
+    notes: Sheet - UK only.
+    countries:
+      - United Kingdom
+    industry:
+      - Non-profit Organization Management
+      - Non-profit Organizations
+      - Real Estate
+      - Housing and Community Development
+      - Housing Programs
+      - Leasing Residential Real Estate
+    description:
+      - housing association
+      - housing associations
+      - social housing
+      - affordable housing
+      - registered provider
+      - housing trust
+      - social rent
+
+  # =====================================================================
+  # 6. Landowners & agriculture (tier B)
+  # =====================================================================
+  - name: Farms & agri-businesses
+    group: 6. Landowners & agriculture
+    priority: Medium
+    notes: Sheet - UK and Europe; agrivoltaics. Countries are the European buy countries only.
+    countries:
+      - United Kingdom
+      - Ireland
+      - Belgium
+      - Netherlands
+      - Sweden
+      - Denmark
+      - Norway
+      - Finland
+      - Switzerland
+      - Liechtenstein
+      - France
+      - Germany
+      - Austria
+      - Luxembourg
+      - Italy
+      - Greece
+      - Malta
+      - Spain
+      - Portugal
+    industry:
+      - Farming
+      - Farming, Ranching, Forestry
+      - Dairy
+      - Food Production
+      - Wholesale Raw Farm Products
+    # Sample 2026-11-05: generic "agriculture/agri/farming" returned agri-input companies (Syngenta,
+    # Yara, seed breeders, tractor makers), not farms. Land-holding wording only, inputs excluded.
+    description:
+      - farm
+      - farms
+      - farmland
+      - arable
+      - dairy farm
+      - dairy farms
+      - grower
+      - growers
+      - greenhouse
+      - greenhouses
+      - orchards
+      - vineyard
+      - vineyards
+      - hectares
+      - agricultural cooperative
+      - farmers cooperative
+      - agrivoltaic
+      - agrivoltaics
+    description_not:
+      - seed
+      - seeds
+      - breeding
+      - crop protection
+      - fertilizer
+      - fertilizers
+      - fertiliser
+      - crop nutrition
+      - tractors
+      - machinery
+      - irrigation
+      - animal feed
+      - animal nutrition
+      - equipment
+      - recruitment
+      - exhibition
+      - trade fair
+      - union
+
+  - name: Estates & large landowners
+    group: 6. Landowners & agriculture
+    priority: Medium
+    notes: '"estate" alone matches every estate agent, so only landowner phrasing is used.'
+    industry: &estates_ind
+      - Real Estate
+      - Farming
+      - Farming, Ranching, Forestry
+      - Golf Courses and Country Clubs
+    description: &estates_desc
+      - landowner
+      - landowners
+      - land management
+      - rural estate
+      - country estate
+      - landed estate
+      - estate office
+      - farmland
+      - acres
+      - hectares
+      - golf course
+    # Full run 2026-11-05: 2,593 kept, largely estate agents and land-for-sale listings. Re-run with the buyer persona from the sheet's
+    # title-keyword column (user, 2026-11-06: "re-run those four with the persona filter").
+    # Bare "Estate" is not used as a title: every estate agency has "Estate Agent" staff.
+    people_titles:
+      - Land
+      - Rural
+      - Estate Manager
+      - Estates Manager
+      - Estate Director
+      - Farm Manager
+
+  - name: Estates & large landowners (1,000+ staff)
+    subsegment: Estates & large landowners
+    group: 6. Landowners & agriculture
+    priority: Medium
+    # The persona filter above lost large real targets (RWE, Vattenfall, Endesa, Nordgold,
+    # Meraas, Sobha, Ciputra...). User, 2026-11-06: keep the persona results AND add back
+    # every 1,000+ staff company the original keyword search finds. Original query, no persona.
+    industry: *estates_ind
+    description: *estates_desc
+    company_size:
+      - 1,001-5,000
+      - 5,001-10,000
+      - 10,001+
+  # =====================================================================
+  # 7. Public sector (tier B). The sheet's "GOVERNMENT BY GEO" names the bodies per country;
+  # their names go into the description keywords. DRAFT CHOICE, flagged for the user: NOT narrowed
+  # to those 15 geos; all 58 buy countries, with the persona filter carrying the precision.
+  # =====================================================================
+  - name: Ministries, regulators & energy agencies
+    group: 7. Public sector
+    priority: Medium
+    notes: Sheet - High at SSL Africa, Nigeria, Egypt, KSA, Philippines.
+    industry:
+      - Government Administration
+      - Government Relations
+      - Public Policy Offices
+      - Executive Offices
+      - Utilities Administration
+    description:
+      - ministry of energy
+      - department of energy
+      - energy ministry
+      - ministry of power
+      - energy agency
+      - energy regulator
+      - regulatory authority
+      - regulatory commission
+      - energy commission
+      - energy authority
+      - rural electrification
+      - DESNZ
+      - Ofgem
+      - Great British Energy
+      - ADEME
+      - IDAE
+      - MITECO
+      - GSE
+      - REPDO
+      - NREA
+      - NERC
+      - SEDA
+      - ESDM
+    people_titles:
+      - Energy
+      - Renewable
+      - Climate
+      - Net Zero
+      - Electrification
+
+  - name: Municipalities & local authorities
+    group: 7. Public sector
+    priority: Medium
+    industry:
+      - Government Administration
+    description:
+      - city council
+      - municipality
+      - municipal
+      - local authority
+      - county council
+      - borough council
+      - district council
+      - metropolitan municipality
+      - local government
+      - combined authority
+      - city of
+      - commune
+      - communes
+      - comune
+      - gemeente
+      - kommune
+      - ayuntamiento
+    # Sample 2026-11-05: bare "council" matched EU bodies (Council of the EU) and UK national
+    # departments came with them. Bare "council" is dropped; EU institutions are excluded.
+    description_not:
+      - European Union
+      - European Commission
+    people_titles:
+      - Energy
+      - Climate
+      - Sustainability
+      - Net Zero
+
+  - name: Public estates (schools, hospitals, defence)
+    group: 7. Public sector
+    priority: Low
+    industry:
+      - Government Administration
+      - Hospitals and Health Care
+      - Hospitals
+      - Education
+      - Primary and Secondary Education
+      - Education Administration Programs
+      - Armed Forces
+    description:
+      - public estate
+      - NHS
+      - NHS trust
+      - NHS foundation trust
+      - ministry of defence
+      - defence estates
+      - academy trust
+      - multi-academy trust
+      - school trust
+      - public hospital
+      - government hospital
+    people_titles:
+      - Estates
+      - Energy
+      - Facilities
+      - Sustainability
+
+  # =====================================================================
+  # 8. Investors & financiers (tier C). Sheet: conference programme, not mass build; low
+  # priority. Included anyway (user, 2026-11-05). Legal firms stay out entirely (sheet): no
+  # legal industry is listed, so none can match.
+  # =====================================================================
+  - name: Infrastructure funds & banks
+    group: 8. Investors & financiers
+    priority: Low
+    anchor: renewables
+    industry:
+      - Investment Management
+      - Banking
+      - Investment Banking
+      - Financial Services
+      - Venture Capital and Private Equity Principals
+    description:
+      - infrastructure fund
+      - infrastructure investment
+      - infrastructure investor
+      - project finance
+      - renewable energy fund
+      - energy transition fund
+      - clean energy fund
+      - renewable energy finance
+    products_and_services:
+      - renewable energy project finance
+
+  - name: PPA buyers, brokers & insurers
+    group: 8. Investors & financiers
+    priority: Low
+    anchor: renewables
+    industry:
+      - Financial Services
+      - Insurance
+      - Insurance Carriers
+      - Insurance Agencies and Brokerages
+      - Utilities
+      - Business Consulting and Services
+    description:
+      - PPA
+      - PPAs
+      - power purchase agreement
+      - power purchase agreements
+      - corporate PPA
+      - renewable insurance
+      - renewable energy insurance
+      - energy broker

@@ -291,11 +291,14 @@ def _import_csv(page: Page, csv_path: str, has_continue: bool) -> None:
     page.wait_for_timeout(150)
     with page.expect_file_chooser(timeout=15000) as fc:
         page.get_by_text("Browse files").click()
-    fc.value.set_files(os.path.abspath(csv_path))
+    # Over CDP the file's bytes cross the protocol: a 43 MB CSV (Solar buy side, 6 Nov 2026) ran past
+    # Playwright's 30 s default. Scale the timeout with the file size (30 s + 6 s/MB).
+    mb = os.path.getsize(csv_path) / 2**20
+    fc.value.set_files(os.path.abspath(csv_path), timeout=int((30 + 6 * mb) * 1000))
 
     # Clay parses the file before the commit control means anything (~4s for a
     # 4KB CSV). The old code waited a blind 500ms.
-    _wait_for_import_ready(page)
+    _wait_for_import_ready(page, timeout=max(90000, int(10 * mb * 1000)))   # big files parse slowly too
     _click_footer_commit(page, timeout=30000)
 
 
@@ -363,8 +366,11 @@ def add_csv_table(page: Page, csv_path: str) -> None:
     # after the CSV stem) to appear, focus it, then wait for its rows.
     table_name = os.path.splitext(os.path.basename(csv_path))[0]
     tab = page.get_by_role("button", name=table_name, exact=True).first
+    # Clay shows the tab only once its server has the file: a 43 MB CSV took longer than 60 s (Solar buy side,
+    # 6 Nov 2026), the importer retried, and the retry made "Name (2)" beside an empty "Name". 15 s/MB.
+    mb = os.path.getsize(csv_path) / 2**20
     try:
-        tab.wait_for(state="visible", timeout=60000)
+        tab.wait_for(state="visible", timeout=max(60000, int(15 * mb * 1000)))
     except Exception as e:
         raise ClayUIError(
             f"Added-table import committed but no {table_name!r} tab appeared: {e}")

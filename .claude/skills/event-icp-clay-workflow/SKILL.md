@@ -269,6 +269,18 @@ python scripts/review_list.py build --people "<S> - email list.csv" --linkedin-o
 python scripts/approval.py review --people "<S> - review.csv" --out "<S> - people for review.csv"
 ```
 
+**Company columns: enrich each UNIQUE company once, then join to its people (user rule, 6 Nov 2026,
+"always respected").** Once the final company list exists:
+1. enrich the unique companies (one Enrich Company per domain, never one per person);
+2. find the people at those companies;
+3. take the company columns (funding amount, funding in USD, industry, size, …) from the company result;
+4. join them onto every person row by domain (`review_list.py build` does the join).
+This saves Clay actions: a company with 20 people costs 1 enrich, not 20. Never put Enrich Company (or any
+company-level column) on a people table or run it per person. If the company list already carries the
+firmographics (a Clay company search returns industry, size, type, revenue, description and LinkedIn),
+the user may skip the enrich: pass that list with `--company-csv` instead of `--company-results`
+(Solar buy side, 6 Nov 2026: "skip enrich company"); funding and specialities then stay blank.
+
 **The per-event Clay review copies:** `deliver.py split --decisions` → import into the user's
 folder → the Clay Tables rows. Follow `references/delivery.md`: the convention, the import, the
 low-memory rules, and confirming what is and isn't in the folder (LinkedIn-only?). Speakers are never in
@@ -316,9 +328,25 @@ pilot. Report sources, per-provider counts, "no email", and any found-but-not-re
 
 ```bash
 python scripts/deliver.py salesforce --people "people - emails.csv" --schema "<Salesforce CSV>" \
-    --out "<S> - Salesforce.csv" --explode-events [--event-ids event_ids.csv] [--map sf_map.yaml]
+    --scope competitive --icp config/icps/<icp>/icp.yaml --out-dir sf/ \
+    --explode-events [--event-ids event_ids.csv] [--map sf_map.yaml]
 ```
 
+- **File names follow one rule** (user, 2026-11-07; `scripts/sf_naming.py`), for the final Salesforce CSV
+  (the one with every email and field):
+
+  | Scope | `--scope` | File |
+  |---|---|---|
+  | Competitive Events | `competitive` | `Competitive_<Brand>.csv` |
+  | Other Sources | `other_sources` | `Other_sources_<Brand>.csv` |
+  | BuySide P&S | `buy_side` | `Buy_side_<Brand>.csv` |
+  | Products & Services (sell side) | `sell_side` | `Sell_side_<Brand>.csv` |
+
+  `<Brand>` is a short brand with no spaces (EVCharge, Solar, Mining, Highways): `salesforce_brand` in the
+  ICP's icp.yaml, or `--brand`. A scope with two uploads adds `--part` → `Other_sources_EVCharge_Trades.csv`.
+  Companion files keep the base name plus ` - <label>` (`Buy_side_EVCharge - LinkedIn only.csv`,
+  `... - duplicates removed.csv`). `deliver.py` builds the name from `--scope` and refuses an `--out` that
+  breaks the rule. Files built before 2026-11-07 keep their old names (user: new exports only).
 - **`--explode-events`** writes one row per person per event (company events + speaker events).
 - **Speaker rows** follow the earlier uploads: Is CA Speaker True; a speaker-only row is not SPEX
   or Attendee and has no Classification.

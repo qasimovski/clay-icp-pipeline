@@ -137,3 +137,13 @@ An HTTP API call consumes **1 Action per row**; formulas and conditional runs
 consume none. A 20,000-row table is ~20,000 Actions for a single per-row column,
 so the Actions budget — not storage or row limits — is the constraint that binds
 first. Confirm per-row metering against your own plan before a large run.
+
+## A third family: the Workflows route
+
+`WORKFLOWS_ROUTE.md` documents a people pass built on `cpj-find-lists-of-people`
+rather than ClayQL. It honours the per-company cap and the `contains` rule, but it
+**cannot** express the whole persona in one `experiences.count(...)`, and its
+`location_countries_include` filters the PERSON's location, not the company office —
+the exact substitution rule 4 warns about. Use it when the companies must be
+classified first and the classification has nowhere to live as a column; prefer the
+ClayQL passes whenever the category is already known, such as Products & Services.

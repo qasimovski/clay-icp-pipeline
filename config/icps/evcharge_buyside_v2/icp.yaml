@@ -1,0 +1,1709 @@
+# DRAFT 2026-11-06. EVCharge BUY SIDE people search (Find People), from the "BuySide ICP v2" tab of
+# scrapers_evcharge/EV Charge Playbook ICP v3.xlsx (no v3 BuySide tab exists). GENERATED from the sheet
+# by a one-off script; the categories are the 35 sub-segments of products_services.yaml beside this file
+# (the company search), so Classification = Sub-segment in the people feed.
+#
+# Read by .claude/skills/event-icp-clay-workflow/scripts/icp_mapping.py (the ICP Mapping node of the
+# people workflow) and post_filter.py (with post_filter.yaml beside this file).
+#
+# Per category: the sheet's "Segment title keywords (Contains)" + every CROSS-CUTTING title (EV-specific,
+# Energy & sustainability, Property & estates, Senior decision-makers). The three cross-cutting titles the
+# sheet marks Exact (CEO, COO, MD) are searched with contains and judged exactly by post_filter.yaml.
+# Government sub-segments ("See Government by geo") get the union of the GOVERNMENT BY GEO title lists
+# (UK, US, Canada, Latin America, Europe).
+#
+# Countries (user, 2026-11-06): Geo_Scope v2 BUY columns that are not Parked (Core / Yes / Secondary)
+# plus the Philippines, in Clay's people spelling. Germany is searched but LinkedIn-only (post_filter.yaml).
+# Seniority: "All except Intern/Trainee, Assistant, Entry, Freelance" (every tab row).
+# EXCLUDE row: Intern; Student; Researcher; Research Fellow; Professor; Lecturer; PhD; Assistant; Trainee.
+# Added: Product Owner (Owner is a contains keyword), and Business Development where the sheet's bare
+# "Development" keyword means property / site development, and MD (= Doctor of Medicine) in Hospitals and
+# Universities (pilot 2026-11-06: the sheet's exact "MD" matched physicians).
+# `sell` is empty: this ICP config is buy side only (the sell side is config/icps/evcharge/).
+
+# Short brand for the final Salesforce CSV names (Competitive_<Brand>.csv, Buy_side_<Brand>.csv ...;
+# user, 2026-11-07; .claude/skills/event-icp-clay-workflow/scripts/sf_naming.py). Letters and digits only.
+salesforce_brand: EVCharge
+seniority:
+- founder
+- owner
+- board-member
+- partner
+- c-suite
+- vp
+- director
+- head
+- manager
+- senior
+- mid-level
+seniority_groups:
+  A:
+  - founder
+  - owner
+  - board-member
+  - partner
+  - c-suite
+  - vp
+  - director
+  B1:
+  - head
+  - manager
+  B2:
+  - senior
+  - mid-level
+exclude_titles:
+- Intern
+- Trainee
+- Assistant
+- Freelance
+sell:
+  titles: []
+  categories: {}
+buy:
+  exclude_titles:
+  - Entry
+  - Student
+  - Researcher
+  - Research Fellow
+  - Professor
+  - Lecturer
+  - PhD
+  - Product Owner
+  exact_titles: []
+  default_countries:
+  - United States
+  - Canada
+  - Mexico
+  - Brazil
+  - Chile
+  - Colombia
+  - Argentina
+  - Peru
+  - Costa Rica
+  - Uruguay
+  - United Kingdom
+  - Ireland
+  - Germany
+  - France
+  - Netherlands
+  - Belgium
+  - Luxembourg
+  - Austria
+  - Switzerland
+  - Norway
+  - Sweden
+  - Denmark
+  - Finland
+  - Iceland
+  - Spain
+  - Portugal
+  - Italy
+  - Greece
+  - Malta
+  - Cyprus
+  - Turkey
+  - Poland
+  - Czech Republic
+  - Hungary
+  - Romania
+  - Slovakia
+  - Bulgaria
+  - Croatia
+  - Slovenia
+  - Serbia
+  - Estonia
+  - Latvia
+  - Lithuania
+  - Bosnia and Herzegovina
+  - North Macedonia
+  - Albania
+  - Montenegro
+  - Ukraine
+  - Moldova
+  - Philippines
+  categories:
+    Retail & shopping centres:
+      titles:
+      - Centre Manager
+      - Property Manager
+      - Asset Manager
+      - Estates
+      - Facilities
+      - Car Park
+      - Development
+      - Energy
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Property
+      - Real Estate
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+      exclude_titles:
+      - Business Development
+    Hotels & hospitality:
+      titles:
+      - Head of Property
+      - Estates
+      - Facilities
+      - Engineering
+      - Guest Experience
+      - Sustainability
+      - Development
+      - Energy
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+      exclude_titles:
+      - Business Development
+    Leisure, venues & attractions:
+      titles:
+      - Venue Director
+      - Facilities
+      - Operations Director
+      - Estates
+      - Car Park
+      - Sustainability
+      - Head of Property
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Property
+      - Real Estate
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Hospitals & health:
+      titles:
+      - Estates
+      - Facilities
+      - Transport
+      - Travel Plan
+      - Parking
+      - Sustainability
+      - Capital Projects
+      - Energy
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Property
+      - Real Estate
+      - Car Park
+      - Site Operations
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      exclude_titles:
+      - MD
+    Universities, colleges & schools:
+      titles:
+      - Estates
+      - Facilities
+      - Campus Operations
+      - Sustainability
+      - Transport
+      - Parking
+      - Capital Projects
+      - Energy
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Property
+      - Real Estate
+      - Car Park
+      - Site Operations
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      exclude_titles:
+      - MD
+    Workplaces & offices:
+      titles:
+      - Workplace
+      - Facilities
+      - Property
+      - Real Estate
+      - Portfolio
+      - ESG
+      - Net Zero
+      - Energy
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Decarbonisation
+      - Decarbonization
+      - Climate
+      - Estates
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Transport hubs:
+      titles:
+      - Car Parks
+      - Landside
+      - Ground Operations
+      - Surface Access
+      - Property
+      - Energy
+      - Sustainability
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Multi-family / MDU & flats:
+      titles:
+      - Asset Management
+      - Head of Property
+      - Technical
+      - Operations
+      - Resident Services
+      - Sustainability
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Build-to-rent:
+      titles:
+      - Asset Management
+      - Development
+      - Operations
+      - Sustainability
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+      exclude_titles:
+      - Business Development
+    Housing associations & social housing:
+      titles:
+      - Asset Management
+      - Head of Property
+      - Sustainability
+      - Development
+      - Estates
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+      exclude_titles:
+      - Business Development
+    Condo associations & HOAs (US):
+      titles:
+      - Community Manager
+      - Board President
+      - Property Manager
+      - Operations
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+      countries:
+      - United States
+    Fuel retail & forecourts:
+      titles:
+      - Forecourt
+      - Fuel
+      - Network Development
+      - Site Development
+      - Property
+      - New Energies
+      - Future Energy
+      - eMobility
+      - EV
+      - Electric Vehicle
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Supermarkets & grocery:
+      titles:
+      - Property
+      - Estates
+      - Energy
+      - Sustainability
+      - Car Park
+      - Store Development
+      - Net Zero
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Facilities
+      - Real Estate
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Quick-service & drive-through:
+      titles:
+      - Property
+      - Development
+      - Estates
+      - Energy
+      - Sustainability
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Facilities
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+      exclude_titles:
+      - Business Development
+    Big-box & DIY retail:
+      titles:
+      - Property
+      - Estates
+      - Energy
+      - Sustainability
+      - Car Park
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Facilities
+      - Real Estate
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Logistics, haulage & supply chain:
+      titles:
+      - Fleet
+      - Transport Manager
+      - Depot
+      - Engineering
+      - Decarbonisation
+      - Electrification
+      - Operations Director
+      - Procurement
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Parcel & home delivery:
+      titles:
+      - Fleet
+      - Transport
+      - Depot
+      - Last Mile
+      - Electrification
+      - Engineering
+      - Sustainability
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Bus, coach & public transport:
+      titles:
+      - Engineering Director
+      - Fleet
+      - Depot
+      - Zero Emission
+      - Electrification
+      - Infrastructure
+      - Asset
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    School & employee buses:
+      titles:
+      - Fleet
+      - Transportation Director
+      - Operations
+      - Electrification
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Taxi, private hire & ride-hail:
+      titles:
+      - Fleet
+      - Driver Operations
+      - Electrification
+      - Head of Supply
+      - Partnerships
+      - Energy
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Car rental & leasing:
+      titles:
+      - Fleet
+      - Remarketing
+      - Electrification
+      - Operations
+      - Procurement
+      - Mobility
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Blue light - ambulance, fire, police:
+      titles:
+      - Fleet
+      - Transport
+      - Workshop
+      - Estates
+      - Sustainability
+      - Head of Logistics
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Municipal & council fleets:
+      titles:
+      - Fleet
+      - Transport
+      - Depot
+      - Waste Services
+      - Sustainability
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Service, utility & corporate fleets:
+      titles:
+      - Fleet
+      - Mobility
+      - Company Car
+      - Travel
+      - Procurement
+      - Electrification
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Vehicle OEMs & fleet sales:
+      titles:
+      - Fleet Sales
+      - eMobility
+      - Charging
+      - Energy Services
+      - Partnerships
+      - EV
+      - Electric Vehicle
+      - E-Mobility
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Local / municipal authorities:
+      titles:
+      - EV Infrastructure Officer
+      - EV Project Manager
+      - LEVI
+      - Transport Planner
+      - Head of Highways
+      - Street Works
+      - Parking Services
+      - Planning Officer
+      - Climate Officer
+      - Net Zero Officer
+      - Transportation Electrification
+      - EV Program Manager
+      - Sustainability Director
+      - Fleet Services
+      - Public Works
+      - Permitting
+      - Right-of-Way
+      - Planning Director
+      - EV Program
+      - Fleet
+      - Sustainability
+      - Transportation Planning
+      - Electromovilidad
+      - Eletromobilidade
+      - Movilidad
+      - Transporte
+      - Energia
+      - Mobility
+      - eMobility
+      - Transport Planning
+      - Parking
+      - Infrastructure
+      - Climate + local-language equivalents
+      - EV
+      - Electric Vehicle
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Regional, state & national:
+      titles:
+      - EV Infrastructure Officer
+      - EV Project Manager
+      - LEVI
+      - Transport Planner
+      - Head of Highways
+      - Street Works
+      - Parking Services
+      - Planning Officer
+      - Climate Officer
+      - Net Zero Officer
+      - Transportation Electrification
+      - EV Program Manager
+      - Sustainability Director
+      - Fleet Services
+      - Public Works
+      - Permitting
+      - Right-of-Way
+      - Planning Director
+      - EV Program
+      - Fleet
+      - Sustainability
+      - Transportation Planning
+      - Electromovilidad
+      - Eletromobilidade
+      - Movilidad
+      - Transporte
+      - Energia
+      - Mobility
+      - eMobility
+      - Transport Planning
+      - Parking
+      - Infrastructure
+      - Climate + local-language equivalents
+      - EV
+      - Electric Vehicle
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Car park operators:
+      titles:
+      - Parking
+      - Car Park
+      - Operations
+      - Commercial
+      - Asset
+      - Development
+      - Innovation
+      - Energy
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+      exclude_titles:
+      - Business Development
+    Developers, REITs & landlords:
+      titles:
+      - Development Director
+      - Head of Development
+      - Asset Manager
+      - Portfolio
+      - Real Estate Director
+      - Property Director
+      - ESG
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Grid operators (gatekeepers):
+      titles:
+      - Connections
+      - Network Planning
+      - DSO
+      - Flexibility
+      - Low Carbon
+      - Transportation Electrification
+      - Grid
+      - Distribution
+      - EV Programme
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Utilities running own networks or fleets:
+      titles:
+      - eMobility
+      - Charging
+      - Fleet
+      - New Business
+      - Head of EV
+      - EV
+      - Electric Vehicle
+      - E-Mobility
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Infrastructure funds, PE, VC, pensions:
+      titles:
+      - Partner
+      - Principal
+      - Investment Director
+      - Investment Manager
+      - Head of Infrastructure
+      - Energy Transition
+      - Associate Director
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Banks & project finance:
+      titles:
+      - Project Finance
+      - Infrastructure Finance
+      - Energy Transition
+      - Director
+      - Head of
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Managing Director
+      - Owner
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Electrical & EV installers:
+      titles:
+      - Owner
+      - Managing Director
+      - Director
+      - Operations
+      - Contracts Manager
+      - Estimator
+      - Electrical
+      - Installation
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+    Solar & MEP installers moving into EV:
+      titles:
+      - Owner
+      - Managing Director
+      - Operations
+      - Installation
+      - Business Development
+      - EV
+      - Electric Vehicle
+      - eMobility
+      - E-Mobility
+      - Charging
+      - Charge Point
+      - EV Infrastructure
+      - Electrification
+      - Zero Emission
+      - Energy Manager
+      - Head of Energy
+      - Sustainability
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - ESG
+      - Climate
+      - Estates
+      - Facilities
+      - Property
+      - Real Estate
+      - Car Park
+      - Parking
+      - Site Operations
+      - Capital Projects
+      - Chief Executive Officer
+      - Chief Operating Officer
+      - Founder
+      - President
+      - Director of Operations
+      - Head of Procurement
+      - Procurement Director
+      - CEO
+      - COO
+      - MD
+rescue_titles: []

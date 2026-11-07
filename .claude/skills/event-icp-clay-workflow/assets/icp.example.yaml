@@ -6,6 +6,9 @@
 # exclude_titles: whole-word "contains" exclusions, applied in the search and again at export.
 # sell.categories: Sell Side label -> countries (people location, not company HQ).
 # buy.categories: Buy Side label -> titles (+ optional countries; else default_countries).
+# Short brand for the final Salesforce CSV names (Competitive_<Brand>.csv, Buy_side_<Brand>.csv ...;
+# user, 2026-11-07; .claude/skills/event-icp-clay-workflow/scripts/sf_naming.py). Letters and digits only.
+salesforce_brand: Highways
 seniority:
 - founder
 - owner

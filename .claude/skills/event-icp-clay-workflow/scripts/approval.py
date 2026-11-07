@@ -17,6 +17,11 @@ changes.yaml (every key optional; matching is case-insensitive):
     remove_classifications: [Consultancies]         # by ICP category
     remove_domains: [acme.com]                      # whole companies
     remove_linkedin: [https://www.linkedin.com/in/x] # single people
+    event_rules:                                    # ONE event's table only (Solar, Nov 2026: "filter countries
+      - event: Future of Energy Summit 2026         #   to ..." for one event). A person who fails it loses that
+        keep_only_countries: [South Africa, Kenya]  #   event from Events / Speaker Event(s); if it was their only
+        # or remove_countries: [...]                #   event they are removed, otherwise they stay for the rest
+        columns: [Events]                           # optional: Events = its tables only (speakers keep it)
     add_title_keywords: [...]                       # NOT applied here: additions need a new Find People run (Phase 6)
     add_countries: [...]                            # idem
 """
@@ -65,9 +70,41 @@ def _has_word(text, term):
     return re.search(r"(?<![a-z0-9])" + re.escape(_norm(term)) + r"(?![a-z0-9])", _norm(text)) is not None
 
 
+def _events(v):
+    return [e.strip() for e in (v or "").split(";") if e.strip()]
+
+
+def _apply_event_rules(r, rules):
+    """Per-event country rules. Takes the event off this person's Events / Speaker Event(s) when their country
+    fails it; -> a removal reason when no event is left, else None (r["_events_dropped"] lists what was taken)."""
+    country = _norm(r.get("Mailing Country"))
+    dropped = []
+    for rule in rules or []:
+        ev = (rule.get("event") or "").strip()
+        only = {_norm(c) for c in rule.get("keep_only_countries") or []}
+        bad = {_norm(c) for c in rule.get("remove_countries") or []}
+        if not ev or not (only or bad):
+            raise SystemExit(f"event rule needs an event and keep_only_countries or remove_countries: {rule}")
+        # columns: which placements the rule covers. Default both; [Events] = the event's company/people
+        # tables only, so its speakers keep the event (Solar, Nov 2026: "only the sponsors table").
+        cols = rule.get("columns") or ["Events", "Speaker Event(s)"]
+        if (only and country not in only) or country in bad:
+            for col in cols:
+                evs = _events(r.get(col))
+                if ev in evs:
+                    r[col] = "; ".join(e for e in evs if e != ev)
+                    if ev not in dropped:
+                        dropped.append(ev)
+    if dropped:
+        r["_events_dropped"] = "; ".join(dropped)
+        if not _events(r.get("Events")) and not _events(r.get("Speaker Event(s)")):
+            return f"event rule: {', '.join(dropped)} was their only event (country {r.get('Mailing Country') or '(blank)'})"
+    return None
+
+
 def apply_changes(rows, changes):
     """-> (kept, removed rows each with a 'Removed Because'). Pure, so tests can call it."""
-    ch = {k: [x for x in (v or []) if str(x).strip()] for k, v in (changes or {}).items()}
+    ch = {k: [x for x in (v or []) if isinstance(x, dict) or str(x).strip()] for k, v in (changes or {}).items()}
     countries = {_norm(c) for c in ch.get("remove_countries", [])}
     only = {_norm(c) for c in ch.get("keep_only_countries", [])}
     classes = {_norm(c) for c in ch.get("remove_classifications", [])}
@@ -90,6 +127,8 @@ def apply_changes(rows, changes):
             why = f"company {r.get('Domain')}"
         elif people and _slug(r.get("LinkedIn URL")) in people:
             why = "person removed by name"
+        if not why:
+            why = _apply_event_rules(r, ch.get("event_rules", []))
         if why:
             removed.append({**r, "Removed Because": why})
         else:
@@ -115,13 +154,19 @@ def cmd_apply(a):
     header, rows = read_csv(a.people)
     changes = yaml.safe_load(open(a.changes, encoding="utf-8")) if a.changes else {}
     unknown = set(changes or {}) - {"remove_title_keywords", "remove_countries", "keep_only_countries", "remove_classifications",
-                                     "remove_domains", "remove_linkedin", "add_title_keywords", "add_countries"}
+                                     "remove_domains", "remove_linkedin", "add_title_keywords", "add_countries",
+                                     "event_rules"}
     if unknown:
         raise SystemExit(f"unknown keys in {a.changes}: {sorted(unknown)}")
     kept, removed = apply_changes(rows, changes)
     write_csv(a.out, header, kept)
     removed_path = a.out[:-4] + " - removed in review.csv"
     write_csv(removed_path, header + ["Removed Because"], removed)
+    trimmed = [r for r in kept if r.get("_events_dropped")]
+    if trimmed:
+        write_csv(a.out[:-4] + " - taken off one event.csv", header + ["_events_dropped"], trimmed)
+        print(f"{len(trimmed)} people kept but taken off an event by an event rule -> "
+              f"{a.out[:-4]} - taken off one event.csv")
     record = {"approved_by": a.approved_by, "approved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
               "notes": a.notes or "", "source_file": os.path.abspath(a.people), "source_sha256": sha256(a.people),
               "approved_file": os.path.abspath(a.out), "approved_sha256": sha256(a.out),

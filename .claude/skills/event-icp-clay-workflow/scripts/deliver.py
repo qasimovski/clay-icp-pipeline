@@ -13,7 +13,11 @@
         --linkedin-only "<S> - review - LinkedIn only.csv" [--exclude-source Speaker] \
         --out event_tables/ --plan plan.json
     python deliver.py salesforce --people "people - supabase.csv" --schema "Competitive Events.csv" \
-        --out salesforce.csv [--event-ids event_ids.csv] [--map sf_map.yaml]
+        --scope competitive --icp config/icps/<icp>/icp.yaml [--part Trades] [--out-dir sf/] \
+        [--event-ids event_ids.csv] [--map sf_map.yaml]
+        FILE NAME RULE (user, 2026-11-07; sf_naming.py): Competitive_<Brand>.csv, Other_sources_<Brand>.csv,
+        Buy_side_<Brand>.csv, Sell_side_<Brand>.csv (+ _<Part> for a 2nd upload of one scope); companions add
+        " - <label>". --brand overrides icp.yaml's salesforce_brand; a hand-written --out must obey the rule.
         (event_ids.csv: Event,Id[,Name] - Name = Salesforce's event name, used for Competitive Event Name)
     python deliver.py rows --plan plan.json --state state.json --prefix Seamless --out "Clay Tables rows"
 
@@ -224,10 +228,61 @@ def explode(people):
     return out
 
 
+def one_row_per_person_event(rows):
+    """One Salesforce row per person per event (Solar, Nov 2026: 561 people sat at one event twice, found at two
+    sister companies or under two exhibitor entries). Keep the row whose company website matches the email's
+    domain, else the first; it stays a speaker if any copy was. -> (kept, dropped)."""
+    def dom(v):
+        return re.sub(r"^www\.", "", re.sub(r"^https?://", "", (v or "").strip().lower())).split("/")[0]
+    groups = collections.defaultdict(list)
+    for r in rows:
+        groups[(r.get("Person Linkedin Url") or id(r), r.get("Competitive Event Name"))].append(r)
+    kept, dropped = [], []
+    for rs in groups.values():
+        best = next((r for r in rs if r.get("Contact Email") and
+                     r["Contact Email"].rsplit("@", 1)[-1].lower() == dom(r.get("Website URL"))), rs[0])
+        if "Is CA Speaker" in best and any(str(r.get("Is CA Speaker")).lower() == "true" for r in rs):
+            best["Is CA Speaker"] = next(r["Is CA Speaker"] for r in rs if str(r.get("Is CA Speaker")).lower() == "true")
+        kept.append(best)
+        dropped += [r for r in rs if r is not best]
+    return kept, dropped
+
+
+def salesforce_out(a):
+    """The output path of `salesforce`, named by the rule (sf_naming.py). Refuses a name that breaks it."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import sf_naming
+    brand = a.brand
+    if not brand and a.icp:
+        import yaml
+        brand = (yaml.safe_load(open(a.icp, encoding="utf-8")) or {}).get("salesforce_brand", "")
+    try:
+        if a.scope:
+            if not brand:
+                raise SystemExit("--scope needs --brand, or --icp with salesforce_brand set in icp.yaml")
+            name = sf_naming.filename(a.scope, brand, a.part or "")
+            if a.out and os.path.basename(a.out) != name:
+                raise SystemExit(f"--out {os.path.basename(a.out)!r} disagrees with the rule's name {name!r}")
+            if a.out_dir:
+                os.makedirs(a.out_dir, exist_ok=True)
+            return a.out or os.path.join(a.out_dir or ".", name)
+        if not a.out:
+            raise SystemExit("salesforce needs --scope (+ --brand / --icp) or an --out that follows the naming rule")
+        sf_naming.check(a.out)
+        return a.out
+    except sf_naming.NameError_ as e:
+        raise SystemExit(str(e))
+
+
 def cmd_salesforce(a):
-    # Header only: a real Salesforce export can be 100 MB.
+    a.out = salesforce_out(a)
+    # Header + one row only: a real Salesforce export can be 100 MB.
     with open(a.schema, encoding="utf-8-sig", newline="") as fh:
-        schema = next(csv.reader(fh))
+        rd = csv.reader(fh)
+        schema = next(rd)
+        sample = dict(zip(schema, next(rd, [])))
+    # Booleans in the schema's own spelling (Solar's upload has TRUE/FALSE, Python writes True/False).
+    upper = any(sample.get(c) in ("TRUE", "FALSE") for c in ("Is CA SPEX", "Is CA Speaker", "Is CA Attendee"))
     ph, people = read_csv(a.people)
     mapping = dict(DEFAULT_MAP)
     if a.map:
@@ -258,10 +313,18 @@ def cmd_salesforce(a):
         for col in schema:
             src = mapping.get(col)
             v = src(r) if callable(src) else (r.get(src, "") if src else "")
+            if upper and v in ("True", "False"):
+                v = v.upper()
             row[col] = v
-            if v:
-                filled[col] += 1
         out.append(row)
+    out, dups = one_row_per_person_event(out)
+    if dups:
+        write_csv(a.out[:-4] + " - duplicates removed.csv", schema, dups)
+        print(f"{len(dups):,} rows dropped: the same person twice at one event -> {a.out[:-4]} - duplicates removed.csv")
+    for row in out:
+        for col in schema:
+            if row[col]:
+                filled[col] += 1
     write_csv(a.out, schema, out)
     print(f"{len(out):,} rows, {len(schema)} Salesforce columns -> {a.out}")
     empty = [c for c in schema if not filled[c]]
@@ -360,7 +423,13 @@ def main():
     f = sub.add_parser("salesforce")
     f.add_argument("--people", required=True)
     f.add_argument("--schema", required=True, help="a Salesforce export whose header is the target")
-    f.add_argument("--out", required=True)
+    f.add_argument("--out", help="output path; its file name must follow the naming rule (sf_naming.py)")
+    f.add_argument("--scope", choices=["competitive", "other_sources", "buy_side", "sell_side"],
+                   help="names the file by the rule: Competitive_ / Other_sources_ / Buy_side_ / Sell_side_<Brand>.csv")
+    f.add_argument("--brand", help="short brand, letters and digits only (EVCharge, Solar); else icp.yaml salesforce_brand")
+    f.add_argument("--icp", help="icp.yaml carrying salesforce_brand")
+    f.add_argument("--part", help="_<Part> for a scope with several uploads (Trades, Associations)")
+    f.add_argument("--out-dir", help="folder for the rule-named file (default: current folder)")
     f.add_argument("--event-ids")
     f.add_argument("--map", help="YAML {Salesforce column: people column or ''} overrides")
     f.add_argument("--explode-events", action="store_true",

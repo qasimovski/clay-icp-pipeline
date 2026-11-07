@@ -194,6 +194,27 @@ def failed_ids(results):
     return {k for k, v in last.items() if v != "complete"}
 
 
+def adopt_orphan(path, state):
+    """-> the run id of a run Clay started for this chunk whose start call we never heard back from,
+    or None when there is none. Stops (SystemExit) when it can't tell which run is ours.
+
+    Candidates: the 20 most recent routine runs that no state entry knows, with `total` equal to the
+    chunk's row count. One -> adopt. None -> the start never reached Clay, so starting is safe.
+    Several -> ambiguous: stop rather than guess (a wrong guess re-pays or loses a chunk)."""
+    rows = sum(1 for line in open(path, encoding="utf-8") if line.strip())
+    known = {v.get("run_id") for v in state.values() if isinstance(v, dict)}
+    recent = clay(["routines", "runs", "list", "--limit", "20"]).get("data") or []
+    # Only runs of OUR routine: other workflows (or colleagues) may have 250-row runs too.
+    ours = {(r.get("routine") or {}).get("id") for r in recent if r.get("routineRunId") in known}
+    cands = [r["routineRunId"] for r in recent
+             if r.get("routineRunId") not in known and r.get("total") == rows
+             and (not ours or (r.get("routine") or {}).get("id") in ours)]
+    if len(cands) > 1:
+        raise SystemExit(f"{os.path.basename(path)}: its start call timed out and {len(cands)} unknown "
+                         f"runs of {rows} rows exist ({cands}); set its run_id in state.json by hand")
+    return cands[0] if cands else None
+
+
 def run_chunk(args, path, state, state_path, results):
     name = os.path.basename(path)
     entry = state.get(name) or {}
@@ -201,6 +222,15 @@ def run_chunk(args, path, state, state_path, results):
     if entry.get("status") == "done" and os.path.exists(dest):
         return
     rid = entry.get("run_id")
+    if not rid and entry.get("status") == "starting":
+        # The last `runs start` never returned (seen 2026-11-06: network_timeout). The run may exist
+        # at Clay without our id, and starting again would pay for the chunk twice. Adopt it when
+        # exactly one recent run is unknown to the state file and has this chunk's row count.
+        rid = adopt_orphan(path, state)
+        if rid:
+            state[name] = {"status": "running", "run_id": rid}
+            save_state(state_path, state)
+            print(f"{name}: adopted {rid} (its start call had timed out)", flush=True)
     if not rid:
         state[name] = {"status": "starting"}
         save_state(state_path, state)
