@@ -1,6 +1,6 @@
 ---
 name: event-icp-clay-workflow
-description: Build and run the Terrapinn Clay Workflows pipeline for an event's ICP — take scraped exhibitor/sponsor/speaker CSVs, reuse any earlier run's typing under the newest ICP version (V2 always beats V1), check companies against the team's Supabase, classify or re-check them into the ICP's Buy Side / Sell Side categories, find the right people per category (job titles, personas, seniority, countries from the ICP workbook) and apply the sheet's exact title and country rules, match speakers to LinkedIn, hand the marketing manager a per-event review in Clay and stop for their approval, then get emails in a Clay workflow that reuses everything Supabase already holds (Blitz → LeadMagic → Prospeo + ZeroBounce only for the rest), and deliver a Salesforce-shaped CSV plus Clay Tables sheet rows. Every ICP-specific value (ICP, job titles, countries, products/services and industries, competitor events) is a variable in config/icps/<icp>/. Use this whenever someone wants to "do the Highways / Mining process" for another event or vertical (aviation, fintech, mining, EV…), push an ICP through Clay, turn an ICP workbook into a people search, re-run an event under a new ICP version, or asks how to get from scraped event CSVs to people lists for Salesforce — even if they don't say "workflow". Asks whenever unsure and before every paid step.
+description: Build and run the Terrapinn Clay Workflows pipeline for an event's ICP — take scraped exhibitor/sponsor/speaker CSVs, reuse any earlier run's typing under the newest ICP version (V2 always beats V1), check companies against the team's Supabase, classify or re-check them into the ICP's Buy Side / Sell Side categories, find the right people per category (job titles, personas, seniority, countries from the ICP workbook) and apply the sheet's exact title and country rules, match speakers to LinkedIn, hand the marketing manager a per-event review in Clay and stop for their approval, then get emails in a Clay workflow that reuses everything Supabase already holds (Blitz → LeadMagic → Prospeo + ZeroBounce only for the rest), and deliver a Salesforce-shaped CSV plus Clay Tables sheet rows, then record the delivery in the team Supabase so no later run pays for those contacts again. Every ICP-specific value (ICP, job titles, countries, products/services and industries, competitor events) is a variable in config/icps/<icp>/. Use this whenever someone wants to "do the Highways / Mining process" for another event or vertical (aviation, fintech, mining, EV…), push an ICP through Clay, turn an ICP workbook into a people search, re-run an event under a new ICP version, or asks how to get from scraped event CSVs to people lists for Salesforce — even if they don't say "workflow". Asks whenever unsure and before every paid step.
 ---
 
 # Event ICP → Clay Workflows → people → Salesforce
@@ -351,7 +351,36 @@ python scripts/deliver.py salesforce --people "people - emails.csv" --schema "<S
 - **Speaker rows** follow the earlier uploads: Is CA Speaker True; a speaker-only row is not SPEX
   or Attendee and has no Classification.
 - **LinkedIn-only people** get their own file, never an email column.
+- **Other Sources use the Labs Other Sources schema, not the CE one** (user, 2026-11-10): the 44 columns of
+  `Labs - Tables - Mapped/Combined/Other Sources/Other Sources.csv`; List Number + List Sales ForceID per Clay
+  people table (from the Clay Tables tab), one row per contact AND list, List Source = "Clay" for people Clay
+  found / the directory name for scraped directories, Classification Buyer/Seller, List Status Code
+  "Suspect - BUYER" / "Suspect - SPEX", List Description `<Brand>_<list name>`.
 - Ask about every unmapped or empty column before calling it done.
+
+## Phase 12: send the delivered list to Supabase (free, ALWAYS, right after the emails)
+
+User, 2026-11-10: "after finding emails, the data should be sent to Supabase. How else would it benefit us if we
+check it against Supabase, it's not updated, and we then pay for that contact again?" So this is a standard step,
+not an offer: once the emails are in and the Salesforce file is built, record it in the team's Supabase.
+
+The email workflow already writes back every PAID answer (hit or miss, with ZeroBounce) per person. What only this
+step records: emails that did not come from the waterfall (scraped directory emails, Supabase reuse), the people and
+companies delivered, `participation` (who was delivered for this event + side) and `company_targets` (which
+companies were worked). Without it the next run's Supabase check cannot see them and pays again.
+
+```bash
+cd <clay_to_claude>
+gtm supabase import-lists "<sf>/<Final Salesforce CSV>" [more files] --event <supabase event slug> --event-name <Brand>   # dry run: counts only
+gtm supabase import-lists ... --apply                                                                                     # fill-gaps only, never overwrites
+```
+
+- Use the ICP's existing Supabase event slug (`select event_slug from gtm.events`; EVCharge = `evcharge-live-uk`).
+- Report the counts it wrote (companies, people, emails, participation, company_targets, skipped no-identity) and
+  say which emails went in without ZeroBounce (later runs reuse them as stored).
+- Import the final Salesforce file(s) of this delivery only. Competitive Events and Other Sources of one ICP can go
+  in one call.
+- First done for EVCharge on 2026-11-10 (Other Sources + Competitive Events: 86,744 people, 61,733 emails).
 
 ## Long jobs on a small machine
 

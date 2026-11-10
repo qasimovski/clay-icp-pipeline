@@ -91,6 +91,8 @@ it also writes `<out> - gated.csv`, the feed that may be paid for.
 - Report counts, never rows. Contact data stays in files, not in the conversation.
 - This skill never writes. Clay's email workflow records its own paid answers through the team API
   (api.record_contacts). Recording a whole delivered list is the `gtm` pipeline's job (`clay_to_claude`: `gtm supabase import-lists <csv> --event <slug>`, dry run
-  by default) — offer it, explain what it writes, and run it only after the user says yes.
+  by default). It is a STANDARD step after the emails (user, 2026-11-10; event-icp-clay-workflow Phase 12): dry run,
+  then `--apply`, report the counts. Without it the next lookup cannot see scraped/reused emails, delivered people or
+  targeted companies, and the team pays for them again.
 - If the connection fails, say so plainly and stop the paid step that depended on it; don't fall
   back to "assume everything is new".
