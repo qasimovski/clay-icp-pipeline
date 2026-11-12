@@ -248,6 +248,33 @@ def one_row_per_person_event(rows):
     return kept, dropped
 
 
+def one_event_per_person(rows, country=None, tier=None):
+    """One event per person (user, Solar, 10 Nov 2026: "one person in one event", not one row per event they
+    could be linked to). The event kept: one they speak at, else one in their own Mailing Country, else the best
+    competitor tier (1 best), else the event with the most of our rows (the bigger show), else by name.
+    country / tier: {Competitive Event Name: value}. -> (kept, dropped)."""
+    country, tier = country or {}, tier or {}
+    size = collections.Counter(r.get("Competitive Event Name") for r in rows)
+    groups = collections.defaultdict(list)
+    for r in rows:
+        groups[r.get("Person Linkedin Url") or id(r)].append(r)
+
+    def key(r):
+        ev = r.get("Competitive Event Name")
+        try:
+            t = int(tier.get(ev) or 9)
+        except ValueError:
+            t = 9
+        here = (country.get(ev) or "").strip().lower() == (r.get("Mailing Country") or "").strip().lower() != ""
+        return (str(r.get("Is CA Speaker")).lower() != "true", not here, t, -size[ev], ev or "")
+    kept, dropped = [], []
+    for rs in groups.values():
+        best = min(rs, key=key)
+        kept.append(best)
+        dropped += [r for r in rs if r is not best]
+    return kept, dropped
+
+
 def salesforce_out(a):
     """The output path of `salesforce`, named by the rule (sf_naming.py). Refuses a name that breaks it."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -321,6 +348,15 @@ def cmd_salesforce(a):
     if dups:
         write_csv(a.out[:-4] + " - duplicates removed.csv", schema, dups)
         print(f"{len(dups):,} rows dropped: the same person twice at one event -> {a.out[:-4]} - duplicates removed.csv")
+    if a.one_event_per_person:
+        # Optional Country / Tier columns in the ids file pick the event (one_event_per_person).
+        er = read_csv(a.event_ids)[1] if a.event_ids else []
+        sf_name = lambda r: r.get("Name") or r["Event"]  # noqa: E731
+        out, others = one_event_per_person(out, {sf_name(r): r.get("Country", "") for r in er},
+                                           {sf_name(r): r.get("Tier", "") for r in er})
+        if others:
+            write_csv(a.out[:-4] + " - other events.csv", schema, others)
+            print(f"{len(others):,} rows dropped: one event per person -> {a.out[:-4]} - other events.csv")
     for row in out:
         for col in schema:
             if row[col]:
@@ -434,6 +470,9 @@ def main():
     f.add_argument("--map", help="YAML {Salesforce column: people column or ''} overrides")
     f.add_argument("--explode-events", action="store_true",
                    help="one row per person per event, from Events + Speaker Event(s) (the review list's shape)")
+    f.add_argument("--one-event-per-person", action="store_true",
+                   help="then keep ONE event per person (speaker > own country > best tier > biggest event); "
+                        "--event-ids may carry Country and Tier columns")
     r = sub.add_parser("rows")
     r.add_argument("--plan", required=True)
     r.add_argument("--state", required=True)

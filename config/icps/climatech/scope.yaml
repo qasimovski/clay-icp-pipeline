@@ -1,0 +1,230 @@
+# APPROVED by the user, 9 Nov 2026 ("yes"). Source: ClimaTech Playbook ICP.xlsx V2 tabs, each read in full.
+# ClimaTech ICP: which classified competitor-event companies are in scope per event.
+# Source: "ClimaTech Playbook ICP.xlsx" Competitor v2 (75 rows, read in full): 52 "In scope" events,
+# 12 Parked, 11 Cut. Parked and Cut events are simply not listed. Companies were classified fresh by
+# the Claygent (scrapers_climatech/_run_v2/classified_all.csv), so there is no earlier-run type_map here.
+# DECISIONS.md (9 Nov 2026, item 7): per-event "screen to ..." notes (col J) are applied AFTER
+# classification, as the per-event rules below.
+#
+# Reading of col J (user, 9 Nov 2026: "Apply Tier 3 notes"):
+# - Tier 1 and Tier 2: keep every V2 label. Their notes say "screen to HVAC / heat pump / BMS ...",
+#   which the classification already did (anything else is Out of ICP). The four Tier 2 events whose
+#   notes name a narrower list (Batimat, Data Centre World London / Paris, World Utilities Congress)
+#   keep their note as a `note` only.
+# - Tier 3 ("only ..." notes): keep only the labels the note names. A note that speaks only about
+#   exhibitors narrows the SELL side and keeps every buy label; a note that names buyers narrows both.
+#   Measured on classified_all.csv: 366 of 9,657 in-ICP companies would leave (267 sell, 99 buy),
+#   mostly ADIPEC (155) and Global Industrie (87).
+
+icp_version: ClimaTech V2 tabs
+
+label_sets:
+  SELL_ALL: [Cooling systems & air conditioning, Heat pumps, District energy systems & heating,
+             Building automation & energy management, Ventilation & indoor air quality, Data-centre cooling,
+             "Pumps, valves & hydronics", Thermal storage, Energy recovery systems,
+             Commercial & industrial refrigeration, Energy services]
+  BUY_ALL: [Developers & giga-projects, Building owners & operators, Facilities management companies,
+            MEP consultants & specifiers, MEP / HVAC contractors & installers, District energy & utilities,
+            Data centres & telecoms, Large energy users, Social housing & public estate]
+  # "heat exchangers, (waste-)heat recovery, industrial heat pumps/chillers, EMS" (ADIPEC, Global Industrie):
+  # heat exchangers sit in District energy systems & heating and Energy recovery systems (Products_Services v2
+  # r26 / r56); chillers in Cooling systems; EMS in Building automation & energy management.
+  INDUSTRIAL_HEAT: [Energy recovery systems, District energy systems & heating, Heat pumps,
+                    Cooling systems & air conditioning, Building automation & energy management]
+
+tiers:
+  1: {keep: all}
+  2: {keep: all}
+  3: {keep: listed}
+
+# Competitor v2 col E ("Best fit for") -> editions. "All - exhibitor sourcing" = all five editions.
+# post_filter.yaml `editions` decides a BUYER's edition by country; a SELLER goes to these editions.
+events:
+  # ---- Tier 1 ----
+  AHR Expo:   # r2
+    tier: 1
+    editions: ["All editions (supplier sourcing)"]
+    note: "Exhibitors only, HQ'd or with offices in our markets; exclude US-only reps/distributors; no attendee pull (sell-side countries + buy side local already apply)"
+  ARHC - ASEAN RHVAC & Cleanroom Expo:   # r3
+    tier: 1
+    editions: [HVACTech Live Vietnam]
+  CLEANFACT & RHVAC Vietnam:   # r4
+    tier: 1
+    editions: [HVACTech Live Vietnam]
+  CR Expo (China Refrigeration):   # r5
+    tier: 1
+    editions: ["All editions (supplier sourcing)"]
+  HVACR Vietnam:   # r6
+    tier: 1
+    editions: [HVACTech Live Vietnam]
+  C&R - Climatizacion y Refrigeracion:   # r12
+    tier: 1
+    editions: ["All editions (supplier sourcing)"]
+  Chillventa:   # r13
+    tier: 1
+    editions: ["All editions (supplier sourcing)"]
+    note: German companies LinkedIn + phone only (post_filter.yaml linkedin_only_countries)
+  Euroheat & Power Congress 2027:   # r14
+    tier: 1
+    editions: [ClimaTech Paris]
+  European Heat Pump Summit:   # r15
+    tier: 1
+    editions: [ClimaTech Paris, ClimaTech London]
+  HVAC+R at UK Construction Week London:   # r16 - not scraped ("confirm it runs")
+    tier: 1
+    editions: [ClimaTech London]
+  IBS - Intelligent Building Systems:   # r17
+    tier: 1
+    editions: [ClimaTech Paris]
+    note: exclude security and AV-only exhibitors (Out of ICP in classification)
+  ISH:   # r18
+    tier: 1
+    editions: ["All editions (supplier sourcing)"]
+    note: "German companies LinkedIn + phone only; exclude bathroom/sanitary (Out of ICP in classification)"
+  ISK-SODEX:   # r19
+    tier: 1
+    editions: ["All editions (supplier sourcing)"]
+  Interclima:   # r20
+    tier: 1
+    editions: [ClimaTech Paris]
+  MCE Mostra Convegno Expocomfort:   # r21
+    tier: 1
+    editions: [ClimaTech Italy, "All editions (supplier sourcing)"]
+  Smart Buildings Show:   # r22
+    tier: 1
+    editions: [ClimaTech London]
+  UKDEA Heat Networks Expo:   # r23
+    tier: 1
+    editions: [ClimaTech London]
+  Big 5 Construct Saudi - HVACR KSA:   # r39
+    tier: 1
+    editions: [Climatech KSA]
+  HVACR World:   # r40
+    tier: 1
+    editions: [Climatech KSA]
+  International District Cooling Conference (IDCC):   # r41
+    tier: 1
+    editions: [Climatech KSA]
+  # ---- Tier 2 ----
+  ACREX India:   # r7
+    tier: 2
+    editions: ["All editions (supplier sourcing)"]
+  Co-Ref Vietnam:   # r8
+    tier: 2
+    editions: [HVACTech Live Vietnam]
+  ENGINEER & MARVEX:   # r9
+    tier: 2
+    editions: [HVACTech Live Vietnam]
+    note: "exhibitor sourcing only (Malaysia not a buy market; buy side is searched in Vietnam only anyway)"
+  RHVAC Indonesia:   # r10
+    tier: 2
+    editions: [HVACTech Live Vietnam]
+    note: exhibitor sourcing only
+  Batimat:   # r24
+    tier: 2
+    editions: [ClimaTech Paris]
+    note: "Buy side: developers, contractors, building owners. Sell side only envelope, low-carbon, smart building, CEE categories (note only; Tier 2 keeps all)"
+  Bepositive:   # r25
+    tier: 2
+    editions: [ClimaTech Paris]
+  CIBSE Build2Perform Live:   # r26
+    tier: 2
+    editions: [ClimaTech London]
+  CIBSE Heat Pumps Summit:   # r27
+    tier: 2
+    editions: [ClimaTech London]
+  Data Centre World London:   # r28
+    tier: 2
+    editions: [ClimaTech London]
+    note: "Screen to precision/liquid cooling, chillers, CRAC/CRAH, DC controls (note only; Tier 2 keeps all)"
+  Data Centre World Paris:   # r29
+    tier: 2
+    editions: [ClimaTech Paris]
+    note: "Screen to cooling vendors (note only; Tier 2 keeps all)"
+  Futurebuild:   # r30
+    tier: 2
+    editions: [ClimaTech London]
+  InstallerSHOW:   # r31
+    tier: 2
+    editions: [ClimaTech London]
+    note: "buyers = HVAC contractors 10+ staff (company size is not checked: no enrichment)"
+  Pollutec:   # r32
+    tier: 2
+    editions: [ClimaTech Paris]
+  Big 5 Global:   # r42
+    tier: 2
+    editions: [Climatech KSA]
+  Middle East Energy:   # r43
+    tier: 2
+    editions: [Climatech KSA]
+  Saudi Build:   # r44
+    tier: 2
+    editions: [Climatech KSA]
+  WETEX:   # r45
+    tier: 2
+    editions: [Climatech KSA]
+  World Utilities Congress:   # r46
+    tier: 2
+    editions: [Climatech KSA]
+    note: "Buy side: district cooling and utility operators. Sell side only chillers, thermal storage, BMS, metering (note only; Tier 2 keeps all)"
+  # ---- Tier 3 (keep only what the note names) ----
+  Vietbuild HCMC:   # r11 "Buy side: contractors and developers only"
+    tier: 3
+    editions: [HVACTech Live Vietnam]
+    keep: [SELL_ALL, MEP / HVAC contractors & installers, Developers & giga-projects]
+  Assises europeennes de la transition energetique:   # r33 "Buy side only: local authorities and public-building owners"
+    tier: 3
+    editions: [ClimaTech Paris]
+    keep: [Social housing & public estate, Building owners & operators]
+  Climate Technology Show:   # r34 "Only heat pump, building efficiency, BMS, cooling exhibitors"
+    tier: 3
+    editions: [ClimaTech London]
+    keep: [Heat pumps, Energy services, Building automation & energy management, Cooling systems & air conditioning, BUY_ALL]
+  EnerGaia:   # r35 "Only heat pump, geothermal, solar thermal, heat recovery, building energy"
+    tier: 3
+    editions: [ClimaTech Paris]
+    keep: [Heat pumps, Energy recovery systems, Building automation & energy management, Energy services, BUY_ALL]
+  Global Industrie:   # r36 "Only heat exchangers, heat recovery, industrial heat pumps/chillers, EMS, building automation"
+    tier: 3
+    editions: [ClimaTech Paris]
+    keep: [INDUSTRIAL_HEAT, BUY_ALL]
+  KEY - The Energy Transition Expo:   # r37 "Screen to energy efficiency, heat pump and building-energy exhibitors"
+    tier: 3
+    editions: [ClimaTech Italy]
+    keep: [Heat pumps, Energy services, Building automation & energy management, Energy recovery systems,
+           Ventilation & indoor air quality, Cooling systems & air conditioning, District energy systems & heating,
+           Thermal storage, BUY_ALL]
+  Klimahouse:   # r38 "buy side (designers, developers) and ventilation/heat pump exhibitors only"
+    tier: 3
+    editions: [ClimaTech Italy]
+    keep: [Ventilation & indoor air quality, Heat pumps, MEP consultants & specifiers, Developers & giga-projects]
+  ADIPEC:   # r47 "Only heat exchangers, waste-heat recovery, industrial heat pumps/chillers, EMS. Buyers: energy/facilities heads at NOCs and utilities"
+    tier: 3
+    editions: [Climatech KSA]
+    keep: [INDUSTRIAL_HEAT, Large energy users, District energy & utilities]
+  Cityscape Global:   # r48 "Buy side only: developer MEP, FM, sustainability and projects heads"
+    tier: 3
+    editions: [Climatech KSA]
+    keep: [BUY_ALL]
+  FM & Clean Saudi Arabia:   # r49 - scraped together with HVACR KSA (one list, DECISIONS.md item 6)
+    tier: 3
+    editions: [Climatech KSA]
+    keep: [Facilities management companies, Building owners & operators]
+  Saudi Elenex:   # r50 "Only BMS, smart building, EMS and HVAC-controls exhibitors"
+    tier: 3
+    editions: [Climatech KSA]
+    keep: [Building automation & energy management, BUY_ALL]
+  Sunrise Arabia Clean Energy:   # r51 "Keep only exhibitors with heat pump, HVAC, thermal storage or EMS lines"
+    tier: 3
+    editions: [Climatech KSA]
+    keep: [Heat pumps, Cooling systems & air conditioning, Ventilation & indoor air quality, Thermal storage,
+           Building automation & energy management, BUY_ALL]
+  World Energy Congress:   # r52 - not scraped as companies ("no exhibitor list needed"); speakers only
+    tier: 3
+    editions: [Climatech KSA]
+    keep: [BUY_ALL]
+  World Future Energy Summit:   # r53 "Only smart cities, efficiency, district cooling, BMS exhibitors; buyers = developers, utilities, government"
+    tier: 3
+    editions: [Climatech KSA]
+    keep: [Building automation & energy management, Energy services, District energy systems & heating,
+           Developers & giga-projects, District energy & utilities, Social housing & public estate]

@@ -1,0 +1,716 @@
+# APPROVED by the user, 9 Nov 2026 ("yes"). Source: ClimaTech Playbook ICP.xlsx V2 tabs, each read in full.
+# ClimaTech ICP: competitor-event companies -> people, for the five ClimaTech editions (Climatech KSA,
+# ClimaTech London, ClimaTech Paris, ClimaTech Italy, HVACTech Live Vietnam).
+# Read by .claude/skills/event-icp-clay-workflow/scripts/icp_mapping.py (the people workflow's ICP Mapping
+# node). Source: scrapers_climatech/"ClimaTech Playbook ICP.xlsx", V2 tabs only, each read in full
+# (user, 9 Nov 2026: "use V2 tabs ... always read the whole tab"): Products_Services v2 (85 rows),
+# Seller JTs v2 (148), BuySide ICP v2 (72), Geo_Scope v2 (65), Brief v2, Competitor v2. Rules the Clay
+# search can't express (exact match, per-keyword exclusions, personas, geo tier, the Germany split)
+# are in post_filter.yaml beside this file; per-event rules in scope.yaml.
+#
+# Category keys are the classifier's labels character for character (scrapers_climatech/_run_v2/
+# classify/classifier_prompt.txt; companies already classified -> _run_v2/classified_all.csv).
+#
+# Decisions (user, 9 Nov 2026: person location as proposed; Germany "LinkedIn only, no phone"):
+# - Person location. The countries below filter where the PERSON is, as on Mining / Solar.
+# - Germany: searched on the sell side (Geo_Scope v2 "Exhibitor sourcing"), LinkedIn only, never
+#   emailed (Geo_Scope v2, Brief v2; post_filter.yaml linkedin_only_countries).
+# - Sell side: Bookers and Stand staff in ONE contains search (the lists share most keywords, so two
+#   searches would pay twice); post_filter.yaml tags the persona (Booker wins on overlap), as Solar.
+# - Exact titles that are safe in contains mode (CEO, MD, GM, BDM, PDG ...) are in `titles` and judged
+#   exactly by post_filter.yaml. Exact titles that contains mode would flood (bare Director, Manager,
+#   Engineer, Owner, Partner, President, Vice President, Consultant) are in `exact_titles`, searched
+#   only by a separate exact-mode pass if it's approved after the draft test.
+# - "Run these lists only against companies that pass Products_Services v2" (Seller JTs v2 r148):
+#   every sell company in the feed has a Products_Services v2 label, so this holds by construction.
+#
+# Seniority, every V2 tab: "All except Intern/Trainee, Assistant, Entry, Freelance"
+# -> every Clay slug except entry and intern, plus the title exclusions below.
+# Short brand for the final Salesforce CSV names (Competitive_<Brand>.csv; user, 2026-11-07; sf_naming.py).
+salesforce_brand: ClimaTech
+seniority:
+- founder
+- owner
+- board-member
+- partner
+- c-suite
+- vp
+- director
+- head
+- manager
+- senior
+- mid-level
+# Same split as Mining / Solar (A, B1, B2): a company returning exactly 10 is searched once per group.
+seniority_groups:
+  A:
+  - founder
+  - owner
+  - board-member
+  - partner
+  - c-suite
+  - vp
+  - director
+  B1:
+  - head
+  - manager
+  B2:
+  - senior
+  - mid-level
+
+# Both sides (the seniority note on every V2 tab). collect.py also applies this list at export.
+exclude_titles:
+- Intern
+- Trainee
+- Assistant
+- Freelance
+- Freelancer                     # whole-word matching misses "Freelancer" (Solar, 28 Oct 2026)
+
+sell:
+  # Seller JTs v2 per-row "Exclude:" notes whose word no sell keyword wants, applied in Clay.
+  # The rest are per-keyword (Marketing -> not Digital / Content / Email ...) in post_filter.yaml,
+  # because a word like Digital or Channel is wanted by another keyword ("Channel Manager").
+  exclude_titles:
+  - Presales                     # Sales Director, Sales Manager, Sales
+  - Pre-Sales
+  - Telesales                    # Sales Executive, Sales
+  - SEO                          # Marketing
+  - Social Media                 # Marketing
+  - Affiliate                    # Marketing
+  - Accounts Payable             # Account Manager
+  - Telecommunication            # Communication
+  - Telecommunications
+  titles:
+  # Exact on the sheet, safe in contains mode (judged exactly in post_filter.yaml):
+  - CEO
+  - Group CEO
+  - Co-CEO
+  - MD
+  - COO
+  - GM
+  - CCO
+  - CTO
+  - CFO
+  - AVP
+  - BDM
+  - PM
+  - PDG
+  - Dirigeant
+  - Chairman
+  - Fairs Coordinator
+  # Bookers, Contains:
+  - Chief Executive
+  - Managing Director
+  - Chief Operating Officer
+  - General Manager
+  - Founder                      # "Contains on purpose: inside-word hits are Co-founder"
+  - Co-Founder
+  - Président                    # r56 Contains (r17 lists it Exact too; contains is the wider net)
+  - Directeur Général
+  - Directeur General            # unaccented spelling, as people type it on LinkedIn
+  - Directrice Générale
+  - Directrice Generale
+  - Country Manager
+  - Marketing
+  - Communication
+  - Communications               # whole-word matching: the singular doesn't hit the plural
+  - Event
+  - Events
+  - Exhibition
+  - Exhibitions
+  - Sales Director
+  - Head of Sales
+  - Sales Manager
+  - International Sales
+  - Export
+  - Commercial Director
+  - Commercial Manager
+  - Directeur Commercial
+  - Business Development         # sheet "Business Develop": word-level contains needs whole words
+  - Business Developer
+  - Head of Partner              # sheet "Head of Partner" (Head of Partner Sales ...)
+  - Head of Partnerships
+  - Key Account
+  - Sales Executive
+  - Account Executive
+  - Project Manager
+  - Chief Commercial Officer
+  - Product Manager
+  - Operations Manager
+  - Managing Partner
+  - Demand Generation
+  - Growth Manager
+  - Head of Strategy
+  - Responsable
+  - Fondateur                    # covers Cofondateur / Co-fondateur
+  - Gérant
+  - Gerant
+  - Directeur du Développement
+  - Directeur du Developpement
+  - Office Manager               # r62 / r129 "Technical / project sales support on the stand"
+  # Stand staff, Contains (the ones not already above):
+  - Sales
+  - Commercial                   # Contains for Stand staff (Exact for Bookers: post_filter.yaml)
+  - Account Manager
+  - Technical Manager
+  - Technical Director
+  - Technical Support
+  - Application Engineer
+  - Applications Engineer
+  - Directeur                    # Contains for Stand staff (Exact for Bookers)
+  - Operations Director
+  - Head of Operations
+  - Service Manager
+  - Service Engineer
+  - Technical Advisor
+  - Chief Technology Officer
+  - Partnerships
+  - Channel Manager
+  - Customer Success
+  - Branch Manager
+  - Business Manager
+  - Regional Development
+  - Head of Projects
+  - Project Director
+  - Ingénieur
+  - Ingenieur
+  - Technical Lead
+  - Solution Manager
+  - Solutions Manager
+  - Délégué
+  - Delegue
+  - Site Manager
+  - Finance Director
+  - Inside Sales
+  # Exact-mode pass only (see header): contains mode would hit every "Finance Director", "Product Owner",
+  # "Vice President Tax", "IT Manager", "Software Engineer".
+  exact_titles:
+  - Director
+  - Manager
+  - Engineer
+  - Consultant
+  - Owner
+  - Partner
+  - President
+  - Vice President
+  # Geo_Scope v2 SELL SIDE column: Core, Yes and Exhibitor sourcing (41 countries). Parked and the
+  # sanctioned rows are left out; Lebanon stays (listed "Exhibitor sourcing" in this workbook). One list
+  # for every category: the sheet doesn't vary it by category.
+  categories:
+    Cooling systems & air conditioning: &sell_countries
+    - Saudi Arabia
+    - United Arab Emirates
+    - Qatar
+    - Kuwait
+    - Bahrain
+    - Oman
+    - Egypt
+    - Jordan
+    - Lebanon
+    - Turkey
+    - United Kingdom
+    - Ireland
+    - France
+    - Italy
+    - Spain
+    - Portugal
+    - Belgium
+    - Netherlands
+    - Switzerland
+    - Luxembourg
+    - Austria
+    - Germany
+    - Sweden
+    - Denmark
+    - Norway
+    - Finland
+    - Poland
+    - Czech Republic
+    - Vietnam
+    - China
+    - Japan
+    - South Korea
+    - Taiwan
+    - India
+    - Thailand
+    - Malaysia
+    - Singapore
+    - Indonesia
+    - United States
+    - Canada
+    - Australia
+    Heat pumps: *sell_countries
+    District energy systems & heating: *sell_countries
+    Building automation & energy management: *sell_countries
+    Ventilation & indoor air quality: *sell_countries
+    Data-centre cooling: *sell_countries
+    Pumps, valves & hydronics: *sell_countries
+    Thermal storage: *sell_countries
+    Energy recovery systems: *sell_countries
+    Commercial & industrial refrigeration: *sell_countries   # sheet "TEAM TO DECIDE"; kept IN (DECISIONS.md, 9 Nov)
+    Energy services: *sell_countries
+
+buy:
+  # BuySide ICP v2 EXCLUDE row (r57) minus Intern (in exclude_titles), plus the seniority exclusion
+  # Entry and the spelled-out forms whole-word matching would otherwise miss.
+  exclude_titles:
+  - Entry
+  - Student
+  - Professor
+  - Lecturer
+  - Teacher
+  - HR
+  - Human Resources
+  - Recruiter
+  - Recruitment
+  - Legal
+  - Accountant
+  - IT Manager
+  - Occupational Health
+  - OHS
+  - Marketing
+  - Sales
+  - Presales
+  - Business Development         # also stops "Development Manager" pulling Business Development Managers
+  # Cross-cutting titles that are Exact on the sheet and that contains mode would flood
+  # ("Product Owner", "Associate Director of Finance"). Exact-mode pass only.
+  exact_titles:
+  - Owner                        # cross-cutting r31; installers "Owner as Exact" (r13)
+  - Associate Director           # r30; MEP consultants "Associate Director as Exact" (r11)
+  - Director General             # Government by geo, Saudi Arabia and Vietnam (r61, r65)
+  # Geo_Scope v2 BUY columns: "buy side = local market only" - each edition's home country, Core.
+  # Which edition a buyer goes to is decided per person (post_filter.yaml editions).
+  default_countries:
+  - Saudi Arabia
+  - United Kingdom
+  - France
+  - Italy
+  - Vietnam
+  # Each group = the union of its sub-segments' title keywords (col F), then the cross-cutting titles
+  # (r21-r54) that are safe in contains mode, the same for every group:
+  #   Sustainability Director, Head of Sustainability, Energy Efficiency, Energy Manager, Net Zero,
+  #   Decarbonisation (+ Decarbonization), Head of Facilities, Facilities Director, Head of Property,
+  #   Estates, MEP Director, Head of MEP, HVAC Manager, HVAC Engineer, Mechanical Engineer,
+  #   Head of Procurement, Procurement Director, Purchasing Manager, Directeur Technique,
+  #   Responsable Energie (+ Énergie), Directeur du Patrimoine, Responsabile Tecnico, Direttore Tecnico
+  #   + exact on the sheet, safe in contains: CEO, Chief Executive Officer, MD, Managing Director, COO,
+  #     Executive Director, Chief Sustainability Officer, Chief Technical Officer, Development Manager.
+  #     Added spelled-out / short forms (the sheet lists one; Highways missed people that way):
+  #     Chief Operating Officer, CTO, Chief Technology Officer.
+  categories:
+    Developers & giga-projects:
+      titles: &buy_common_dev
+      - MEP Director
+      - Director of MEP
+      - Projects Director
+      - Project Delivery
+      - Technical Director
+      - Sustainability Director
+      - Head of Engineering
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager      # r4 "Development Manager as Exact" (post_filter.yaml); Business Development excluded
+    Building owners & operators:
+      titles:
+      - Head of Facilities
+      - Facilities Director
+      - Asset Manager
+      - Energy Manager
+      - Head of Engineering
+      - Head of Property
+      - Facilities Management
+      - Chief Engineer
+      - Sustainability Director
+      - Estates Director
+      - Head of Estates
+      - Head of Sustainability
+      - Energy Efficiency
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Facilities management companies:
+      titles:
+      - Head of FM
+      - Facilities Management
+      - Technical Director
+      - Operations Director
+      - Head of M&E
+      - Contracts Director
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    MEP consultants & specifiers:
+      titles:
+      - Building Services
+      - Mechanical Engineer
+      - MEP Director
+      - Head of Mechanical
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    MEP / HVAC contractors & installers:
+      titles:
+      - Contracts Director
+      - Head of M&E
+      - Mechanical Services
+      - Estimating Manager
+      - Installation Manager
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    District energy & utilities:
+      titles:
+      - District Cooling
+      - District Energy
+      - Heat Network
+      - Heat Networks
+      - Plant Manager
+      - Operations Director
+      - Head of Networks
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Data centres & telecoms:
+      titles:
+      - Data Centre Operations
+      - Data Center Operations   # US spelling (proposed: Clay titles are often US-spelt)
+      - Critical Facilities
+      - Head of Data Centre
+      - Head of Data Center
+      - Mission Critical
+      - Cooling Engineer
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Large energy users:
+      titles:
+      - Energy Manager
+      - Utilities Manager
+      - Head of Sustainability
+      - Plant Engineering
+      - Engineering Manager
+      - Sustainability Director
+      - Energy Efficiency
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Social housing & public estate:
+      titles:
+      - Head of Asset Management
+      - Retrofit
+      - Decarbonisation
+      - Decarbonization
+      - Head of Property Services
+      - Estates Director
+      # GOVERNMENT BY GEO (r61-r65): public bodies are classified into this group, so every geo's
+      # keywords are searched for every public-estate company (one list; a Saudi person titled
+      # "Transizione Energetica" is rare, so it costs nothing extra).
+      - Energy Efficiency        # Saudi Arabia, Vietnam
+      - Sustainability           # Saudi Arabia (bare word, contains)
+      - Facilities               # Saudi Arabia (bare word, contains)
+      - Projects Director        # Saudi Arabia
+      - Head of Energy           # UK
+      - Net Zero                 # UK
+      - Heat Networks            # UK
+      - Climate Change Manager   # UK
+      - Directeur des Batiments  # France (sheet spelling)
+      - Directeur des Bâtiments
+      - Transition Energetique   # France (sheet spelling)
+      - Transition Énergétique
+      - Energy Manager           # Italy
+      - Responsabile Patrimonio  # Italy
+      - Dirigente Tecnico        # Italy
+      - Transizione Energetica   # Italy
+      - Building Management      # Vietnam
+      # Cross-cutting (not already above):
+      - Sustainability Director
+      - Head of Sustainability
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+
+# Empty on purpose (as Mining / Solar): a rescue list would bring back "Assistant General Manager".
+rescue_titles: []

@@ -95,6 +95,10 @@ are picked in the Clay UI and verified by name.
 
 ## Run (per approved list)
 
+**First the audiences step (SKILL.md Phase 9b, user 12 Nov 2026):** `audiences_check.py --apply` on the approved
+list. People already in the ICP's Clay audience are removed. The Supabase pre-check and the worklist are built
+from its `- not in audiences.csv` output, never from the approved file directly.
+
 Only through `bulk_run.py --approval approval.json` (it refuses any feed that isn't byte-identical to the approved
 list) — commands in SKILL.md Phase 8. Plan → one pilot chunk → the rest, each after the user's yes.
 

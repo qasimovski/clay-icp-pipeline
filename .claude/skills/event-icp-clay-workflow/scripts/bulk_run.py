@@ -33,6 +33,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import urllib.request
 
@@ -44,10 +45,16 @@ def load_state(path):
     return json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
 
 
+_STATE_LOCK = threading.Lock()
+
+
 def save_state(path, state):
-    tmp = path + ".tmp"
-    json.dump(state, open(tmp, "w", encoding="utf-8"), indent=1)
-    os.replace(tmp, path)
+    # --parallel: chunk threads share one state dict; snapshot and write under a lock.
+    with _STATE_LOCK:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(dict(state), f, indent=1)
+        os.replace(tmp, path)
 
 
 def check_linkedin_spellings(rows, id_cols):
@@ -272,6 +279,9 @@ def main():
     ap.add_argument("--chunk", type=int, default=250)
     ap.add_argument("--limit", type=int, help="at most N chunks this invocation")
     ap.add_argument("--timeout", type=int, default=2400, help="seconds to wait per chunk")
+    ap.add_argument("--parallel", type=int, default=1,
+                    help="chunks in flight at once (default 1). Each chunk is still started once and its run id "
+                         "saved before polling, so a kill never re-charges; more in flight can mean more 429s")
     ap.add_argument("--plan", action="store_true", help="show the plan, spend nothing")
     ap.add_argument("--retry-failed", action="store_true")
     ap.add_argument("--reuse-from", nargs="*", default=[],
@@ -310,8 +320,23 @@ def main():
     if args.plan:
         print("--plan: nothing started")
         return
-    for c in pending[:args.limit] if args.limit else pending:
-        run_chunk(args, c, state, state_path, results)
+    todo = pending[:args.limit] if args.limit else pending
+    if args.parallel > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        ex = ThreadPoolExecutor(args.parallel)
+        futs = [ex.submit(run_chunk, args, c, state, state_path, results) for c in todo]
+        try:
+            for f in futs:
+                f.result()
+        except BaseException:
+            # A chunk that stops (SystemExit, Ctrl+C) starts nothing new: queued chunks are cancelled and
+            # the ones in flight finish (their run ids are already in state.json).
+            ex.shutdown(wait=True, cancel_futures=True)
+            raise
+        ex.shutdown(wait=True)
+    else:
+        for c in todo:
+            run_chunk(args, c, state, state_path, results)
     left = failed_ids(results)
     print(f"failed rows on disk: {len(left)}" + ("  -> re-run with --retry-failed" if left else ""))
 

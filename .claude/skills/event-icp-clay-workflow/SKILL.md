@@ -1,6 +1,6 @@
 ---
 name: event-icp-clay-workflow
-description: Build and run the Terrapinn Clay Workflows pipeline for an event's ICP — take scraped exhibitor/sponsor/speaker CSVs, reuse any earlier run's typing under the newest ICP version (V2 always beats V1), check companies against the team's Supabase, classify or re-check them into the ICP's Buy Side / Sell Side categories, find the right people per category (job titles, personas, seniority, countries from the ICP workbook) and apply the sheet's exact title and country rules, match speakers to LinkedIn, hand the marketing manager a per-event review in Clay and stop for their approval, then get emails in a Clay workflow that reuses everything Supabase already holds (Blitz → LeadMagic → Prospeo + ZeroBounce only for the rest), and deliver a Salesforce-shaped CSV plus Clay Tables sheet rows, then record the delivery in the team Supabase so no later run pays for those contacts again. Every ICP-specific value (ICP, job titles, countries, products/services and industries, competitor events) is a variable in config/icps/<icp>/. Use this whenever someone wants to "do the Highways / Mining process" for another event or vertical (aviation, fintech, mining, EV…), push an ICP through Clay, turn an ICP workbook into a people search, re-run an event under a new ICP version, or asks how to get from scraped event CSVs to people lists for Salesforce — even if they don't say "workflow". Asks whenever unsure and before every paid step.
+description: Build and run the Terrapinn Clay Workflows pipeline for an event's ICP — take scraped exhibitor/sponsor/speaker CSVs, reuse any earlier run's typing under the newest ICP version (V2 always beats V1), check companies against the team's Supabase, classify or re-check them into the ICP's Buy Side / Sell Side categories, find the right people per category (job titles, personas, seniority, countries from the ICP workbook) and apply the sheet's exact title and country rules, match speakers to LinkedIn, hand the marketing manager a per-event review in Clay and stop for their approval, apply their changes, then always run the audiences step (remove everyone whose LinkedIn URL is already in the ICP's Clay audience), then get emails in a Clay workflow that reuses everything Supabase already holds (Blitz → LeadMagic → Prospeo + ZeroBounce only for the rest), and deliver a Salesforce-shaped CSV plus Clay Tables sheet rows, then record the delivery in the team Supabase so no later run pays for those contacts again. Every ICP-specific value (ICP, job titles, countries, products/services and industries, competitor events) is a variable in config/icps/<icp>/. Use this whenever someone wants to "do the Highways / Mining process" for another event or vertical (aviation, fintech, mining, EV…), push an ICP through Clay, turn an ICP workbook into a people search, re-run an event under a new ICP version, or asks how to get from scraped event CSVs to people lists for Salesforce — even if they don't say "workflow". Asks whenever unsure and before every paid step.
 ---
 
 # Event ICP → Clay Workflows → people → Salesforce
@@ -291,7 +291,34 @@ removes titles, countries or companies, and enriching first pays for people they
 Give the user the files, the Clay folder and the summary. **Then stop and wait.** Don't build or
 run the email workflow, and don't suggest "starting the pilot meanwhile".
 
-When the manager answers, turn it into `changes.yaml` (shape in `approval.py`'s docstring), read
+**When the manager sends back the per-table review sheet** (the Clay Tables rows plus their columns
+Verdict, "What GTM needs to do", Contacts now / Removed - … / Contacts after), follow the user's rule
+(ClimaTech, 10 Nov 2026):
+- **Verdict ACCEPT: do nothing.**
+- **Any other verdict** ("ACCEPT AFTER CLEAN-UP", "NEEDS FIXING", …): fix it as "What GTM needs to do"
+  says, **in the local CSVs only**. Never re-import or edit the Clay tables.
+
+Save the sheet's rows as a `.tsv` in the run folder. Do a dry run first, then apply:
+
+```bash
+python scripts/gtm_fixes.py --sheet gtm_review_<date>.tsv --final-dir people/final \
+    --review "<S> - review.csv" --review "<S> - review - LinkedIn only.csv" --by "<manager>"   # dry run
+python scripts/gtm_fixes.py … --apply
+```
+
+A removal covers only the table the manager flagged (that event + entity). The same company in an accepted
+table stays. The script:
+- removes the rows from `event_tables/`;
+- turns the company's decision at that event into DROP;
+- takes the event off those people in the review lists (people left with no event are removed);
+- backs up every file it touches, and logs the removed rows.
+
+Its docstring lists the instructions it understands ("Delete these companies (all contacts): A (n); …",
+"Enrich the N contacts in Germany with LinkedIn URL only", which is only a check because they are already
+split off). It stops on anything else. When it stops, ask the user and extend the parser; never guess.
+Report the count checks: the sheet's totals can be off by one against its own company counts.
+
+For feedback in any other form, turn it into `changes.yaml` (shape in `approval.py`'s docstring), read
 it back in plain words, and apply it:
 
 ```bash
@@ -302,14 +329,60 @@ python scripts/approval.py apply --people "<S> - review.csv" --changes changes.y
 **Additions** (a new title or country) need a new Find People run for the affected companies,
 priced first, then a fresh review.
 
-## Phase 10: emails (workflow 3, approved file only, never the LinkedIn-only file)
+## Phase 9b: the audiences step (free, ALWAYS, after the manager's changes and before any email)
 
-Read `references/email_workflow.md`.
+User, 12 Nov 2026: "once the marketing manager reviews the tables, after we have applied the changes she asked
+for, which is the step before email enrichments, you should always then do the audiences step: check the LinkedIn
+URL for each person that we have against the LinkedIn URLs in audiences in Clay." It is a standard step for every
+event and every scope (Competitive Events, Other Sources, Buy Side, Sell Side), not an offer.
+
+Decisions the same day:
+- **A person found in the audience is removed from the list.** No email lookup, not in the Salesforce CSV.
+- **One named audience per ICP, not all of Audiences.** It is `clay_audience` in the ICP's `icp.yaml` (the exact
+  audience name or its `audseg_` id). If it is not set, **ask the user which audience** and record the answer
+  there with the date. Never guess it from a similar name ("REVIEW: …" and "REMOVE: …" both exist per brand),
+  and never fall back to all people.
+
+```bash
+python scripts/audiences_check.py --people "people - approved.csv" --people "<S> - review - LinkedIn only.csv" \
+    --icp-config config/icps/<icp>/icp.yaml              # dry run: counts only
+python scripts/audiences_check.py … --apply
+```
+
+- Run it on **every people file that goes forward**, the LinkedIn-only file too.
+- It writes `<file> - not in audiences.csv` (the people who go forward), `audiences - removed.csv` (who was
+  removed, with the Audiences record id and Salesforce Contact ID) and `audiences_check.json`. The input files
+  are not edited.
+- **Everything after this reads the `- not in audiences.csv` files**: the Supabase pre-check, the email worklist
+  and its approval record, `collect.py emails`, `deliver.py salesforce`, and the LinkedIn-only delivery.
+- Read-only in Clay and free (the `clay audiences` CLI, about 1,500 people a minute). It stops on any Clay error,
+  so "could not ask" is never read as "not in the audience". A killed run resumes from the same command.
+- A match is the same LinkedIn profile slug. Clay stores the URLs in several spellings and its exact search
+  misses them, so the script searches by slug and confirms each hit itself. Don't replace it with an `Equal` filter.
+- People with no LinkedIn profile URL cannot be checked. They stay; report how many.
+- Report per file: people in, removed, going forward, not checked. Give the user the dry-run counts before `--apply`
+  if the removed share looks odd (none at all, or most of the list): that usually means the wrong audience.
+
+## Phase 10: emails (workflow 3, the audience-checked approved file only, never the LinkedIn-only file)
+
+Read `references/email_workflow.md`. The input is Phase 9b's `people - approved - not in audiences.csv`, not the
+approved file itself.
 - **Supabase first, for everyone:** any email it already holds is reused with its validation.
 - **The waterfall only for the rest:** Blitz → LeadMagic → Prospeo, then ZeroBounce on the
   waterfall's email.
 - **Every paid answer is written back.**
 - **A failed Supabase lookup:** that person is not searched.
+- **People only, never companies (user, ClimaTech 10 Nov 2026: "save Clay actions").** The email workflow
+  runs per person and holds no company step. Company columns (size, industry, funding, …) come from the
+  ONE Enrich Company per unique domain done before the review (Phase 9), joined onto every person by
+  domain. Never add Enrich Company, or any company-level node, to the email workflow or to a people table.
+  ClimaTech: 5,449 companies were enriched once for 33,670 people.
+- **Pre-check free, then send only the rest.** Run `supabase_lookup.py contacts` on the audience-checked list first
+  (free), and build the paid worklist from its "still to enrich" rows. Ask about "user to decide"
+  (known bad / no email); Solar and ClimaTech skipped them. Approve the worklist itself with
+  `approval.py apply --record approval_worklist.json` and pass that to `bulk_run.py --approval`.
+- **Row id:** key on `Person ID` (one per profile, 18 characters). Clay rejects ids over 64 characters, and
+  long LinkedIn slugs exceed that.
 
 ```bash
 python scripts/email_workflow.py check --config email_workflow.yaml
@@ -348,6 +421,10 @@ python scripts/deliver.py salesforce --people "people - emails.csv" --schema "<S
   `... - duplicates removed.csv`). `deliver.py` builds the name from `--scope` and refuses an `--out` that
   breaks the rule. Files built before 2026-11-07 keep their old names (user: new exports only).
 - **`--explode-events`** writes one row per person per event (company events + speaker events).
+- **`--one-event-per-person`** (user, Solar, 10 Nov 2026: "one person in one event") then keeps ONE event per
+  person: one they speak at, else one in their own country, else the best tier, else the biggest event. Give
+  the ids file `Country` and `Tier` columns; the dropped rows go to `<base> - other events.csv`. LinkedIn-only
+  (Germany) people go in the same file with email blank (user, 10 Nov 2026), not a separate upload.
 - **Speaker rows** follow the earlier uploads: Is CA Speaker True; a speaker-only row is not SPEX
   or Attendee and has no Classification.
 - **LinkedIn-only people** get their own file, never an email column.

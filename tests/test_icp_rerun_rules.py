@@ -511,3 +511,96 @@ def test_deliver_names_the_salesforce_file_and_refuses_a_bad_out(tmp_path):
         deliver.salesforce_out(ns(**dict(base, scope="buy_side", out="Competitive_EVCharge.csv")))
     assert deliver.salesforce_out(ns(**dict(base, scope=None, out="x/Other_sources_EVCharge_Trades.csv"))) \
         == "x/Other_sources_EVCharge_Trades.csv"
+
+
+def test_salesforce_one_event_per_person():
+    """Solar, 10 Nov 2026 (user): one person in one event. Speaker first, then own country, tier, bigger show."""
+    def row(p, ev, c="Spain", spk="FALSE"):
+        return {"Person Linkedin Url": p, "Competitive Event Name": ev, "Mailing Country": c, "Is CA Speaker": spk}
+    rows = [row("a", "Big"), row("a", "Home"), row("a", "Talk", spk="TRUE"),   # a speaks at Talk
+            row("b", "Big"), row("b", "Home"),                                  # b lives where Home is
+            row("c", "Big", "Peru"), row("c", "T1", "Peru"),                    # c: tier wins over size
+            row("d", "Big", "Peru"), row("d", "Home", "Peru"), row("x", "Big")]  # d: the bigger show
+    country = {"Home": "Spain", "Talk": "Italy", "Big": "Japan", "T1": "Japan"}
+    tier = {"T1": "1", "Big": "2", "Home": "2", "Talk": "3"}
+    kept, dropped = deliver.one_event_per_person(rows, country, tier)
+    got = {r["Person Linkedin Url"]: r["Competitive Event Name"] for r in kept}
+    assert got == {"a": "Talk", "b": "Home", "c": "T1", "d": "Big", "x": "Big"}
+    assert len(kept) + len(dropped) == len(rows)
+
+
+# --- the audiences step (user, 12 Nov 2026): people already in the ICP's Clay audience are removed before emails
+
+class _FakeAudiences:
+    """Stands in for the Clay CLI: an audience holding `members` (record id -> stored LinkedIn URL)."""
+
+    def __init__(self, members, fail_on=None):
+        self.members, self.fail_on, self.calls = members, fail_on, []
+
+    def __call__(self, args):
+        self.calls.append(args)
+        if self.fail_on and self.fail_on in args:
+            raise SystemExit("clay failed")
+        if args[:2] == ["audiences", "list"]:
+            return {"data": [{"id": "audseg_x", "name": "REVIEW: Test ICP Scoring"}]}
+        if args[:2] == ["audiences", "get"]:
+            return {"id": "audseg_x", "name": "REVIEW: Test ICP Scoring", "entityType": "people",
+                    "filter": {"type": "GroupOp", "combinationMode": "And", "items": []}}
+        if args[:3] == ["audiences", "fields", "list"]:
+            return {"data": [{"id": "audf_sfdc", "name": "SFDC Contact ID"}]}
+        if args[:3] == ["audiences", "records", "search-ids"]:
+            path = args[args.index("--filter") + 1]
+            if path.startswith("/mnt/"):
+                path = path[5].upper() + ":" + path[6:]
+            with open(path, encoding="utf-8") as fh:
+                values = json.load(fh)["items"][1]["value"]
+            # like Clay's ContainAny: a substring match, ignoring case
+            return {"data": [i for i, u in self.members.items() if any(v in u.lower() for v in values)]}
+        if args[:3] == ["audiences", "records", "get"]:
+            ids = [int(x) for x in args[args.index("--ids") + 1].split(",")]
+            return {"data": [{"recordId": i, "fields": {"linkedin_url": self.members[i], "audf_sfdc": f"003{i}"}}
+                             for i in ids]}
+        raise AssertionError(f"unexpected clay call {args}")
+
+
+def test_people_already_in_the_audience_are_removed_before_emails(tmp_path):
+    ac = load("audiences_check")
+    people = tmp_path / "people - approved.csv"
+    write_csv(people, [
+        {"Person Name": "In, other spelling", "LinkedIn URL": "https://WWW.linkedin.com/in/Jane-Doe-1/?trk=x"},
+        {"Person Name": "Longer slug only", "LinkedIn URL": "https://www.linkedin.com/in/john-smith"},
+        {"Person Name": "New", "LinkedIn URL": "https://www.linkedin.com/in/new-person"},
+        {"Person Name": "No URL", "LinkedIn URL": ""},
+    ])
+    before = people.read_bytes()
+    fake = _FakeAudiences({1: "http://linkedin.com/in/jane-doe-1", 2: "https://www.linkedin.com/in/john-smith-123"})
+    rec = ac.main(["--people", str(people), "--audience", "review: test icp scoring", "--apply"], clay=fake)
+
+    kept = [r["Person Name"] for r in read_csv(tmp_path / "people - approved - not in audiences.csv")]
+    removed = read_csv(tmp_path / "audiences - removed.csv")
+    # john-smith is NOT john-smith-123: a substring hit in Clay is not a match
+    assert kept == ["Longer slug only", "New", "No URL"]
+    assert [(r["Person Name"], r["SFDC Contact ID"], r["Removed Because"]) for r in removed] == \
+        [("In, other spelling", "0031", "already in Clay audience")]
+    assert rec["files"][0]["not_checked"] == 1
+    assert people.read_bytes() == before          # the approved file keeps its hash
+
+
+def test_a_dry_run_writes_no_people_file_and_no_audience_stops(tmp_path):
+    ac = load("audiences_check")
+    people = tmp_path / "p.csv"
+    write_csv(people, [{"Person Name": "A", "LinkedIn URL": "https://www.linkedin.com/in/a"}])
+    ac.main(["--people", str(people), "--audience", "audseg_x"], clay=_FakeAudiences({}))
+    assert not (tmp_path / "p - not in audiences.csv").exists()
+    with pytest.raises(SystemExit, match="clay_audience"):
+        ac.main(["--people", str(people)], clay=_FakeAudiences({}))
+
+
+def test_a_clay_failure_is_never_read_as_not_in_the_audience(tmp_path):
+    ac = load("audiences_check")
+    people = tmp_path / "p.csv"
+    write_csv(people, [{"Person Name": "A", "LinkedIn URL": "https://www.linkedin.com/in/a"}])
+    with pytest.raises(SystemExit):
+        ac.main(["--people", str(people), "--audience", "audseg_x", "--apply"],
+                clay=_FakeAudiences({1: "https://linkedin.com/in/a"}, fail_on="search-ids"))
+    assert not (tmp_path / "p - not in audiences.csv").exists()
