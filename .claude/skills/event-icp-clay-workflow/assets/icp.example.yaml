@@ -9,6 +9,10 @@
 # Short brand for the final Salesforce CSV names (Competitive_<Brand>.csv, Buy_side_<Brand>.csv ...;
 # user, 2026-11-07; .claude/skills/event-icp-clay-workflow/scripts/sf_naming.py). Letters and digits only.
 salesforce_brand: Highways
+# The Clay audience the people are checked against before emails (the audiences step, user 2026-11-12;
+# scripts/audiences_check.py). The audience's exact name in Clay, or its audseg_ id. People already in it are
+# removed from the list. Ask the user which audience; never guess it from a similar name.
+# clay_audience: "<exact audience name in Clay>"
 seniority:
 - founder
 - owner

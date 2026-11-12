@@ -1,0 +1,170 @@
+# APPROVED by the user, 9 Nov 2026 ("yes"). Source: ClimaTech Playbook ICP.xlsx V2 tabs, each read in full.
+# ClimaTech ICP: rules applied to the people Clay returns, because the Clay search can't express them.
+# Clay's search (icp.yaml) is the wider net; this file is the sheet's exact wording.
+# Source: "ClimaTech Playbook ICP.xlsx" V2 tabs (Seller JTs v2, BuySide ICP v2, Geo_Scope v2, Brief v2).
+#
+# Matching: `exact` = the whole title, or one part of a compound title split on & / | , ; @ and
+# " - " ("CEO & Founder" passes CEO). `contains` = the keyword appears as whole words. A person
+# passes when any keyword matches and none of that keyword's `exclude` words appear in the title.
+# Kept but FLAGGED in "Title Check" for the marketing manager, never dropped (as Mining / Solar):
+# near-exact titles ("Group CEO") and non-English titles (总经理) the rules can't read.
+
+sell:
+  # Seller JTs v2 (r4-r129). A person matching both lists is tagged Booker (Booker wins).
+  personas:
+    Booker:
+      exact: [CEO, Group CEO, MD, COO, GM, Owner, Partner, President, Director, Directeur, Fairs Coordinator,
+              CCO, BDM, Manager, Vice President, Chairman, Dirigeant, PDG, Commercial]
+      contains:
+        Chief Executive: {}
+        Managing Director: {exclude: [Digital, Assistant]}
+        Chief Operating Officer: {}
+        General Manager: {exclude: [Assistant, Digital, Event, Hotel]}
+        Founder: {}
+        Co-Founder: {}
+        Président: {}
+        Directeur Général: {}
+        Directeur General: {}
+        Directrice Générale: {}
+        Directrice Generale: {}
+        Country Manager: {}
+        Marketing: {exclude: &mkt [Digital, SEO, Performance, Content, Social Media, Email, Affiliate, Assistant, Intern]}
+        Communication: {exclude: &comms [Telecommunication, Telecommunications, Internal, Investor]}
+        Communications: {exclude: *comms}
+        Event: {exclude: [Trade]}          # "Exclude: Trade (unproven)"
+        Events: {exclude: [Trade]}
+        Exhibition: {}
+        Exhibitions: {}
+        Sales Director: {exclude: [Presales, Digital]}
+        Head of Sales: {}
+        Sales Manager: {exclude: [Presales, Digital, Assistant]}
+        International Sales: {}
+        Export: {}
+        Commercial Director: {}
+        Commercial Manager: {}
+        Directeur Commercial: {}
+        Business Development: {exclude: &bd [Assistant, Digital]}
+        Business Developer: {exclude: *bd}
+        Head of Partner: {}
+        Head of Partnerships: {}
+        Key Account: {exclude: [Channel, Field]}
+        Sales Executive: {exclude: [Telesales]}
+        Account Executive: {}
+        Project Manager: {exclude: [Product]}
+        Chief Commercial Officer: {}
+        Product Manager: {}
+        Operations Manager: {exclude: [Digital]}
+        Managing Partner: {}
+        Demand Generation: {}
+        Growth Manager: {}
+        Head of Strategy: {}
+        Responsable: {}
+        Fondateur: {}
+        Gérant: {}
+        Gerant: {}
+        Directeur du Développement: {}
+        Directeur du Developpement: {}
+        Office Manager: {}
+    Stand staff:
+      exact: [BDM, CEO, CTO, MD, Director, Président, Manager, Engineer, Consultant, President, PM, COO, Dirigeant,
+              Chairman, Vice President, Co-CEO, CFO, AVP, PDG]
+      contains:
+        Sales: {exclude: [Presales, Telesales, Digital]}
+        Commercial: {exclude: [Field, Digital]}
+        Business Development: {exclude: *bd}
+        Business Developer: {exclude: *bd}
+        Account Manager: {exclude: [Channel, Accounts Payable]}
+        Account Executive: {}
+        Key Account: {exclude: [Channel, Field]}
+        Product Manager: {}
+        Project Manager: {exclude: [Product]}
+        Technical Manager: {}
+        Technical Director: {}
+        Technical Support: {}
+        Application Engineer: {}
+        Applications Engineer: {}
+        Marketing: {exclude: *mkt}
+        Managing Director: {exclude: [Digital, Assistant]}
+        General Manager: {exclude: [Assistant, Digital, Event, Hotel]}
+        Directeur: {}
+        Operations Director: {}
+        Country Manager: {}
+        Founder: {}
+        Co-Founder: {}
+        Operations Manager: {exclude: [Digital]}
+        Head of Operations: {}
+        Service Manager: {}
+        Service Engineer: {}
+        Technical Advisor: {}
+        Chief Executive: {}
+        Chief Technology Officer: {}
+        Partnerships: {}
+        Channel Manager: {}
+        Customer Success: {}
+        Branch Manager: {}
+        Business Manager: {}
+        Regional Development: {}
+        Head of Projects: {}
+        Project Director: {}
+        Ingénieur: {}
+        Ingenieur: {}
+        Technical Lead: {}
+        Solution Manager: {}
+        Solutions Manager: {}
+        Délégué: {}
+        Delegue: {}
+        Responsable: {}
+        Site Manager: {}
+        Finance Director: {}
+        Inside Sales: {}
+        Fondateur: {}
+        Gérant: {}
+        Gerant: {}
+        Directeur du Développement: {}
+        Directeur du Developpement: {}
+        Office Manager: {}
+  # Geo_Scope v2 SELL SIDE column.
+  geo_tier:
+    Core: [Turkey, United Kingdom, France, Italy, Spain, China, Japan, South Korea, United States]
+    "Yes": [Saudi Arabia, United Arab Emirates, Ireland, Portugal, Belgium, Netherlands, Switzerland, Luxembourg,
+            Austria, Sweden, Denmark, Norway, Finland, Poland, Vietnam]
+    Exhibitor sourcing: [Qatar, Kuwait, Bahrain, Oman, Egypt, Jordan, Lebanon, Germany, Czech Republic, Taiwan,
+                         India, Thailand, Malaysia, Singapore, Indonesia, Canada, Australia]
+
+buy:
+  # BuySide ICP v2: each group's titles in icp.yaml are `contains`, except these, which are Exact on the sheet
+  # (cross-cutting r21-r31, "Development Manager as Exact" r4, "Associate Director as Exact" r11,
+  # "Owner as Exact" r13, "Director General as Exact" r61/r65) and their added spelled-out forms.
+  exact: [CEO, Chief Executive Officer, MD, Managing Director, COO, Chief Operating Officer, Executive Director,
+          Chief Sustainability Officer, Chief Technical Officer, CTO, Chief Technology Officer, Development Manager,
+          Associate Director, Owner, Director General]
+  # The EXCLUDE row (r57), applied to every buy title, plus the seniority exclusions.
+  exclude: [Intern, Trainee, Student, Assistant, Entry, Freelance, Freelancer, Professor, Lecturer, Teacher, HR,
+            Human Resources, Recruiter, Recruitment, Legal, Accountant, IT Manager, Occupational Health, OHS,
+            Marketing, Sales, Presales, Business Development]
+  geo_tier:
+    Core: [Saudi Arabia, United Kingdom, France, Italy, Vietnam]
+
+# Germany: searched (sell side only), LinkedIn URL only. Never emailed (Geo_Scope v2 r5/r29, Brief v2 r29:
+# "LinkedIn + phone only - never email"). No phone lookup (user, 9 Nov 2026: "LinkedIn only, no phone").
+# Its people go to a separate LinkedIn-only file and never reach the email workflow.
+linkedin_only_countries: [Germany]
+
+# Speakers (user, 9 Nov 2026: "In scope, filtered"): in scope; kept when their company passes the ICP AND their title
+# passes the Seller / Buyer lists above (filter, not flag), as Solar.
+speakers:
+  titles: filter
+  # Industry words too common in company names to prove a LinkedIn match ("Cooling Solutions Ltd").
+  company_stop_words: [hvac, cooling, heating, climate, energy, air, thermal, refrigeration, engineering,
+                       technology, technologies, solutions, services, systems, group, international, green]
+
+# Geo_Scope v2 BUY columns, one per ClimaTech edition ("buy side = local market only"). A buy-side person
+# goes to the edition whose column lists their country, intersected with the event's "Best fit for"
+# (scope.yaml). A sell-side person goes to the event's "Best fit for" editions ("All editions (supplier
+# sourcing)" = all five).
+editions:
+  Climatech KSA: {"Core": ["Saudi Arabia"]}
+  ClimaTech London: {"Core": ["United Kingdom"]}
+  ClimaTech Paris: {"Core": ["France"]}
+  ClimaTech Italy: {"Core": ["Italy"]}
+  HVACTech Live Vietnam: {"Core": ["Vietnam"]}
