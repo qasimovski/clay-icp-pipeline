@@ -333,6 +333,7 @@ def _click_footer_commit(page: Page, timeout: int) -> None:
     """Click the commit control in the import dialog's footer. The
     stage-display-footer test-id IS the actionable commit target — clicking it
     is the approach that created 60+ workbooks successfully, so keep it as-is."""
+    dismiss_toasts(page)                # a bottom-right toast can cover the footer (Submarine, 17 Nov 2026)
     page.get_by_test_id("stage-display-footer").click(timeout=timeout)
 
 
@@ -344,11 +345,35 @@ def _add_table_button(page: Page):
         page.locator('button[type="button"]'))
 
 
+def dismiss_toasts(page: Page) -> int:
+    """Close Clay's bottom-right toasts. Best effort, never raises.
+
+    Submarine CE delivery, 17 Nov 2026: a persistent "You're approaching your
+    workspace row limit of 15M total rows" toast sat over the bottom-bar 'Add'
+    button once a workbook had five tables. The click then timed out on every
+    retry, and the sixth table was never created."""
+    n = 0
+    try:
+        btns = page.locator('button[aria-label="Dismiss toast"]')
+        for i in range(btns.count()):
+            try:
+                btns.nth(i).click(timeout=2000)
+                n += 1
+            except Exception:
+                pass
+        if n:
+            page.wait_for_timeout(400)
+    except Exception:
+        pass
+    return n
+
+
 def add_csv_table(page: Page, csv_path: str) -> None:
     """Add another table to the already-open workbook by importing a CSV via
     the bottom-bar 'Add' button (Create new table -> Import from CSV)."""
     add_table = _add_table_button(page)
     add_table.wait_for(state="visible", timeout=20000)
+    dismiss_toasts(page)                # a row-limit toast can cover 'Add'
     add_table.click(timeout=15000)
     page.wait_for_timeout(150)
     # The "Create new table" modal is a large, partly virtualized source picker;
@@ -770,6 +795,7 @@ def delete_table(page, name: str, verify: bool = True) -> bool:
     # retry the whole open-and-click a few times before failing.
     clicked = False
     for attempt in range(3):
+        dismiss_toasts(page)            # the row-limit toast covers right-hand tabs (Submarine, 17 Nov 2026)
         try:
             open_tab_menu(page, name)
         except ClayUIError:
