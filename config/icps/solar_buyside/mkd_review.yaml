@@ -1,0 +1,48 @@
+# Solar buy side - marketing manager's review of the Clay review copies, received 2026-11-11.
+# Per people table: keep ONLY contacts whose Job Title CONTAINS (case-insensitive substring) one of `keep_titles`.
+# Contacts with non-English titles always stay in. "Non-English" here means: our post_filter flagged it
+# ("non-English title ...") OR the title has any non-ASCII character. That definition reproduces her removal
+# counts exactly on 8 of the 9 tables; on Installers it's 3,197 vs her 3,200.
+# No per-company cut (max 20 already). Germany stays LinkedIn-only (no email, no phone), as delivered.
+# Status on her sheet: "MKD approved" for all 9 tables (Investors & financiers and Public sector accepted 2026-11-12).
+# The user, 2026-11-11, asked for all of them to be applied.
+tables:
+  "2. Developers & IPPs|Buyside People":
+    keep_titles: [Development, Developer, Origination, Project, Grid, Land, Planning, Procurement, Construction,
+                  Asset Manager, Generation, Investment, Engineering, Technical Director, Portfolio, Operations,
+                  Performance]
+    expect_removed: 1997
+  "1. Installers & EPCs|Buyside People":
+    keep_titles: [Installer, Installation, Solar, PV, Design, Surveyor, Estimator, Procurement, Purchasing, Buyer,
+                  Project Manager, Project Director, Contracts, Engineering, EPC, Construction, Engineering Manager,
+                  Grid, Commissioning, Electrician, Electrical, Owner, Roofer]
+    expect_removed: 3200
+  "8. Investors & financiers|Buyside People":
+    keep_titles: [Investment, Infrastructure, Project Finance, Energy Transition, Renewables, PPA, Origination,
+                  Underwriter]
+    expect_removed: 332
+  "6. Landowners & agriculture|Buyside People":
+    keep_titles: [Farm, Farmer, Owner, Estate, Partner, Director, Land, Rural, Property, Asset Manager]
+    expect_removed: 1186
+  "4. Large energy users (C&I)|Buyside People - Manufacturing & industrial":
+    keep_titles: [Energy Manager, Energy, Utilities, Engineering Manager, Plant Manager, Facilities, Sustainability,
+                  Net Zero, Procurement]
+    expect_removed: 18165
+  "4. Large energy users (C&I)|Buyside People - Other C&I":
+    keep_titles: [Energy Manager, Energy, Utilities, Engineering Manager, Plant Manager, Facilities, Sustainability,
+                  Net Zero, Procurement, Property, Estates, Power, Electrical Engineer, Decarbonisation,
+                  Critical Infrastructure, Engineering]
+    expect_removed: 14185
+  "5. Property & facilities|Buyside People":
+    keep_titles: [Development Director, Technical Director, Sustainability, Energy, Procurement, Property,
+                  Asset Manager, Estates, Facilities, Technical Services, Building Services, Asset Management,
+                  Retrofit, Property Services]
+    expect_removed: 3580
+  "7. Public sector|Buyside People":
+    keep_titles: [Energy, Renewable, Climate, Net Zero, Policy, Planning, Sustainability, Estates, Housing,
+                  Procurement, Facilities]
+    expect_removed: 1180
+  "3. Utilities & energy retailers|Buyside People":
+    keep_titles: [Renewable, Distributed Energy, Generation, Storage, Innovation, Procurement, Grid, Network Planning,
+                  Connections, Flexibility, Solar, Battery, Proposition]
+    expect_removed: 1910
