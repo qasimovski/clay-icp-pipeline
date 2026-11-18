@@ -420,6 +420,11 @@ python scripts/deliver.py salesforce --people "people - emails.csv" --schema "<S
   Companion files keep the base name plus ` - <label>` (`Buy_side_EVCharge - LinkedIn only.csv`,
   `... - duplicates removed.csv`). `deliver.py` builds the name from `--scope` and refuses an `--out` that
   breaks the rule. Files built before 2026-11-07 keep their old names (user: new exports only).
+- **HARD RULE: Brand + Brand Classification are never blank** (user, 2026-11-18) in a `Buy_side_`,
+  `Sell_side_` or `Other_sources_` file: `Brand` = the short brand (`EVCharge`, `Solar`); `Brand Classification`
+  = `<Brand>_Buyer` for a Buyer row, `<Brand>_Seller` for a Seller row (capital B / S, every brand). Set them
+  with `sf_naming.brand_fields(brand, classification)` and run `sf_naming.check_brand_columns(rows, brand)`
+  before writing the file; it refuses blanks, lowercase suffixes and a side that disagrees with Classification.
 - **`--explode-events`** writes one row per person per event (company events + speaker events).
 - **`--one-event-per-person`** (user, Solar, 10 Nov 2026: "one person in one event") then keeps ONE event per
   person: one they speak at, else one in their own country, else the best tier, else the biggest event. Give

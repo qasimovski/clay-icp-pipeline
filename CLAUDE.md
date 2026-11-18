@@ -148,6 +148,12 @@ new prefixed pair, never a discriminator column on the live tables.
 
 ## Hard rules
 
+**Salesforce Brand columns are never blank** (user, 2026-11-18). Every `Buy_side_`, `Sell_side_` and
+`Other_sources_` file sets `Brand` = the short brand (`salesforce_brand`: `EVCharge`, `Solar`) and
+`Brand Classification` = `<Brand>_Buyer` or `<Brand>_Seller` from the row's Classification — capital B / S
+for every brand (`EVCharge_Buyer`, `Solar_Seller`). Build them with `sf_naming.brand_fields()` and gate the
+write on `sf_naming.check_brand_columns()`; `docs/NAMING.md` §F. New exports only.
+
 **Run-now vs configure-only.** Anything calling a paid provider per row — Claygent/AI columns,
 `Enrich Company`, Find People — is created and fully configured but **never triggered**. Formula
 columns, table creation, CSV import, and Send Table Data actions are created *and* run. The one
