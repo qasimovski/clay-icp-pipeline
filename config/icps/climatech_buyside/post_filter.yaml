@@ -1,0 +1,79 @@
+# DRAFT 2026-11-15. ClimaTech BUY SIDE post filter. GENERATED from config/icps/climatech/post_filter.yaml
+# (APPROVED 9 Nov 2026): its `buy` block and `editions` unchanged. Sell side and speakers are left out (buy
+# side only). 2026-11-15: buy.exact also takes the exact-pass owner titles (user, after the pilot).
+# linkedin_only_countries is empty: Germany is not a buy country (Geo_Scope v2).
+
+buy:
+  exact:
+  - Founder
+  - Co-Founder
+  - Director
+  - Gérant
+  - Gerant
+  - Président
+  - President
+  - Titolare
+  - Amministratore Unico
+  - CEO
+  - Chief Executive Officer
+  - MD
+  - Managing Director
+  - COO
+  - Chief Operating Officer
+  - Executive Director
+  - Chief Sustainability Officer
+  - Chief Technical Officer
+  - CTO
+  - Chief Technology Officer
+  - Development Manager
+  - Associate Director
+  - Owner
+  - Director General
+  exclude:
+  - Intern
+  - Trainee
+  - Student
+  - Assistant
+  - Entry
+  - Freelance
+  - Freelancer
+  - Professor
+  - Lecturer
+  - Teacher
+  - HR
+  - Human Resources
+  - Recruiter
+  - Recruitment
+  - Legal
+  - Accountant
+  - IT Manager
+  - Occupational Health
+  - OHS
+  - Marketing
+  - Sales
+  - Presales
+  - Business Development
+  geo_tier:
+    Core:
+    - Saudi Arabia
+    - United Kingdom
+    - France
+    - Italy
+    - Vietnam
+linkedin_only_countries: []
+editions:
+  Climatech KSA:
+    Core:
+    - Saudi Arabia
+  ClimaTech London:
+    Core:
+    - United Kingdom
+  ClimaTech Paris:
+    Core:
+    - France
+  ClimaTech Italy:
+    Core:
+    - Italy
+  HVACTech Live Vietnam:
+    Core:
+    - Vietnam

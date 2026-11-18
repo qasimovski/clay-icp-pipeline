@@ -165,3 +165,8 @@ field, the file that goes to IT for the Salesforce load) is named by its scope a
   `tests/test_icp_rerun_rules.py`).
 - Files built before 2026-11-07 (Solar CE, EVCharge Other Sources, PhilEnergy) keep their names (user:
   new exports only). A run-folder script that writes a Salesforce file by hand must use the same names.
+- **Brand columns — hard rule (user, 2026-11-18).** Every `Buy_side_`, `Sell_side_` and `Other_sources_` file
+  fills `Brand` with the short brand and `Brand Classification` with `<Brand>_Buyer` / `<Brand>_Seller` from the
+  row's Classification (`EVCharge_Buyer`, `Solar_Seller`; capital B / S for every brand). Use
+  `sf_naming.brand_fields()` and gate the write on `sf_naming.check_brand_columns()`. Files built before
+  2026-11-18 left both blank; new exports only.

@@ -494,6 +494,28 @@ def test_an_old_style_or_misspelt_name_is_refused(bad):
         sfn.check(bad)
 
 
+@pytest.mark.parametrize("brand,cls,want", [
+    ("EVCharge", "Buyer", "EVCharge_Buyer"), ("EVCharge", "Seller", "EVCharge_Seller"),
+    ("Solar", "Buyer", "Solar_Buyer"), ("Solar", "seller", "Solar_Seller"),
+])
+def test_brand_columns_follow_the_rule(brand, cls, want):
+    # User, 2026-11-18 (hard rule): Brand = short brand; Brand Classification = <Brand>_Buyer / <Brand>_Seller.
+    assert sfn.brand_fields(brand, cls) == {"Brand": brand, "Brand Classification": want}
+
+
+def test_blank_or_wrong_brand_columns_are_refused():
+    good = [{"Classification": "Buyer", **sfn.brand_fields("EVCharge", "Buyer")},
+            {"Classification": "Seller", **sfn.brand_fields("EVCharge", "Seller")}]
+    assert sfn.check_brand_columns(good, "EVCharge") == 2
+    for bad in ({"Classification": "Buyer", "Brand": "", "Brand Classification": ""},            # the old blank files
+                {"Classification": "Buyer", "Brand": "EVCharge", "Brand Classification": "EVCharge_buyer"},
+                {"Classification": "Seller", "Brand": "EVCharge", "Brand Classification": "EVCharge_Buyer"},
+                {"Classification": "Buyer", "Brand": "EV Charge", "Brand Classification": "EV Charge_Buyer"},
+                {"Classification": "", "Brand": "EVCharge", "Brand Classification": "EVCharge_Buyer"}):
+        with pytest.raises(sfn.NameError_):
+            sfn.check_brand_columns(good + [bad], "EVCharge")
+
+
 def test_companions_keep_the_base_name():
     assert sfn.companion("sf/Buy_side_EVCharge.csv", "LinkedIn only") == "sf/Buy_side_EVCharge - LinkedIn only.csv"
 

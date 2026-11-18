@@ -1,0 +1,1033 @@
+# DRAFT 2026-11-15. ClimaTech BUY SIDE company searches, from the "BuySide ICP v2" tab.
+#
+# Source: scrapers_climatech/ClimaTech Playbook ICP.xlsx, tab "BuySide ICP v2" (9 buyer groups,
+# 13 sub-segments, cross-cutting titles, "Government by geo", investors note) and tab
+# "Geo_Scope v2" (BUY columns). V2 always wins (memory: icp-version-precedence).
+#
+# Route (user, 2026-11-15): the Solar / EVCharge buy-side route, with two sources for companies:
+#   Clay company search from the CLI (clay_company_search.py, this file via ps_query_config.py)
+#   AND Blitz company search (scrapers_climatech/_buyside/search/blitz_company_search.py, which
+#   reads this same file) for every sub-segment x country -> union, dedupe by domain
+#   (merge_company_search.py) -> Supabase companies gate -> Find People (Clay) + Blitz ->
+#   Deepline people search where coverage is thin for a country.
+#
+# Decisions (user, 2026-11-15):
+#   - Countries: the 5 event countries only (Geo_Scope v2: "BUY SIDE = local market only"):
+#     Climatech KSA = Saudi Arabia, London = UK, Paris = France, Italy = Italy,
+#     HVACTech Live Vietnam = Vietnam. Neighbouring countries are sell-side sourcing only.
+#   - Include "Government by geo" and "Investors and financiers" on top of the 9 groups.
+#   - Dedupe companies AND people against ClimaTech Competitive Events (_run_v2) and ClimaTech
+#     Other Sources (_other_sources) before any paid search.
+#   - Germany is not a buy country, so the LinkedIn-only rule does not arise here.
+#
+# Per-sub-segment countries come from the sheet:
+#   Giga-project & master developers -> Saudi Arabia only ("(KSA)"; "Climatech KSA core").
+#   Commercial & residential developers -> UK, France, Italy, Vietnam ("(UK, FR, IT, VN)").
+#   Heat pump & HVAC installers -> UK, France, Italy ("mainly London/Paris/Italy visitor audience").
+#   Social housing -> UK, France, Italy (note "London and Paris"; the examples also name ACER, Italy).
+#     User 2026-11-15 ("go with your suggestions"): Italy stays in.
+#   Government by geo -> one search per country, with that country's bodies.
+#   Everything else -> all 5.
+#
+# Precision, not caps (Solar rule): the sheet's industries, "Extra keyword filter (company)",
+# example organisations and notes are spread across industry / description / description_not /
+# anchors. Broad sectors (real estate, hospitality, hospitals, transport, manufacturing,
+# telecoms) also carry the persona filter (people_titles: a current employee with the buyer
+# persona, located in a buy country), and a "(1,000+ staff)" companion without the persona so big
+# real targets whose staff Clay has not typed are not lost (Solar 2026-11-06). The persona list on
+# a company search is the sheet's segment titles with the generic words left out (Director,
+# Manager, Operations: every company has them) plus local-language forms (French/Italian titles
+# from the cross-cutting list). The full persona is applied at the people search, not here.
+#
+# Local-language keywords (fonciere, bailleur social, teleriscaldamento...) are kept because
+# French / Italian / Vietnamese companies often describe themselves in their own language;
+# `contains` matches whole words, so both accented and unaccented spellings are listed.
+#
+# Industry names the sheet uses that are not Clay enum values were mapped:
+#   Hospital & Health Care -> Hospitals and Health Care, Hospitals
+#   Leisure -> Leisure, Travel & Tourism, Recreational Facilities, Entertainment Providers
+#   Airlines/Aviation; Transportation -> Airlines and Aviation, Rail Transportation, Urban Transit
+#     Services, Transportation/Trucking/Railroad, Maritime Transportation
+#   Information Technology & Services -> Information Technology and Services, IT Services and IT
+#     Consulting, Data Infrastructure and Analytics, IT System Data Services
+#   Oil & Energy -> Oil and Gas, Utilities, Steam and Air-Conditioning Supply (district energy)
+#   Non-profit -> Non-profit Organizations, Housing and Community Development, Housing Programs
+#
+# Additions not on the sheet, marked ADDED below, for the user's approval:
+#   - "Energy service companies (ESCOs)" in group 3: the sheet's Boundary note says ESCOs are
+#     buy side, but no sub-segment lists them.
+
+# Company office countries, in Clay's COMPANY enum.
+countries:
+  - Saudi Arabia
+  - United Kingdom
+  - France
+  - Italy
+  - Vietnam
+
+# The same 5 in Clay's PEOPLE enum (identical spellings for these five).
+person_countries:
+  - Saudi Arabia
+  - United Kingdom
+  - France
+  - Italy
+  - Vietnam
+
+persona_companion:
+  suffix: (1,000+ staff)
+  company_size:
+    - 1,001-5,000
+    - 5,001-10,000
+    - 10,001+
+
+# The sheet has no tier column; Tier is left blank and "Priority" carries the sheet's
+# "Priority (proposed)" value.
+tiers: {}
+
+anchors:
+  # REITs / asset managers: Investment Management alone is every fund manager, so the company
+  # must also talk about property.
+  real_estate:
+    - real estate
+    - property
+    - properties
+    - immobilier
+    - immobiliere
+    - immobilière
+    - immobiliare
+  # Heat pump installers: the company must talk about heat pumps (sample 2026-11-15: bare
+  # installateur / RGE let in window makers, fire-alarm and solar installers).
+  heat_pump:
+    - heat pump
+    - heat pumps
+    - air source
+    - ground source
+    - pompe a chaleur
+    - pompe à chaleur
+    - pompes a chaleur
+    - pompes à chaleur
+    - pompa di calore
+    - pompe di calore
+    - HVAC
+    - air conditioning
+    - climatisation
+    - climatizzazione
+  # MEP consultants: bare "engineering consultancy" let in automotive, marine, tunnelling and
+  # geospatial firms (sample 2026-11-15), so the company must also talk about buildings / MEP.
+  buildings:
+    - building
+    - buildings
+    - MEP
+    - HVAC
+    - M&E
+    - mechanical and electrical
+    - batiment
+    - bâtiment
+    - batiments
+    - bâtiments
+    - edilizia
+    - impianti
+    - architecture
+    - architectural
+  # Investors: only those funding HVAC / district energy / efficiency assets (sheet note).
+  energy_assets:
+    - district cooling
+    - district heating
+    - district energy
+    - heat network
+    - heat networks
+    - energy efficiency
+    - energy infrastructure
+    - energy transition
+    - decarbonisation
+    - decarbonization
+    - ESCO
+    - energy services
+
+categories:
+
+  # =====================================================================
+  # 1. Developers & giga-projects
+  # =====================================================================
+  - name: Giga-project & master developers (KSA)
+    group: 1. Developers & giga-projects
+    priority: High
+    notes: Sheet - Climatech KSA core. Development Manager as Exact at the people step.
+    countries:
+      - Saudi Arabia
+    person_countries:
+      - Saudi Arabia
+    industry:
+      - Real Estate
+      - Commercial Real Estate
+      - Construction
+      - Building Construction
+      - Nonresidential Building Construction
+      - Residential Building Construction
+      - Community Development and Urban Planning
+      - Housing and Community Development
+    description:
+      - giga-project
+      - giga-projects
+      - giga project
+      - giga projects
+      - gigaproject
+      - master developer
+      - master-developer
+      - master planned
+      - master-planned
+      - masterplanned
+      - destination
+      - destinations
+      - Vision 2030
+      - Public Investment Fund
+      - PIF
+      - NEOM
+      - Diriyah
+      - Red Sea Global
+      - Qiddiya
+      - ROSHN
+      - mixed-use
+      - mixed use
+
+  - name: Commercial & residential developers (UK, FR, IT, VN)
+    group: 1. Developers & giga-projects
+    priority: High
+    countries:
+      - United Kingdom
+      - France
+      - Italy
+      - Vietnam
+    person_countries:
+      - United Kingdom
+      - France
+      - Italy
+      - Vietnam
+    industry:
+      - Real Estate
+      - Commercial Real Estate
+      - Construction
+      - Building Construction
+      - Nonresidential Building Construction
+      - Residential Building Construction
+    description:
+      - property developer
+      - property developers
+      - property development
+      - real estate developer
+      - real estate developers
+      - real estate development
+      - residential development
+      - commercial development
+      - mixed-use development
+      - housebuilder
+      - housebuilders
+      - promoteur immobilier
+      - promoteurs immobiliers
+      - promotion immobiliere
+      - promotion immobilière
+      - sviluppo immobiliare
+      - sviluppatore immobiliare
+    people_titles:
+      - MEP
+      - Technical Director
+      - Sustainability
+      - Head of Engineering
+      - Projects Director
+      - Project Director
+      - Development Director
+      - Directeur Technique
+      - Direttore Tecnico
+      - Responsabile Tecnico
+
+  # =====================================================================
+  # 2. Building owners & operators
+  # =====================================================================
+  - name: Commercial real estate, REITs & asset managers
+    group: 2. Building owners & operators
+    priority: High
+    anchor: real_estate
+    industry:
+      - Real Estate
+      - Commercial Real Estate
+      - Leasing Non-residential Real Estate
+      - Real Estate and Equipment Rental Services
+      - Investment Management
+    description:
+      - REIT
+      - REITs
+      - real estate investment trust
+      - asset manager
+      - asset management
+      - property company
+      - property investment
+      - property portfolio
+      - investment property
+      - fonciere
+      - foncière
+      - SIIC
+      - SCPI
+      - SGR
+      - SIIQ
+      - real estate investment
+    # Sample 2026-11-15: estate agency networks (Connells, LRG) are not building owners.
+    description_not:
+      - estate agency
+      - estate agent
+      - estate agents
+    people_titles:
+      - Facilities
+      - Asset Manager
+      - Energy Manager
+      - Head of Engineering
+      - Head of Property
+      - Sustainability
+      - Directeur du Patrimoine
+      - Responsabile Patrimonio
+
+  - name: Retail, hospitality & leisure
+    group: 2. Building owners & operators
+    priority: High
+    industry:
+      - Retail
+      - Hospitality
+      - Hotels and Motels
+      - Accommodation Services
+      - Leisure, Travel & Tourism
+      - Recreational Facilities
+      - Leasing Non-residential Real Estate
+      - Amusement Parks and Arcades
+      - Spectator Sports
+    description:
+      - mall
+      - malls
+      - shopping mall
+      - shopping malls
+      - shopping centre
+      - shopping centres
+      - shopping center
+      - shopping centers
+      - retail property
+      - retail park
+      - retail parks
+      - department store
+      - department stores
+      - hypermarket
+      - hypermarkets
+      - hotel
+      - hotels
+      - hotel group
+      - resort
+      - resorts
+      - theme park
+      - stadium
+      - arena
+      - convention centre
+      - convention center
+      - centre commercial
+      - centri commerciali
+      - centro commerciale
+      - albergo
+      - alberghi
+    # Sample 2026-11-15: Entertainment Providers (NBCUniversal, Garena) dropped above; recruiters out.
+    description_not:
+      - recruitment
+      - recruitment agency
+    people_titles:
+      - Facilities
+      - Head of Engineering
+      - Director of Engineering
+      - Chief Engineer
+      - Engineering Manager
+      - Energy Manager
+      - Sustainability
+      - Directeur Technique
+      - Responsabile Tecnico
+
+  - name: Airports, transport & infrastructure
+    group: 2. Building owners & operators
+    priority: Medium
+    industry:
+      - Airlines and Aviation
+      - Rail Transportation
+      - Urban Transit Services
+      - Transportation/Trucking/Railroad
+    # Sample 2026-11-15: Logistics and Maritime industries let in shipping and logistics groups
+    # (CMA CGM, Hapag-Lloyd, Toll); dropped, with "port authority". Airlines stay (sheet lists
+    # Airlines/Aviation) - flagged for the manager review.
+    description:
+      - airport
+      - airports
+      - airport operator
+      - rail
+      - railway
+      - railways
+      - metro
+      - underground
+      - light rail
+      - transit
+      - aeroport
+      - aéroport
+      - aeroporto
+      - ferroviaire
+      - ferroviaria
+    people_titles:
+      - Facilities
+      - Head of Engineering
+      - Sustainability
+      - Energy Manager
+      - Estates
+      - Asset Manager
+
+  - name: Healthcare & education estates
+    group: 2. Building owners & operators
+    priority: Medium
+    industry:
+      - Hospitals and Health Care
+      - Hospitals
+      - Higher Education
+      - Education Administration Programs
+      - Primary and Secondary Education
+    description:
+      - hospital
+      - hospitals
+      - hospital group
+      - NHS trust
+      - NHS foundation trust
+      - medical city
+      - healthcare group
+      - university
+      - universities
+      - college
+      - colleges
+      - academy trust
+      - hopital
+      - hôpital
+      - CHU
+      - clinique
+      - ospedale
+      - ospedaliera
+      - universite
+      - université
+      - universita
+      - università
+    # Insurers, medtech and distributors match "healthcare group" (EVCharge sample 2026-11-06).
+    description_not:
+      - health insurance
+      - health insurer
+      - medical devices
+      - medtech
+      - pharmaceutical
+      - pharmaceuticals
+      - distributor
+      - telehealth
+      - virtual care
+      - recruitment
+    people_titles:
+      - Estates
+      - Facilities
+      - Energy Manager
+      - Sustainability
+      - Head of Engineering
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+
+  # =====================================================================
+  # 3. Facilities management companies
+  # =====================================================================
+  - name: Integrated & technical FM providers
+    group: 3. Facilities management companies
+    priority: High
+    industry:
+      - Facilities Services
+      - Building Equipment Contractors
+      - Commercial and Industrial Machinery Maintenance
+    description:
+      - facilities management
+      - facility management
+      - FM services
+      - FM provider
+      - hard services
+      - integrated facilities
+      - integrated FM
+      - technical facilities
+      - technical services
+      - building maintenance
+      - planned maintenance
+      - facility services
+      - multitechnique
+      - multi-technique
+      - gestion technique
+      - maintenance multitechnique
+      - global service
+      - facility management italia
+
+  # ADDED (not a sheet sub-segment): the Boundary note puts ESCOs on the buy side.
+  - name: Energy service companies (ESCOs)
+    group: 3. Facilities management companies
+    priority: Medium
+    notes: ADDED 2026-11-15 from the sheet's Boundary note; awaiting the user's approval.
+    industry:
+      - Facilities Services
+      - Utilities
+      - Services for Renewable Energy
+      - Engineering Services
+      - Environmental Services
+      - Business Consulting and Services
+    description:
+      - ESCO
+      - energy service company
+      - energy services company
+      - energy performance contract
+      - energy performance contracting
+      - energy performance contracts
+      - EPC contract
+      - societe de services energetiques
+      - société de services énergétiques
+      - contrat de performance energetique
+      - contrat de performance énergétique
+      - societa di servizi energetici
+      - società di servizi energetici
+      - servizi energetici
+
+  # =====================================================================
+  # 4. MEP consultants & specifiers
+  # =====================================================================
+  - name: M&E / building services consultancies
+    group: 4. MEP consultants & specifiers
+    priority: High
+    notes: Sheet - Associate Director as Exact at the people step.
+    anchor: buildings
+    industry:
+      - Civil Engineering
+      - Mechanical or Industrial Engineering
+      - Architecture and Planning
+      - Engineering Services
+    description:
+      - MEP consultant
+      - MEP consultants
+      - MEP consultancy
+      - MEP design
+      - MEP engineering
+      - building services
+      - building services engineering
+      - M&E consultant
+      - M&E consultancy
+      - mechanical and electrical engineering
+      - HVAC design
+      - consulting engineers
+      - engineering consultancy
+      - bureau d'etudes
+      - bureau d'études
+      - bureau d'etudes techniques
+      - ingenierie fluides
+      - ingénierie fluides
+      - studio di ingegneria
+      - progettazione impianti
+      - engineering office
+      - engineering offices
+
+  # =====================================================================
+  # 5. MEP / HVAC contractors & installers
+  # Boundary (sheet): buy side unless the contractor owns a product brand (then sell side too;
+  # dedupe by domain). Sellers already in ClimaTech CE are removed by the merge's dedupe.
+  # =====================================================================
+  - name: MEP and HVAC contractors
+    group: 5. MEP / HVAC contractors & installers
+    priority: Medium
+    industry:
+      - Construction
+      - Mechanical or Industrial Engineering
+      - Building Equipment Contractors
+      - Specialty Trade Contractors
+      - Building Construction
+      - Nonresidential Building Construction
+    description:
+      - MEP contractor
+      - MEP contractors
+      - MEP contracting
+      - MEP services
+      - HVAC contractor
+      - HVAC contractors
+      - HVAC installation
+      - HVAC services
+      - mechanical contractor
+      - mechanical contractors
+      - mechanical services
+      - M&E contractor
+      - M&E services
+      - mechanical and electrical contractor
+      - building services contractor
+      - air conditioning installation
+      - genie climatique
+      - génie climatique
+      - CVC
+      - impiantistica
+      - impianti meccanici
+      - impianti termici
+      - impianti tecnologici
+    # Sample 2026-11-15: CLIM+ (a Saint-Gobain distribution network) is a seller.
+    description_not:
+      - distributor
+      - distribution network
+      - negoce
+      - négoce
+
+  - name: Heat pump & HVAC installers
+    group: 5. MEP / HVAC contractors & installers
+    priority: Low
+    notes: Sheet - Owner as Exact; mainly London/Paris/Italy visitor audience.
+    countries:
+      - United Kingdom
+      - France
+      - Italy
+    person_countries:
+      - United Kingdom
+      - France
+      - Italy
+    industry:
+      - Construction
+      - Building Equipment Contractors
+      - Specialty Trade Contractors
+      - Services for Renewable Energy
+      - Renewables & Environment
+    anchor: heat_pump
+    # Blitz only (blitz_company_search.py): send the heat-pump words to Blitz and check the
+    # installer words locally; "installer" alone would page through every UK/FR/IT builder.
+    blitz_keywords: anchor
+    description:
+      - installer
+      - installers
+      - installation
+      - installations
+      - installateur
+      - installateurs
+      - installatore
+      - installatori
+      - installazione
+      - MCS certified
+      - MCS accredited
+      - RGE
+      - QualiPAC
+    # Sample 2026-11-15: manufacturers (Weishaupt, Mitsubishi Electric), trade associations
+    # (UFME, Assoclima) and solar-only installers came in.
+    description_not:
+      - manufacturer
+      - manufacturers
+      - fabricant
+      - costruttore
+      - costruttori
+      - association
+      - federation
+      - associazione
+      # Re-sample 2026-11-15: distributors and merchants (CLIM+, Midsummer, SIG, Zanutta).
+      - distributor
+      - distributors
+      - wholesale
+      - wholesaler
+      - merchant
+      - points de vente
+      - punti vendita
+
+  # =====================================================================
+  # 6. District energy & utilities
+  # =====================================================================
+  - name: District cooling & heat network operators
+    group: 6. District energy & utilities
+    priority: High
+    notes: Sheet - priority KSA and Paris.
+    industry:
+      - Utilities
+      - Oil and Gas
+      - Steam and Air-Conditioning Supply
+      - Water, Waste, Steam, and Air Conditioning Services
+      - Electric Power Generation
+      - Renewable Energy Power Generation
+      - Utilities Administration
+      - Natural Gas Distribution
+    description:
+      - district cooling
+      - district heating
+      - district energy
+      - heat network
+      - heat networks
+      - heating network
+      - heating networks
+      - cooling network
+      - reseau de chaleur
+      - réseau de chaleur
+      - reseaux de chaleur
+      - réseaux de chaleur
+      - reseau de froid
+      - réseau de froid
+      - teleriscaldamento
+      - teleraffrescamento
+      - chilled water
+
+  # =====================================================================
+  # 7. Data centres & telecoms. Operator wording only: bare "data centre" let IT resellers and
+  # integrators in on the Solar sample (2026-11-05).
+  # =====================================================================
+  - name: Data-centre operators & telecom towers
+    group: 7. Data centres & telecoms
+    priority: Medium
+    industry:
+      - Information Technology and Services
+      - IT Services and IT Consulting
+      - Data Infrastructure and Analytics
+      - IT System Data Services
+      - Telecommunications
+      - Telecommunications Carriers
+      - Wireless Services
+    description:
+      - colocation
+      - hyperscale
+      - data centre operator
+      - data center operator
+      - data centre campus
+      - data center campus
+      - data centre provider
+      - data center provider
+      - digital infrastructure
+      - telecom towers
+      - tower company
+      - mobile network operator
+      - telecom operator
+      - telecommunications operator
+    description_not:
+      - systems integrator
+      - solutions provider
+      - reseller
+      - IT consulting
+      # Sample 2026-11-15: IT consultancies, integrators and a recruiter matched "digital infrastructure".
+      - IT services
+      - IT service provider
+      - technology consulting
+      - consulting firm
+      - consultancy
+      - system integration
+      - systems integration
+      - digital transformation
+      - recruitment
+    people_titles:
+      - Data Centre
+      - Data Center
+      - Critical Facilities
+      - Mission Critical
+      - Cooling
+      - Facilities
+      - Energy Manager
+
+  # =====================================================================
+  # 8. Large energy users
+  # =====================================================================
+  - name: Industry, F&B and oil & gas
+    group: 8. Large energy users
+    priority: Medium
+    industry:
+      - Food and Beverage Manufacturing
+      - Food & Beverages
+      - Beverage Manufacturing
+      - Food Production
+      - Dairy Product Manufacturing
+      - Manufacturing
+      - Oil and Gas
+      - Chemical Manufacturing
+      - Pharmaceutical Manufacturing
+      - Plastics Manufacturing
+      - Primary Metal Manufacturing
+      - Glass, Ceramics and Concrete Manufacturing
+    description:
+      - factory
+      - factories
+      - manufacturing plant
+      - manufacturing plants
+      - manufacturing site
+      - manufacturing facility
+      - production facility
+      - production plant
+      - bottling
+      - food production
+      - food processing
+      - refinery
+      - refineries
+      - petrochemical
+      - petrochemicals
+      - usine
+      - usines
+      - stabilimento
+      - stabilimenti
+    # HVAC makers are sellers (already in ClimaTech CE, and not buyers here).
+    description_not:
+      - HVAC
+      - air conditioning
+      - heat pump
+      - heat pumps
+      - refrigeration equipment
+      - chillers
+    people_titles:
+      - Energy Manager
+      - Utilities Manager
+      - Utilities Engineer
+      - Energy Engineer
+      - Sustainability
+      - Plant Engineering
+      - Responsable Energie
+      - Responsable Énergie
+
+  # =====================================================================
+  # 9. Social housing & public estate
+  # =====================================================================
+  - name: Social housing providers
+    group: 9. Social housing & public estate
+    priority: High
+    notes: Sheet - London and Paris. Italy kept (sheet examples name ACER, Italy; user OK 2026-11-15).
+    countries:
+      - United Kingdom
+      - France
+      - Italy
+    person_countries:
+      - United Kingdom
+      - France
+      - Italy
+    industry:
+      - Real Estate
+      - Non-profit Organizations
+      - Housing and Community Development
+      - Housing Programs
+      - Leasing Residential Real Estate
+      - Government Administration
+      - Civic and Social Organizations
+    description:
+      - housing association
+      - housing associations
+      - social housing
+      - registered provider
+      - housing provider
+      - housing group
+      - bailleur social
+      - bailleurs sociaux
+      - logement social
+      - logements sociaux
+      - HLM
+      - office public de l'habitat
+      - edilizia residenziale pubblica
+      - ACER
+      - ALER
+      - case popolari
+    # Sample 2026-11-15: housebuilders (Taylor Wimpey) matched "affordable housing" (removed);
+    # ministries are in the Government searches.
+    description_not:
+      - housebuilder
+      - housebuilders
+      - ministry
+      - ministero
+
+  # =====================================================================
+  # 10. Government by geo (user 2026-11-15: include). One search per country, each with the
+  # bodies the sheet names for it. No persona filter: Clay types public-sector staff poorly.
+  # =====================================================================
+  - name: Government - Saudi Arabia
+    group: 10. Government
+    priority: Medium
+    notes: Sheet - SEEC; Tarshid; MoMRAH and municipalities; Saudi Building Code Center; NCEC. Director General as Exact.
+    countries:
+      - Saudi Arabia
+    person_countries:
+      - Saudi Arabia
+    industry:
+      - Government Administration
+      - Government Relations
+      - Public Policy Offices
+      - Executive Offices
+      - Utilities Administration
+      - Housing and Community Development
+      - Community Development and Urban Planning
+      - Environmental Quality Programs
+    description:
+      - SEEC
+      - Saudi Energy Efficiency Center
+      - energy efficiency
+      - Tarshid
+      - National Energy Services Company
+      - MoMRAH
+      - Ministry of Municipal
+      - Ministry of Municipalities
+      - municipality
+      - municipalities
+      - Amanah
+      - Amana
+      - Saudi Building Code
+      - building code
+      - NCEC
+      - National Center for Environmental Compliance
+      - Ministry of Energy
+      - Ministry of Housing
+      - Royal Commission
+
+  - name: Government - United Kingdom
+    group: 10. Government
+    priority: Medium
+    notes: Sheet - DESNZ; GLA; councils; NHS estates; Salix; BUS grant administrators.
+    countries:
+      - United Kingdom
+    person_countries:
+      - United Kingdom
+    industry:
+      - Government Administration
+      - Government Relations
+      - Public Policy Offices
+      - Executive Offices
+      - Utilities Administration
+      - Environmental Quality Programs
+    description:
+      - DESNZ
+      - Department for Energy Security
+      - Greater London Authority
+      - GLA
+      - city council
+      - county council
+      - borough council
+      - district council
+      - metropolitan borough
+      - local authority
+      - combined authority
+      - unitary authority
+      - Salix
+      - Boiler Upgrade Scheme
+      - Ofgem
+      - net zero
+      - heat networks
+    # Solar sample 2026-11-05: EU bodies matched council wording.
+    description_not:
+      - European Union
+      - European Commission
+
+  - name: Government - France
+    group: 10. Government
+    priority: Medium
+    notes: Sheet - ADEME; regions; metropoles; collectivites (Assises audience).
+    countries:
+      - France
+    person_countries:
+      - France
+    industry:
+      - Government Administration
+      - Government Relations
+      - Public Policy Offices
+      - Executive Offices
+      - Environmental Quality Programs
+    description:
+      - ADEME
+      - conseil regional
+      - conseil régional
+      - metropole
+      - métropole
+      - communaute d'agglomeration
+      - communauté d'agglomération
+      - communaute urbaine
+      - communauté urbaine
+      - conseil departemental
+      - conseil départemental
+      - collectivite
+      - collectivité
+      - collectivites
+      - collectivités
+      - mairie
+      - ville de
+      - transition energetique
+      - transition énergétique
+      - transition ecologique
+      - transition écologique
+    # Sample 2026-11-15: bare "region" pulled in unrelated ministries (Education, Culture, CAF).
+    description_not:
+      - European Union
+      - European Commission
+
+  - name: Government - Italy
+    group: 10. Government
+    priority: Medium
+    notes: Sheet - ENEA; GSE; regioni; comuni; ACER social housing agencies (those are in Social housing).
+    countries:
+      - Italy
+    person_countries:
+      - Italy
+    industry:
+      - Government Administration
+      - Government Relations
+      - Public Policy Offices
+      - Executive Offices
+      - Utilities Administration
+      - Environmental Quality Programs
+    description:
+      - ENEA
+      - GSE
+      - Gestore dei Servizi Energetici
+      - regione
+      - comune
+      - comune di
+      - citta metropolitana
+      - città metropolitana
+      - provincia
+      - sicurezza energetica
+      - transizione energetica
+      - efficienza energetica
+    description_not:
+      - European Union
+      - European Commission
+
+  - name: Government - Vietnam
+    group: 10. Government
+    priority: Medium
+    notes: Sheet - MOIT (energy efficiency); MOC (building codes); HCMC and Hanoi people's committees. Director General as Exact.
+    countries:
+      - Vietnam
+    person_countries:
+      - Vietnam
+    industry:
+      - Government Administration
+      - Government Relations
+      - Public Policy Offices
+      - Executive Offices
+      - Utilities Administration
+    description:
+      - MOIT
+      - Ministry of Industry and Trade
+      - MOC
+      - Ministry of Construction
+      - People's Committee
+      - Department of Industry and Trade
+      - Department of Construction
+      - energy efficiency
+      - energy conservation
+      - building code
+
+  # =====================================================================
+  # 11. Investors & financiers (user 2026-11-15: include). Sheet: low priority, buy side only
+  # when funding HVAC / district energy assets (district cooling infrastructure funds, ESCO
+  # financiers). The energy_assets anchor keeps generic PE / VC out.
+  # =====================================================================
+  - name: Infrastructure funds & ESCO financiers
+    group: 11. Investors & financiers
+    priority: Low
+    notes: Sheet titles - Investment Director; Head of Infrastructure; Energy Transition.
+    anchor: energy_assets
+    industry:
+      - Investment Management
+      - Venture Capital and Private Equity Principals
+      - Banking
+      - Investment Banking
+      - Financial Services
+      - Funds and Trusts
+    description:
+      - infrastructure fund
+      - infrastructure funds
+      - infrastructure investment
+      - infrastructure investor
+      - infrastructure investors
+      - energy transition fund
+      - green infrastructure
+      - sustainable infrastructure
+      - project finance
+      - energy efficiency financing
+      - energy efficiency finance

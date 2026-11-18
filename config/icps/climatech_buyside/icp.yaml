@@ -1,0 +1,605 @@
+# DRAFT 2026-11-15. ClimaTech BUY SIDE people search (Find People + Blitz), from the "BuySide ICP v2" tab of
+# scrapers_climatech/"ClimaTech Playbook ICP.xlsx". GENERATED from config/icps/climatech/icp.yaml (APPROVED by
+# the user 9 Nov 2026 for ClimaTech CE) by a one-off script, so the 9 buyer-group categories are byte-identical
+# to the approved CE buy side: same titles, exclusions, exact titles, seniority, 5 countries.
+#
+# Classification in the people feed = the buyer group of products_services.yaml beside this file, without its
+# number ("1. Developers & giga-projects" -> "Developers & giga-projects"). The ADDED ESCO search (group 3)
+# therefore uses the Facilities management companies titles.
+#
+# Two categories added for the buy side (user 2026-11-15: include Government by geo and Investors):
+#   Government: the sheet's GOVERNMENT BY GEO title lists for all 5 countries (each person is searched only in
+#     the company's own country via Countries Override, so the union is harmless) + the cross-cutting
+#     "Sustainability & energy" and "Property & estates" titles. Director General is Exact (post_filter).
+#     Senior decision-makers and Procurement are left out (my call, as EVCharge's Government: a council CEO
+#     is not the HVAC buyer). User 2026-11-15 ("go with your suggestions"): left out.
+#
+# Also decided 2026-11-15 (user: "go with your suggestions"):
+#   - Cap 20 people per company (Solar buy-side precedent; merge_people.py --cap 20).
+#   - Audiences step = the ClimaTech Other Sources rule (user 2026-11-13): match against ALL of Clay
+#     Audiences; a matched person STAYS, takes the audience record's fields, and is NOT sent to email
+#     enrichment (scrapers_climatech/_other_sources/people/os_audience_match.py).
+#   Investors & financiers: the sheet's investor note titles (Investment Director; Head of Infrastructure;
+#     Energy Transition) + Senior decision-makers + Sustainability & energy.
+#
+# Countries: buy.default_countries = the 5 event countries. Per-sub-segment limits from the sheet (Giga KSA
+# only; Commercial developers UK/FR/IT/VN; Heat pump installers and Social housing UK/FR/IT; Government by its
+# own country) go in the feed's Countries Override column (build_feed.py), not here.
+# `sell` is empty: this ICP config is buy side only (the sell side is config/icps/climatech/).
+
+salesforce_brand: ClimaTech
+seniority:
+- founder
+- owner
+- board-member
+- partner
+- c-suite
+- vp
+- director
+- head
+- manager
+- senior
+- mid-level
+seniority_groups:
+  A:
+  - founder
+  - owner
+  - board-member
+  - partner
+  - c-suite
+  - vp
+  - director
+  B1:
+  - head
+  - manager
+  B2:
+  - senior
+  - mid-level
+exclude_titles:
+- Intern
+- Trainee
+- Assistant
+- Freelance
+- Freelancer
+sell:
+  titles: []
+  categories: {}
+buy:
+  exclude_titles:
+  - Entry
+  - Student
+  - Professor
+  - Lecturer
+  - Teacher
+  - HR
+  - Human Resources
+  - Recruiter
+  - Recruitment
+  - Legal
+  - Accountant
+  - IT Manager
+  - Occupational Health
+  - OHS
+  - Marketing
+  - Sales
+  - Presales
+  - Business Development
+  # Exact-mode pass (Title Mode = exact), only for companies the contains search found nobody at.
+  # User 2026-11-15 (pilot: 1-50-staff firms come back empty): the sheet's Exact titles (Owner, Associate
+  # Director, Director General) + local owner titles (Founder, Co-Founder, Director, Gerant, President,
+  # Titolare, Amministratore Unico).
+  exact_titles:
+  - Owner
+  - Associate Director
+  - Director General
+  - Founder
+  - Co-Founder
+  - Director
+  - Gérant
+  - Gerant
+  - Président
+  - President
+  - Titolare
+  - Amministratore Unico
+  default_countries:
+  - Saudi Arabia
+  - United Kingdom
+  - France
+  - Italy
+  - Vietnam
+  categories:
+    Developers & giga-projects:
+      titles:
+      - MEP Director
+      - Director of MEP
+      - Projects Director
+      - Project Delivery
+      - Technical Director
+      - Sustainability Director
+      - Head of Engineering
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Building owners & operators:
+      titles:
+      - Head of Facilities
+      - Facilities Director
+      - Asset Manager
+      - Energy Manager
+      - Head of Engineering
+      - Head of Property
+      - Facilities Management
+      - Chief Engineer
+      - Sustainability Director
+      - Estates Director
+      - Head of Estates
+      - Head of Sustainability
+      - Energy Efficiency
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Facilities management companies:
+      titles:
+      - Head of FM
+      - Facilities Management
+      - Technical Director
+      - Operations Director
+      - Head of M&E
+      - Contracts Director
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    MEP consultants & specifiers:
+      titles:
+      - Building Services
+      - Mechanical Engineer
+      - MEP Director
+      - Head of Mechanical
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    MEP / HVAC contractors & installers:
+      titles:
+      - Contracts Director
+      - Head of M&E
+      - Mechanical Services
+      - Estimating Manager
+      - Installation Manager
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    District energy & utilities:
+      titles:
+      - District Cooling
+      - District Energy
+      - Heat Network
+      - Heat Networks
+      - Plant Manager
+      - Operations Director
+      - Head of Networks
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Data centres & telecoms:
+      titles:
+      - Data Centre Operations
+      - Data Center Operations
+      - Critical Facilities
+      - Head of Data Centre
+      - Head of Data Center
+      - Mission Critical
+      - Cooling Engineer
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Large energy users:
+      titles:
+      - Energy Manager
+      - Utilities Manager
+      - Head of Sustainability
+      - Plant Engineering
+      - Engineering Manager
+      - Sustainability Director
+      - Energy Efficiency
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Social housing & public estate:
+      titles:
+      - Head of Asset Management
+      - Retrofit
+      - Decarbonisation
+      - Decarbonization
+      - Head of Property Services
+      - Estates Director
+      - Energy Efficiency
+      - Sustainability
+      - Facilities
+      - Projects Director
+      - Head of Energy
+      - Net Zero
+      - Heat Networks
+      - Climate Change Manager
+      - Directeur des Batiments
+      - Directeur des Bâtiments
+      - Transition Energetique
+      - Transition Énergétique
+      - Energy Manager
+      - Responsabile Patrimonio
+      - Dirigente Tecnico
+      - Transizione Energetica
+      - Building Management
+      - Sustainability Director
+      - Head of Sustainability
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+      - MEP Director
+      - Head of MEP
+      - HVAC Manager
+      - HVAC Engineer
+      - Mechanical Engineer
+      - Head of Procurement
+      - Procurement Director
+      - Purchasing Manager
+      - Directeur Technique
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Responsabile Tecnico
+      - Direttore Tecnico
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Chief Sustainability Officer
+      - Chief Technical Officer
+      - CTO
+      - Chief Technology Officer
+      - Development Manager
+    Government:
+      # User 2026-11-15 (after the Deepline coverage report: FR government 7%, IT 9%): add the local-authority
+      # technical-services heads - the HVAC / building buyer at a mairie / comune - in FR / IT and in the English
+      # the translated titles use. Whole-word phrases (post_filter.has), so "Agent des services techniques" stays out.
+      titles:
+      - Directeur des Services Techniques
+      - Directrice des Services Techniques
+      - Responsable des Services Techniques
+      - Directeur Général des Services Techniques
+      - Directrice Générale des Services Techniques
+      - Directeur General des Services Techniques
+      - Responsabile Ufficio Tecnico
+      - Responsabile dell'Ufficio Tecnico
+      - Responsabile Area Tecnica
+      - Responsabile Settore Tecnico
+      - Dirigente Ufficio Tecnico
+      - Dirigente Area Tecnica
+      - Dirigente Settore Tecnico
+      - Dirigente Lavori Pubblici
+      - Dirigente Settore Lavori Pubblici
+      - Responsabile Lavori Pubblici
+      - Director of Technical Services
+      - Technical Services Director
+      - Head of Technical Services
+      - Technical Services Manager
+      - General Director of Technical Services
+      - Head of the Technical Office
+      - Head of Technical Office
+      - Technical Office Manager
+      - Technical Area Manager
+      - Head of Technical Department
+      - Technical Department Manager
+      - Director of Public Works
+      - Public Works Director
+      - Head of Public Works
+      - Public Works Manager
+      - Energy Efficiency
+      - Sustainability
+      - Facilities
+      - Projects Director
+      - Head of Energy
+      - Estates Director
+      - Heat Networks
+      - Heat Network
+      - Climate Change Manager
+      - Directeur des Batiments
+      - Directeur des Bâtiments
+      - Responsable Energie
+      - Responsable Énergie
+      - Directeur du Patrimoine
+      - Transition Energetique
+      - Transition Énergétique
+      - Responsabile Patrimonio
+      - Dirigente Tecnico
+      - Transizione Energetica
+      - Building Management
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
+      - Head of Facilities
+      - Facilities Director
+      - Head of Property
+      - Estates
+    Investors & financiers:
+      titles:
+      - Investment Director
+      - Head of Infrastructure
+      - Energy Transition
+      - CEO
+      - Chief Executive Officer
+      - MD
+      - Managing Director
+      - COO
+      - Chief Operating Officer
+      - Executive Director
+      - Sustainability Director
+      - Head of Sustainability
+      - Energy Efficiency
+      - Energy Manager
+      - Net Zero
+      - Decarbonisation
+      - Decarbonization
