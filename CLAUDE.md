@@ -148,11 +148,14 @@ new prefixed pair, never a discriminator column on the live tables.
 
 ## Hard rules
 
-**Salesforce Brand columns are never blank** (user, 2026-11-18). Every `Buy_side_`, `Sell_side_` and
-`Other_sources_` file sets `Brand` = the short brand (`salesforce_brand`: `EVCharge`, `Solar`) and
-`Brand Classification` = `<Brand>_Buyer` or `<Brand>_Seller` from the row's Classification — capital B / S
-for every brand (`EVCharge_Buyer`, `Solar_Seller`). Build them with `sf_naming.brand_fields()` and gate the
-write on `sf_naming.check_brand_columns()`; `docs/NAMING.md` §F. New exports only.
+**Salesforce Brand columns are never blank** (user, 2026-11-18). Every `Buy_side_`, `Sell_side_`,
+`Other_sources_` and `Competitive_` file sets `Brand` = the short brand (`salesforce_brand`: `EVCharge`, `Solar`)
+and `Brand Classification` to exactly one of **three** values: `<Brand>_Buyer` or `<Brand>_Seller` from the row's
+side (Competitive: the company's typing), or `<Brand>_Other` for a row with no side — in practice speaker-only
+competitive rows (user, 2026-11-19; every brand and every future event). Capital B / S / O for every brand
+(`EVCharge_Buyer`, `Solar_Seller`, `EVCharge_Other`). Build them with `sf_naming.brand_fields()` and gate the
+write on `sf_naming.check_brand_columns()` (list files) or `check_brand_filled()` (Competitive);
+`docs/NAMING.md` §F. New exports only.
 
 **Run-now vs configure-only.** Anything calling a paid provider per row — Claygent/AI columns,
 `Enrich Company`, Find People — is created and fully configured but **never triggered**. Formula

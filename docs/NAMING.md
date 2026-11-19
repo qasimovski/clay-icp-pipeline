@@ -169,4 +169,10 @@ field, the file that goes to IT for the Salesforce load) is named by its scope a
   fills `Brand` with the short brand and `Brand Classification` with `<Brand>_Buyer` / `<Brand>_Seller` from the
   row's Classification (`EVCharge_Buyer`, `Solar_Seller`; capital B / S for every brand). Use
   `sf_naming.brand_fields()` and gate the write on `sf_naming.check_brand_columns()`. Files built before
-  2026-11-18 left both blank; new exports only.
+  2026-11-18 left both blank; new exports only. Competitive files carry both columns too (user, later on
+  2026-11-18), the side taken from the company's typing.
+- **Third value: `<Brand>_Other` (user, 2026-11-19).** A row with no side — in practice speaker-only rows in a
+  Competitive file, whose company was never typed — gets `Brand Classification` = `<Brand>_Other`
+  (`EVCharge_Other`, `Solar_Other`), never blank. Applies to every brand and every future event, so the column
+  has exactly three values: `<Brand>_Buyer`, `<Brand>_Seller`, `<Brand>_Other`. `brand_fields(brand, "")` returns
+  `_Other`; `check_brand_filled()` gates a Competitive file (one of the three on every row).

@@ -319,13 +319,15 @@ def cmd_salesforce(a):
     if brand and (a.scope or "") == "competitive":
         # The competitive file carries the brand columns too (user, Solar, 18 Nov 2026), after the schema's own:
         # Brand, Brand Classification = <Brand>_Buyer / _Seller from the company's Side (a speaker-only row has
-        # no Classification but its company was typed), List Creation Date = the build date.
+        # no Classification but its company was typed), List Creation Date = the build date. A row with no Side at
+        # all gets <Brand>_Other, never blank (user, 19 Nov 2026).
         import datetime
+        import sf_naming
         today = datetime.date.today().isoformat()
         schema = schema + [c for c in ("Brand", "Brand Classification", "List Creation Date") if c not in schema]
         side = {"Buy Side": "Buyer", "Sell Side": "Seller"}
         mapping["Brand"] = lambda r: brand
-        mapping["Brand Classification"] = lambda r: f"{brand}_{side[r['Side']]}" if r.get("Side") in side else ""
+        mapping["Brand Classification"] = lambda r: f"{brand}_{side.get(r.get('Side'), sf_naming.OTHER)}"
         mapping["List Creation Date"] = lambda r: today
     if a.map:
         import yaml
