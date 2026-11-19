@@ -312,6 +312,21 @@ def cmd_salesforce(a):
     upper = any(sample.get(c) in ("TRUE", "FALSE") for c in ("Is CA SPEX", "Is CA Speaker", "Is CA Attendee"))
     ph, people = read_csv(a.people)
     mapping = dict(DEFAULT_MAP)
+    brand = a.brand
+    if not brand and a.icp:
+        import yaml
+        brand = (yaml.safe_load(open(a.icp, encoding="utf-8")) or {}).get("salesforce_brand", "")
+    if brand and (a.scope or "") == "competitive":
+        # The competitive file carries the brand columns too (user, Solar, 18 Nov 2026), after the schema's own:
+        # Brand, Brand Classification = <Brand>_Buyer / _Seller from the company's Side (a speaker-only row has
+        # no Classification but its company was typed), List Creation Date = the build date.
+        import datetime
+        today = datetime.date.today().isoformat()
+        schema = schema + [c for c in ("Brand", "Brand Classification", "List Creation Date") if c not in schema]
+        side = {"Buy Side": "Buyer", "Sell Side": "Seller"}
+        mapping["Brand"] = lambda r: brand
+        mapping["Brand Classification"] = lambda r: f"{brand}_{side[r['Side']]}" if r.get("Side") in side else ""
+        mapping["List Creation Date"] = lambda r: today
     if a.map:
         import yaml
         for k, v in (yaml.safe_load(open(a.map, encoding="utf-8")) or {}).items():

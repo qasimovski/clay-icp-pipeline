@@ -425,6 +425,10 @@ python scripts/deliver.py salesforce --people "people - emails.csv" --schema "<S
   = `<Brand>_Buyer` for a Buyer row, `<Brand>_Seller` for a Seller row (capital B / S, every brand). Set them
   with `sf_naming.brand_fields(brand, classification)` and run `sf_naming.check_brand_columns(rows, brand)`
   before writing the file; it refuses blanks, lowercase suffixes and a side that disagrees with Classification.
+- **Competitive files carry them too** (user, Solar, 18 Nov 2026): `deliver.py salesforce --scope competitive
+  --brand <Brand>` appends `Brand`, `Brand Classification` (`<Brand>_Buyer` / `_Seller` from the company's Side,
+  so speaker-only rows get one) and `List Creation Date` (the build date) after the schema's columns.
+  Targeted Project Edition stays blank (user, 18 Nov 2026), although the Terrapinn MCP could supply edition ids.
 - **`--explode-events`** writes one row per person per event (company events + speaker events).
 - **`--one-event-per-person`** (user, Solar, 10 Nov 2026: "one person in one event") then keeps ONE event per
   person: one they speak at, else one in their own country, else the best tier, else the biggest event. Give
