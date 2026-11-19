@@ -497,6 +497,8 @@ def test_an_old_style_or_misspelt_name_is_refused(bad):
 @pytest.mark.parametrize("brand,cls,want", [
     ("EVCharge", "Buyer", "EVCharge_Buyer"), ("EVCharge", "Seller", "EVCharge_Seller"),
     ("Solar", "Buyer", "Solar_Buyer"), ("Solar", "seller", "Solar_Seller"),
+    # User, 2026-11-19: a row with no side (speaker-only) is <Brand>_Other, never blank.
+    ("EVCharge", "", "EVCharge_Other"), ("Solar", None, "Solar_Other"), ("Solar", "Other", "Solar_Other"),
 ])
 def test_brand_columns_follow_the_rule(brand, cls, want):
     # User, 2026-11-18 (hard rule): Brand = short brand; Brand Classification = <Brand>_Buyer / <Brand>_Seller.
@@ -514,6 +516,23 @@ def test_blank_or_wrong_brand_columns_are_refused():
                 {"Classification": "", "Brand": "EVCharge", "Brand Classification": "EVCharge_Buyer"}):
         with pytest.raises(sfn.NameError_):
             sfn.check_brand_columns(good + [bad], "EVCharge")
+    with pytest.raises(sfn.NameError_):                    # a typo'd side is refused, not quietly made _Other
+        sfn.brand_fields("EVCharge", "Buy-side")
+
+
+def test_competitive_brand_classification_has_three_values_and_no_blanks():
+    # User, 2026-11-19: Competitive speaker-only rows get <Brand>_Other; the side there comes from the company's
+    # typing, so the check is "one of the three", not "matches the row's Classification".
+    assert sfn.brand_classifications("Solar") == ("Solar_Buyer", "Solar_Seller", "Solar_Other")
+    rows = [{"Brand": "EVCharge", "Brand Classification": v}
+            for v in ("EVCharge_Buyer", "EVCharge_Seller", "EVCharge_Other")]
+    assert sfn.check_brand_filled(rows, "EVCharge") == 3
+    for bad in ({"Brand": "EVCharge", "Brand Classification": ""},
+                {"Brand": "EVCharge", "Brand Classification": "EVCharge_other"},
+                {"Brand": "EVCharge", "Brand Classification": "Solar_Other"},
+                {"Brand": "", "Brand Classification": "EVCharge_Other"}):
+        with pytest.raises(sfn.NameError_):
+            sfn.check_brand_filled(rows + [bad], "EVCharge")
 
 
 def test_companions_keep_the_base_name():

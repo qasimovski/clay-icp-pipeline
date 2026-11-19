@@ -21,15 +21,24 @@ Decisions taken with the user the same day:
     sf_naming.check("Buy_side_EVCharge.csv")                   -> raises NameError_ when it breaks the rule
 
 BRAND COLUMNS - HARD RULE (user, 2026-11-18). Every Buy_side_, Sell_side_ and Other_sources_ file (the Labs
-list schema; Competitive files have no such columns) fills, on EVERY row:
+list schema), and every Competitive_ file, fills on EVERY row:
     Brand                 = the short brand, the same token as the file name (EVCharge, Solar)
     Brand Classification  = <Brand>_Buyer when the row's Classification is Buyer, <Brand>_Seller when Seller
                             (EVCharge_Buyer, EVCharge_Seller, Solar_Buyer, Solar_Seller; capital B / S)
 Decisions taken with the user the same day: capitalised suffix for every brand; Brand = salesforce_brand, not a
 spaced event name; all three scopes. Files built before 2026-11-18 left both columns blank (new exports only).
+Later on 2026-11-18 the user asked for the same two columns on Competitive files too (side from the company's
+typing), so every scope carries them.
+
+THIRD VALUE (user, 2026-11-19): a row with no side - in practice the speaker-only rows of a Competitive file,
+whose company was never typed Buy / Sell side - gets Brand Classification = <Brand>_Other (EVCharge_Other,
+Solar_Other), never blank. Every brand, every future event. So Brand Classification has exactly three values:
+<Brand>_Buyer, <Brand>_Seller, <Brand>_Other.
 
     sf_naming.brand_fields("EVCharge", "Buyer")   -> {"Brand": "EVCharge", "Brand Classification": "EVCharge_Buyer"}
+    sf_naming.brand_fields("EVCharge", "")        -> {"Brand": "EVCharge", "Brand Classification": "EVCharge_Other"}
     sf_naming.check_brand_columns(rows, "EVCharge") -> raises NameError_ on a blank / wrong Brand or Brand Classification
+    sf_naming.check_brand_filled(rows, "EVCharge")  -> Competitive files: raises unless every row has one of the three
 """
 
 import os
@@ -84,16 +93,41 @@ def check(path):
 
 
 SIDES = {"buyer": "Buyer", "seller": "Seller"}
-BRAND_SCOPES = ("Other_sources", "Buy_side", "Sell_side")      # files that carry Brand / Brand Classification
+OTHER = "Other"                                                # no side (speaker-only rows), user 2026-11-19
+BRAND_SCOPES = ("Competitive", "Other_sources", "Buy_side", "Sell_side")   # files that carry Brand / Brand Classification
+
+
+def brand_classifications(brand):
+    """The only three Brand Classification values a brand may carry."""
+    brand = _token("brand", brand)
+    return tuple(f"{brand}_{s}" for s in ("Buyer", "Seller", OTHER))
 
 
 def brand_fields(brand, classification):
-    """Brand + Brand Classification for one row (hard rule, user 2026-11-18). classification: Buyer / Seller."""
-    side = SIDES.get((classification or "").strip().lower())
+    """Brand + Brand Classification for one row (hard rule, user 2026-11-18; _Other added 2026-11-19).
+    classification: Buyer / Seller, or blank / Other for a row with no side (-> <Brand>_Other)."""
+    key = (classification or "").strip().lower()
+    side = SIDES.get(key) or (OTHER if key in ("", OTHER.lower()) else None)
     if not side:
-        raise NameError_(f"Classification {classification!r} must be Buyer or Seller to set Brand Classification")
+        raise NameError_(f"Classification {classification!r} must be Buyer, Seller, or blank / Other "
+                         f"to set Brand Classification")
     brand = _token("brand", brand)
     return {"Brand": brand, "Brand Classification": f"{brand}_{side}"}
+
+
+def check_brand_filled(rows, brand):
+    """Raise NameError_ unless every row has Brand == brand and one of the three Brand Classification values.
+    For Competitive files, whose side comes from the company's typing rather than the row's Classification. -> rows."""
+    allowed = brand_classifications(brand)
+    bad, n = [], 0
+    for n, r in enumerate(rows, 1):
+        if r.get("Brand") != brand or r.get("Brand Classification") not in allowed:
+            bad.append(f"row {n}: Brand {r.get('Brand')!r} / Brand Classification {r.get('Brand Classification')!r}")
+            if len(bad) >= 5:
+                break
+    if bad:
+        raise NameError_(f"Brand columns break the rule (want Brand {brand!r} and one of {allowed}): " + "; ".join(bad))
+    return n
 
 
 def check_brand_columns(rows, brand):

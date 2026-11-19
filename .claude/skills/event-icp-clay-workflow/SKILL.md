@@ -428,6 +428,10 @@ python scripts/deliver.py salesforce --people "people - emails.csv" --schema "<S
 - **Competitive files carry them too** (user, Solar, 18 Nov 2026): `deliver.py salesforce --scope competitive
   --brand <Brand>` appends `Brand`, `Brand Classification` (`<Brand>_Buyer` / `_Seller` from the company's Side,
   so speaker-only rows get one) and `List Creation Date` (the build date) after the schema's columns.
+- **Third value `<Brand>_Other`** (user, 2026-11-19, every brand and future event): a row with no side at all —
+  speaker-only rows whose company was never typed — gets `Brand Classification` = `<Brand>_Other`
+  (`EVCharge_Other`, `Solar_Other`), never blank. So it has exactly three values: `_Buyer`, `_Seller`, `_Other`.
+  Gate a Competitive file with `sf_naming.check_brand_filled(rows, brand)`.
   Targeted Project Edition stays blank (user, 18 Nov 2026), although the Terrapinn MCP could supply edition ids.
 - **`--explode-events`** writes one row per person per event (company events + speaker events).
 - **`--one-event-per-person`** (user, Solar, 10 Nov 2026: "one person in one event") then keeps ONE event per
