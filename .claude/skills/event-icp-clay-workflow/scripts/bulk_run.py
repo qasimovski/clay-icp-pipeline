@@ -213,6 +213,8 @@ def adopt_orphan(path, state):
     recent = clay(["routines", "runs", "list", "--limit", "20"]).get("data") or []
     # Only runs of OUR routine: other workflows (or colleagues) may have 250-row runs too.
     ours = {(r.get("routine") or {}).get("id") for r in recent if r.get("routineRunId") in known}
+    if state.get("_workflow"):        # always our own workflow, even before any run is known (2026-11-19: another
+        ours.add(f"workflow:{state['_workflow']}")   # session's 250-row run looked like this chunk's orphan)
     cands = [r["routineRunId"] for r in recent
              if r.get("routineRunId") not in known and r.get("total") == rows
              and (not ours or (r.get("routine") or {}).get("id") in ours)]
@@ -220,6 +222,23 @@ def adopt_orphan(path, state):
         raise SystemExit(f"{os.path.basename(path)}: its start call timed out and {len(cands)} unknown "
                          f"runs of {rows} rows exist ({cands}); set its run_id in state.json by hand")
     return cands[0] if cands else None
+
+
+def find_run_id(obj):
+    """The routine run id inside an approved request's `result` (shape not documented: search it)."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in ("routineRunId", "routine_run_id", "runId") and isinstance(v, str):
+                return v
+            got = find_run_id(v)
+            if got:
+                return got
+    elif isinstance(obj, list):
+        for v in obj:
+            got = find_run_id(v)
+            if got:
+                return got
+    return None
 
 
 def run_chunk(args, path, state, state_path, results):
@@ -238,11 +257,37 @@ def run_chunk(args, path, state, state_path, results):
             state[name] = {"status": "running", "run_id": rid}
             save_state(state_path, state)
             print(f"{name}: adopted {rid} (its start call had timed out)", flush=True)
+    if not rid and entry.get("status") == "awaiting_approval":
+        # Clay's approval gate (seen 2026-11-19): the start call raised an approval request instead of a run.
+        # The human decides in Clay (`clay approvals approve <id>`); we never approve on their behalf.
+        ap = clay(["approvals", "get", entry["approval_id"]], check=False)
+        dec = ap.get("decision") if isinstance(ap, dict) else None
+        if dec == "denied":
+            raise SystemExit(f"{name}: approval {entry['approval_id']} was DENIED - stop")
+        rid = find_run_id(ap.get("result")) if dec == "approved" and isinstance(ap, dict) else None
+        if not rid:
+            print(f"{name}: waiting for approval {entry['approval_id']} (decision: {dec or 'none yet'}) - "
+                  f"re-run after it is approved", flush=True)
+            return
+        state[name] = {"status": "running", "run_id": rid}
+        save_state(state_path, state)
+        print(f"{name}: approved -> {rid}", flush=True)
     if not rid:
         state[name] = {"status": "starting"}
         save_state(state_path, state)
-        rid = clay(["routines", "runs", "start", f"workflow:{args.workflow}",
-                    "--bulk", to_cli_path(path)])["routineRunId"]
+        r = clay(["routines", "runs", "start", f"workflow:{args.workflow}", "--bulk", to_cli_path(path)], check=False)
+        err = (r.get("error") or {}) if isinstance(r, dict) else {}
+        if err.get("code") == "approval_required":
+            aid = (err.get("details") or {}).get("actionApprovalRequestId")
+            if not aid:
+                raise SystemExit(f"{name}: approval required but no request id in {str(r)[:300]}")
+            state[name] = {"status": "awaiting_approval", "approval_id": aid}
+            save_state(state_path, state)
+            print(f"{name}: APPROVAL REQUIRED {aid} - inspect: clay approvals get {aid}", flush=True)
+            return
+        if not isinstance(r, dict) or not r.get("routineRunId"):
+            raise SystemExit(f"{name}: start failed: {str(r)[:400]}")
+        rid = r["routineRunId"]
         state[name] = {"status": "running", "run_id": rid}
         save_state(state_path, state)
         print(f"{name}: started {rid}", flush=True)

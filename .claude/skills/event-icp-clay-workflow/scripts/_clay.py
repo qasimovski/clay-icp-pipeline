@@ -31,6 +31,8 @@ def clay(args, check=True):
     if r.returncode != 0 and check:
         raise RuntimeError(f"clay {args[:3]} failed: "
                            f"{(r.stderr.decode('utf-8', 'replace') or out)[:400]}")
+    if r.returncode != 0 and not out.strip():
+        out = r.stderr.decode("utf-8", "replace")   # check=False: the error JSON (e.g. approval_required) is on stderr
     try:
         return json.loads(out)
     except ValueError:
