@@ -1,0 +1,736 @@
+# DRAFT 2026-11-19. Submarine Networks BUY SIDE company searches, from the "BuySide ICP v2" tab.
+#
+# Source: scrapers_submarine/Submarine Networks Playbook ICP (includes SubSea).xlsx, tab "BuySide ICP v2"
+# (6 buyer groups, 11 sub-segments, cross-cutting titles, "Government by geo") and tab "Geo_Scope v2"
+# (the two BUY columns). V2 always wins (memory: icp-version-precedence).
+#
+# Route (user, 2026-11-19, "ClimaTech route"): Clay company search from the CLI (clay_company_search.py,
+# this file via ps_query_config.py) AND Blitz company search for every sub-segment -> union, dedupe by
+# domain -> drop companies already in Submarine CE + Other Sources -> Supabase gate (known kept, flagged)
+# -> Clay Find People -> Blitz where Clay finds nobody -> free Deepline where a country is thin. Cap 20
+# people per company. Run folder scrapers_submarine/_buyside/, decisions in its DECISIONS.md.
+#
+# Decisions (user, 2026-11-19):
+#   - Countries = the union of both Geo_Scope v2 buy columns, all tiers (Core / Yes / Secondary), the same
+#     list as Submarine Other Sources. Germany = LinkedIn + phone only (split at email time). Sanctioned
+#     countries are never built (none of them is in the list).
+#   - Dedupe companies (domain) AND people (LinkedIn) against Submarine CE (_run_v2) and Other Sources
+#     (_run_v2/other_sources).
+#   - Group 5 "Marine and seabed users" included as written: seabed managers, offshore wind developers,
+#     interconnector / TSO owners and port authorities (their marine-consents / licensing / route people).
+#
+# Company country enum differs from the people enum: Czech Republic -> Czechia, Côte d'Ivoire -> Ivory
+# Coast, Brunei Darussalam -> Brunei, Timor-Leste -> East Timor. Solomon Islands and Palau are not Clay
+# company countries, so they are searched on the people side only (person_countries).
+#
+# Precision, not caps (Solar rule): the sheet's industries + "Extra keyword filter (company)" carry each
+# search; anchors / description_not / company_size are added where a sheet keyword alone floods (each one
+# marked with its reason). The persona (people_titles) is used only where the company universe is a
+# whole sector (hyperscalers = every software company that says "cloud"). Explicit "(1,000+ staff)" /
+# "(10,000+ staff)" companions are written by hand, so persona_companion is off.
+
+persona_companion: false
+
+tiers: {}
+
+anchors:
+  # Marine users: an owner / developer / operator of seabed, wind farms, interconnectors or ports, not
+  # the vessel and installation contractors (those are sell side).
+  marine_owner:
+    - developer
+    - developers
+    - develops
+    - owner
+    - owns
+    - operator
+    - operates
+    - wind farm
+    - wind farms
+    - transmission system operator
+    - TSO
+    - grid operator
+    - port
+    - ports
+    - harbour
+    - harbor
+    - seabed
+    - Crown Estate
+    - leasing
+
+# Company office countries, Clay COMPANY enum (91).
+countries:
+  - "United Kingdom"
+  - "Ireland"
+  - "France"
+  - "Netherlands"
+  - "Spain"
+  - "Italy"
+  - "Portugal"
+  - "Belgium"
+  - "Germany"
+  - "Switzerland"
+  - "Norway"
+  - "Sweden"
+  - "Denmark"
+  - "Finland"
+  - "Iceland"
+  - "Greece"
+  - "Malta"
+  - "Cyprus"
+  - "Turkey"
+  - "United Arab Emirates"
+  - "Saudi Arabia"
+  - "Oman"
+  - "Qatar"
+  - "Bahrain"
+  - "Egypt"
+  - "South Africa"
+  - "Kenya"
+  - "Nigeria"
+  - "Djibouti"
+  - "Luxembourg"
+  - "Poland"
+  - "Estonia"
+  - "Latvia"
+  - "Lithuania"
+  - "Bulgaria"
+  - "Romania"
+  - "Hungary"
+  - "Czechia"
+  - "Croatia"
+  - "Slovakia"
+  - "Ukraine"
+  - "Georgia"
+  - "Kuwait"
+  - "Jordan"
+  - "Israel"
+  - "Angola"
+  - "Ghana"
+  - "Senegal"
+  - "Morocco"
+  - "Mauritius"
+  - "Tanzania"
+  - "Mozambique"
+  - "Cameroon"
+  - "Ivory Coast"
+  - "Namibia"
+  - "Seychelles"
+  - "Comoros"
+  - "Somalia"
+  - "Cape Verde"
+  - "United States"
+  - "Canada"
+  - "Singapore"
+  - "Japan"
+  - "China"
+  - "Indonesia"
+  - "Philippines"
+  - "Malaysia"
+  - "Vietnam"
+  - "Thailand"
+  - "Hong Kong"
+  - "Taiwan"
+  - "South Korea"
+  - "India"
+  - "Australia"
+  - "New Zealand"
+  - "Sri Lanka"
+  - "Bangladesh"
+  - "Pakistan"
+  - "Cambodia"
+  - "Brunei"
+  - "Maldives"
+  - "East Timor"
+  - "Fiji"
+  - "Papua New Guinea"
+  - "Guam"
+  - "Samoa"
+  - "Tonga"
+  - "Vanuatu"
+  - "New Caledonia"
+  - "French Polynesia"
+  - "Marshall Islands"
+
+# Person countries, Clay PEOPLE enum (93).
+person_countries:
+  - "United Kingdom"
+  - "Ireland"
+  - "France"
+  - "Netherlands"
+  - "Spain"
+  - "Italy"
+  - "Portugal"
+  - "Belgium"
+  - "Germany"
+  - "Switzerland"
+  - "Norway"
+  - "Sweden"
+  - "Denmark"
+  - "Finland"
+  - "Iceland"
+  - "Greece"
+  - "Malta"
+  - "Cyprus"
+  - "Turkey"
+  - "United Arab Emirates"
+  - "Saudi Arabia"
+  - "Oman"
+  - "Qatar"
+  - "Bahrain"
+  - "Egypt"
+  - "South Africa"
+  - "Kenya"
+  - "Nigeria"
+  - "Djibouti"
+  - "Luxembourg"
+  - "Poland"
+  - "Estonia"
+  - "Latvia"
+  - "Lithuania"
+  - "Bulgaria"
+  - "Romania"
+  - "Hungary"
+  - "Czech Republic"
+  - "Croatia"
+  - "Slovakia"
+  - "Ukraine"
+  - "Georgia"
+  - "Kuwait"
+  - "Jordan"
+  - "Israel"
+  - "Angola"
+  - "Ghana"
+  - "Senegal"
+  - "Morocco"
+  - "Mauritius"
+  - "Tanzania"
+  - "Mozambique"
+  - "Cameroon"
+  - "Côte d'Ivoire"
+  - "Namibia"
+  - "Seychelles"
+  - "Comoros"
+  - "Somalia"
+  - "Cape Verde"
+  - "United States"
+  - "Canada"
+  - "Singapore"
+  - "Japan"
+  - "China"
+  - "Indonesia"
+  - "Philippines"
+  - "Malaysia"
+  - "Vietnam"
+  - "Thailand"
+  - "Hong Kong"
+  - "Taiwan"
+  - "South Korea"
+  - "India"
+  - "Australia"
+  - "New Zealand"
+  - "Sri Lanka"
+  - "Bangladesh"
+  - "Pakistan"
+  - "Cambodia"
+  - "Brunei Darussalam"
+  - "Maldives"
+  - "Timor-Leste"
+  - "Fiji"
+  - "Papua New Guinea"
+  - "Guam"
+  - "Samoa"
+  - "Tonga"
+  - "Vanuatu"
+  - "Solomon Islands"
+  - "New Caledonia"
+  - "French Polynesia"
+  - "Palau"
+  - "Marshall Islands"
+
+# Merge order = plan order: a company found by several searches is filed under the FIRST (the sheet's
+# buyer-group order), so cable owners claim SEACOM before the carrier searches do.
+# Exception (2026-11-19): group 4 (government) runs FIRST, because regulators (NCC, ITU) are typed
+# Telecommunications and would otherwise be filed under a carrier search; its phrases are specific.
+categories:
+
+  # =====================================================================
+  # 4. Government, regulators & defence
+  # =====================================================================
+  # Sample 2026-11-19: bare "ministry / agency / department" + a digital anchor returned tax, health
+  # and finance ministries. Now telecom-regulator and telecom-ministry phrases only (specific enough
+  # without an anchor). Telecommunications industry ADDED: regulators such as NCC are typed that way.
+
+  - name: Telecom ministries and regulators
+    group: 4. Government, regulators & defence
+    priority: High
+    notes: Sheet - Ofcom, DSIT, BEREC members, TDRA, CST, NTRA, IMDA, ACMA, DICT, TRAI.
+    industry:
+      - Government Administration
+      - Public Policy Offices
+      - Telecommunications
+    # Re-sample 2026-11-19: bare "regulator / regulatory authority" returned FDA, HSE, MHRA (dropped).
+    description:
+      - telecommunications regulator
+      - telecommunications regulatory
+      - communications regulator
+      - communications regulatory
+      - telecom regulator
+      - telecoms regulator
+      - communications authority
+      - communications commission
+      - telecommunications authority
+      - telecommunications commission
+      - ministry of communications
+      - ministry of ICT
+      - ministry of information and communication
+      - ministry of information and communications
+      - ministry of digital
+      - digital ministry
+      - ministry of telecommunications
+      - department of telecommunications
+      - department of communications
+      - spectrum management
+      - ICT regulator
+      - ICT authority
+
+  # Government by geo: the bodies the sheet names per region, by name. Full names where the acronym is
+  # ambiguous (CST, CRA, TRA, MIC, CSA, MPA are left as full names only).
+  - name: Government by geo - named bodies
+    subsegment: Telecom ministries and regulators
+    group: 4. Government, regulators & defence
+    priority: High
+    notes: Sheet "GOVERNMENT BY GEO" - UK, EU, Nordics & Baltics, Southern Europe, Germany, Middle East, Africa, NATO, Singapore, Japan/Korea, Australia/Pacific, South & South-East Asia.
+    industry:
+      - Government Administration
+      - Public Policy Offices
+      - Armed Forces
+      - International Affairs
+      - Executive Offices
+    description:
+      - Ofcom
+      - Department for Science, Innovation and Technology
+      - National Cyber Security Centre
+      - National Protective Security Authority
+      - Crown Estate
+      - DG CNECT
+      - HaDEA
+      - ENISA
+      - European Defence Agency
+      - BEREC
+      - Traficom
+      - Post- och telestyrelsen
+      - Swedish Post and Telecom Authority
+      - Nkom
+      - Norwegian Communications Authority
+      - Danish Agency for Data Supply and Infrastructure
+      - ANACOM
+      - AGCOM
+      - CNMC
+      - EETT
+      - Malta Communications Authority
+      - Bundesnetzagentur
+      - BNetzA
+      - Federal Network Agency
+      - Telecommunications and Digital Government Regulatory Authority
+      - TDRA
+      - Communications, Space and Technology Commission
+      - Telecommunications Regulatory Authority
+      - Communications Regulatory Authority
+      - National Telecom Regulatory Authority
+      - NTRA
+      - Nigerian Communications Commission
+      - ICASA
+      - Independent Communications Authority of South Africa
+      - Communications Authority of Kenya
+      - WATRA
+      - CRASA
+      - MARCOM
+      - Allied Maritime Command
+      - Infocomm Media Development Authority
+      - IMDA
+      - Maritime and Port Authority of Singapore
+      - Cyber Security Agency of Singapore
+      - Ministry of Internal Affairs and Communications
+      - Ministry of Science and ICT
+      - Australian Communications and Media Authority
+      - ACMA
+      - Department of Infrastructure, Transport, Regional Development
+      - Pacific Islands Telecommunications Association
+      - Department of Telecommunications
+      - TRAI
+      - Telecom Regulatory Authority of India
+      - Komdigi
+      - Kementerian Komunikasi dan Digital
+      - Department of Information and Communications Technology
+      - Malaysian Communications and Multimedia Commission
+      - MCMC
+
+  - name: Navies, coastguards and defence
+    group: 4. Government, regulators & defence
+    priority: High
+    notes: Sheet - Royal Navy, French Ministere des armees, NATO MARCOM, EDA, Republic of Singapore Navy, Royal Australian Navy. Core audience for Subsea Security Summit / World.
+    industry:
+      - Armed Forces
+      - Government Administration
+      - Military and International Affairs
+    description:
+      - navy
+      - naval
+      - coastguard
+      - coast guard
+      - maritime security
+      - maritime command
+      - maritime forces
+      - marine nationale
+      - koninklijke marine
+      - ministry of defence
+      - ministry of defense
+      - defence ministry
+      - defense ministry
+      - ministère des armées
+      - ministere des armees
+      - seabed warfare
+      - critical undersea infrastructure
+    # Sample 2026-11-19: "department of defense" / "NATO" pulled US DoD agencies, the Marine Corps,
+    # Space Command and air forces (dropped). Navies and defence ministries stay.
+    description_not:
+      - air force
+      - marine corps
+      - space force
+      - space command
+      - special operations
+      - inspector general
+      - intelligence agency
+
+  # Sample 2026-11-19: "United Nations / multilateral" alone returned every UN agency (WHO, UN Women,
+  # UNFPA), and with a telecom anchor still mostly unrelated bodies -> named institutions only.
+  - name: EU, multilateral institutions and agencies
+    group: 4. Government, regulators & defence
+    priority: High
+    notes: Sheet - European Commission, HaDEA, ENISA, ITU, World Bank digital teams, CCRC (Australia).
+    industry:
+      - Government Administration
+      - International Affairs
+      - Public Policy Offices
+      - Telecommunications
+    description:
+      - European Commission
+      - ITU
+      - International Telecommunication Union
+      - World Bank
+      - Cable Connectivity and Resilience Centre
+      - Asia-Pacific Telecommunity
+      - European Union Agency for Cybersecurity
+      - Body of European Regulators
+
+  # =====================================================================
+  # 1. Cable owners & consortia
+  # =====================================================================
+  - name: Independent cable owners and developers
+    group: 1. Cable owners & consortia
+    priority: High
+    notes: Sheet - EllaLink, Medusa, Crosslake Fibre, Islalink, Aqua Comms, SEACOM, WIOCC, Exa, Southern Cross, SUBCO, Bulk Infrastructure.
+    industry:
+      - Telecommunications
+      - Telecommunications Carriers
+    description:
+      - submarine cable
+      - submarine cables
+      - subsea cable
+      - subsea cables
+      - subsea cable system
+      - submarine cable system
+      - cable system owner
+      - undersea cable
+      - undersea cables
+      - subsea fibre
+      - subsea fiber
+      - subsea system
+    # Regulators and the ITU are typed Telecommunications too (sample 2026-11-19).
+    description_not:
+      - regulator
+      - regulatory authority
+      - United Nations
+
+
+  - name: Consortium members and landing parties
+    group: 1. Cable owners & consortia
+    priority: High
+    notes: Sheet - 2Africa, SEA-ME-WE 6, Blue-Raman, Medusa partners, APG / SJC2 members.
+    industry:
+      - Telecommunications
+      - Telecommunications Carriers
+    description:
+      - consortium
+      - landing party
+      - cable landing
+      - landing station
+      - landing stations
+    # Sample 2026-11-19: "consortium" also matched industry bodies (O-RAN Alliance, Broadband Forum,
+    # Small Cell Forum, Wireless Broadband Alliance) and research networks.
+    description_not:
+      - alliance
+      - forum
+      - standards body
+      - standards organization
+      - trade organization
+      - trade association
+      - industry association
+      - industry body
+      - research and education network
+      - knowledgebase
+
+  # =====================================================================
+  # 2. Hyperscalers & content providers
+  # =====================================================================
+  # "cloud" in Software Development / IT Services is every SaaS firm, so the base search needs the
+  # buyer persona (a current employee titled like the sheet's network-acquisition / subsea teams, in a
+  # buy country). The generic sheet titles (Network Infrastructure, Sourcing) are left to the people
+  # search. A hand-written 10,000+ companion keeps the big platforms whose staff Clay has not typed.
+  # Sample 2026-11-19: with "Global Network / Network Deployment / Hyperscale" in the persona, and a
+  # 10,000+ companion, the list was IT-services firms (HCLTech, Cognizant, Capgemini). Persona now the
+  # subsea-specific titles only; the companion is gone. Apple (electronics) and Netflix (entertainment)
+  # industries added (ADDED) because the sheet names Apple and "content companies".
+  - name: Global cloud and content companies
+    group: 2. Hyperscalers & content providers
+    priority: High
+    notes: Sheet - Microsoft, Meta, Google, AWS, Apple, Oracle. Network acquisition teams buy; partnership/marketing teams out.
+    industry:
+      - Software Development
+      - IT Services and IT Consulting
+      - Technology, Information and Internet
+      - Computers and Electronics Manufacturing
+      - Entertainment Providers
+    description:
+      - cloud
+      - hyperscale
+      - hyperscaler
+      - content delivery
+      - streaming
+      - data centers
+      - data centres
+      - internet
+      - platform
+      - products
+    people_titles:
+      - Subsea
+      - Submarine
+      - Network Acquisition
+      - Strategic Negotiator
+      - Subsea Cable
+
+  # =====================================================================
+  # 3. Carriers & wholesale operators (network side)
+  # =====================================================================
+  - name: Tier-1 incumbents
+    group: 3. Carriers & wholesale operators (network side)
+    priority: High
+    notes: Sheet - Vodafone, BT, Orange, Telefonica, Deutsche Telekom, Telecom Egypt, e&, stc, Singtel, NTT, KDDI, Telstra, Tata Communications, PLDT, Telkom Indonesia. Deutsche Telekom - Germany LinkedIn + phone only.
+    industry:
+      - Telecommunications
+      - Telecommunications Carriers
+    description:
+      - international carrier
+      - wholesale
+      - submarine
+      - subsea
+      - international connectivity
+      - international capacity
+    # Regulators and the ITU are typed Telecommunications too (sample 2026-11-19).
+    description_not:
+      - regulator
+      - regulatory authority
+      - United Nations
+
+  # Incumbents rarely say "international carrier" in their own blurb (Deutsche Telekom, Orange): the
+  # sheet's examples are all large national operators, so every telecom operator of 1,000+ staff.
+
+  - name: Tier-1 incumbents (1,000+ staff)
+    subsegment: Tier-1 incumbents
+    group: 3. Carriers & wholesale operators (network side)
+    priority: High
+    industry:
+      - Telecommunications
+      - Telecommunications Carriers
+    description:
+      - telecommunications
+      - telecom
+      - telecoms
+      - operator
+      - carrier
+      - mobile
+      - broadband
+      - connectivity
+      - network
+    # Sample 2026-11-19: equipment makers are typed Telecommunications too (Huawei, Ericsson, Nokia,
+    # ZTE, OPPO) - sell side.
+    description_not:
+      - smartphone
+      - smartphones
+      - smart devices
+      - equipment
+      - vendor
+      - manufacturer
+      - regulator
+      - regulatory authority
+      - United Nations
+    company_size:
+      - 1,001-5,000
+      - 5,001-10,000
+      - 10,001+
+
+  - name: Wholesale and fibre operators
+    group: 3. Carriers & wholesale operators (network side)
+    priority: High
+    notes: Sheet - Colt, Sparkle, Telxius, Zayo, euNetworks, Arelion, China Mobile International, China Unicom Global, PCCW Global, Vocus. Sales/account/BD teams are SPEX (sell side), not buyers.
+    industry:
+      - Telecommunications
+      - Telecommunications Carriers
+    description:
+      - wholesale
+      - dark fibre
+      - dark fiber
+      - IP transit
+      - long-haul
+      - long haul
+      - backbone network
+      - fibre network operator
+      - fiber network operator
+    # Regulators and the ITU are typed Telecommunications too (sample 2026-11-19).
+    description_not:
+      - regulator
+      - regulatory authority
+      - United Nations
+
+  # =====================================================================
+  # 5. Marine and seabed users (user, 2026-11-19: included as written)
+  # =====================================================================
+  # The sheet's industries + Wind / Transmission / Maritime / Real Estate (Crown Estate) / Government
+  # Administration (port authorities) - ADDED mappings. Anchored on owner / developer / operator language
+  # so vessel and installation contractors (sell side) stay out.
+  - name: Seabed managers, offshore wind and interconnector owners, ports
+    group: 5. Marine and seabed users
+    priority: Medium
+    notes: Sheet - The Crown Estate, Orsted, National Grid, TenneT, port authorities. Crossing / proximity agreements with cable owners.
+    anchor: marine_owner
+    industry:
+      - Renewable Energy Power Generation
+      - Wind Electric Power Generation
+      - Utilities
+      - Electric Power Transmission, Control, and Distribution
+      - Maritime Transportation
+      - Maritime
+      - Real Estate
+      - Government Administration
+    description:
+      - offshore wind
+      - interconnector
+      - interconnectors
+      - seabed
+      - port authority
+      - ports authority
+      - harbour authority
+      - harbor authority
+      - offshore transmission
+    # Sample 2026-11-19: vessel owners and installation contractors (Solstad, Cyan Renewables / MMA,
+    # Seaway7) came through - sell side.
+    description_not:
+      - installation vessel
+      - vessel operator
+      - crew transfer
+      - shipbroker
+      - ship management
+      - offshore vessels
+      - vessel owner
+      - shipowner
+      - ship owner
+      - shipping company
+      - offshore services
+      - offshore contractor
+      - marine contractor
+      - installation contractor
+      - subsea contractor
+      - EPCI
+      - offshore support
+
+  # =====================================================================
+  # 6. Investors and financiers
+  # =====================================================================
+  # Sample 2026-11-19: one search over Banking + "infrastructure" returned retail and microfinance
+  # banks (HDFC, Doha Bank, Mobilink). Split three ways, as the sub-segment name reads.
+  - name: Infrastructure funds
+    subsegment: Infrastructure funds, DFIs, project-finance banks
+    group: 6. Investors and financiers
+    priority: Medium
+    notes: Sheet - Meridiam, DigitalBridge, Macquarie. Corporate-finance advisers stay sell side.
+    industry:
+      - Investment Management
+      - Venture Capital and Private Equity Principals
+      - Financial Services
+      - Capital Markets
+    description:
+      - digital infrastructure fund
+      - digital infrastructure investor
+      - digital infrastructure investment
+      - infrastructure investment
+      - infrastructure investor
+      - infrastructure investors
+      - infrastructure fund
+      - infrastructure funds
+      - infrastructure equity
+      - infrastructure asset manager
+      - infrastructure assets
+    description_not:
+      - corporate finance advisory
+      - M&A advisory
+
+  - name: Development finance institutions
+    subsegment: Infrastructure funds, DFIs, project-finance banks
+    group: 6. Investors and financiers
+    priority: Medium
+    notes: Sheet - EIB, IFC, AfDB, ADB.
+    industry:
+      - Banking
+      - Financial Services
+      - Investment Management
+      - International Affairs
+      - Government Administration
+    # Re-sample 2026-11-19: "development finance / development bank" matched retail banks (HDFC, Bank
+    # Alfalah, National Development Bank Sri Lanka). DFI wording only.
+    description:
+      - development finance institution
+      - development finance institutions
+      - multilateral development bank
+      - multilateral development finance
+      - multilateral financial institution
+      - European Investment Bank
+      - International Finance Corporation
+      - export credit agency
+      - DFI
+    # Re-sample 2026-11-19: commercial banks that name their DFI shareholders still match.
+    description_not:
+      - retail banking
+      - personal banking
+      - microfinance
+      - mobile financial services
+      - savings account
+      - consumer finance
+
+  - name: Project-finance banks (10,000+ staff)
+    subsegment: Infrastructure funds, DFIs, project-finance banks
+    group: 6. Investors and financiers
+    priority: Medium
+    notes: Big international lenders that arrange infrastructure project finance (MUFG, SMBC, ING, Credit Agricole type).
+    industry:
+      - Banking
+      - Investment Banking
+      - Financial Services
+    description:
+      - project finance
+      - infrastructure finance
+      - infrastructure financing
+      - corporate and investment banking
+      - investment banking
+    company_size:
+      - 10,001+
+

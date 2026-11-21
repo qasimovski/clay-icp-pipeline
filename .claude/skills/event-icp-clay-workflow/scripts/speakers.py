@@ -30,6 +30,15 @@ Variables in post_filter.yaml `speakers:` (all optional):
     titles: flag | filter    flag (default) keeps every speaker in an in-scope country and marks a title
                              that fails the sheet's rules in Title Check; filter drops them (ask the user:
                              Mining kept all speakers, "filter on country only")
+`people` overrides, for attendee or contact lists that take the speaker route (Submarine, 19 Nov 2026:
+Capacity Europe attendee sheets, "keep all the attendees"):
+    --titles flag|filter     overrides speakers.titles for this run
+    --countries filter|flag  filter (default) drops a profile whose country is not in the side's list;
+                             flag keeps it and marks "country not in the side's list" in Title Check
+    --source LABEL           Source written on every row (default Speaker). Anything else (e.g. Attendee)
+                             is NOT a speaker: its events go to `Events` (the company-row column that
+                             deliver.py reads as SPEX / Attendee) and `Speaker Event(s)` stays empty, so the
+                             Salesforce file never marks an attendee as a speaker
 The TinyFish key is read from TINYFISH_API_KEY or --env-file; it is never printed.
 """
 
@@ -368,7 +377,9 @@ def cmd_people(a):
     R = Rules(yaml.safe_load(open(a.icp, encoding="utf-8")) or {}, yaml.safe_load(open(a.rules, encoding="utf-8")) or {})
     cfg = speaker_cfg(a.rules)
     stop = CO_STOP | {w.lower() for w in cfg.get("company_stop_words") or []}
-    filter_titles = (cfg.get("titles") or "flag") == "filter"
+    filter_titles = (a.titles or cfg.get("titles") or "flag") == "filter"
+    keep_all_geo = a.countries == "flag"
+    is_speaker = a.source == "Speaker"
     persons = load_results(a.person_results)
     comps = {}
     for d in a.company_results:
@@ -392,19 +403,21 @@ def cmd_people(a):
         reason, f = R.judge(s["Side"], s["Classification"], title, country)
         in_geo = not reason.startswith(("country", "unrecognised"))
         title_ok = not reason
-        notes = [] if title_ok or not in_geo else ["speaker: title not on the sheet's list"]
+        notes = [] if title_ok or not in_geo else [f"{a.source.lower()}: title not on the sheet's list"]
+        if not in_geo and keep_all_geo:
+            notes.append("country not in the side's list")
         if moved:
             notes.append("moved since the event")
         row = {"Company Name": company, "Domain": dom or s["Domain"], "Side": s["Side"],
-               "Classification": s["Classification"], "Fit": "KEEP", "Events": "",
+               "Classification": s["Classification"], "Fit": "KEEP", "Events": "" if is_speaker else s["Events"],
                "Person Name": p.get("name", ""), "First Name": p.get("first_name") or "",
                "Last Name": p.get("last_name") or "", "Job Title": title,
                "LinkedIn URL": "https://www.linkedin.com/in/" + slug(p.get("url") or s["LinkedIn URL"]),
                "Mailing City": city, "Mailing State Province": state, "Mailing Country": country,
-               "Outcome": "speaker", "Persona": f.get("Persona", ""),
+               "Outcome": a.source.lower(), "Persona": f.get("Persona", ""),
                "Title Check": "; ".join([f.get("Title Check", "")] * bool(f.get("Title Check")) + notes),
                "Geo Tier": R.geo_tier(s["Side"], country) if in_geo else "",
-               "Source": "Speaker", "Speaker Event(s)": s["Events"], "Speaker Event Title": s["Job Title"],
+               "Source": a.source, "Speaker Event(s)": s["Events"] if is_speaker else "", "Speaker Event Title": s["Job Title"],
                "Speaker Event Company": s["Company"], "Profile Source": s["Profile Source"],
                "Headline": p.get("headline") or "", **company_cols(c)}
         # nested current_experience fills what Enrich Company can't (no company match, or a company page only)
@@ -412,14 +425,31 @@ def cmd_people(a):
         row["Company Website"] = row["Company Website"] or ce.get("company_domain") or ""
         checks.append({**row, "Country In Scope": "yes" if in_geo else "no",
                        "Title Passes Sheet Rules": "yes" if title_ok else "no", "Dropped Because": reason})
-        if not in_geo:
+        if not in_geo and not keep_all_geo:
             tally["dropped: country not in the side's list"] += 1
         elif filter_titles and not title_ok:
             tally["dropped: title (speakers.titles = filter)"] += 1
         else:
-            tally["kept" + (" (title flagged)" if not title_ok else "")] += 1
+            tally["kept" + (" (title flagged)" if not title_ok and in_geo else "")
+                  + (" (country flagged)" if not in_geo else "")] += 1
             out.append(row)
-    write(a.out, out, list(checks[0].keys())[:-3] if checks else None)
+    # Stage 0 ("already found": same name at the same company in the people search) never reaches Enrich Person,
+    # so without these rows review_list.py could not tag them (Submarine, 20 Nov 2026: 455 of 505 such speakers
+    # went untagged). Tag-only rows: review_list.py merges them into the person's existing row, never adds them.
+    if a.matched:
+        for m in read(a.matched):
+            if m.get("Status") != "already found" or not m.get("LinkedIn URL"):
+                continue
+            out.append({"LinkedIn URL": "https://www.linkedin.com/in/" + slug(m["LinkedIn URL"]), "Source": a.source,
+                        "Events": "" if is_speaker else m.get("Events", ""),
+                        "Speaker Event(s)": m.get("Events", "") if is_speaker else "",
+                        "Speaker Event Title": m.get("Job Title", "") if is_speaker else "",
+                        "Person Name": m.get("Name", ""), "Domain": m.get("Domain", ""), "Tag Only": "yes"})
+            tally["already in the people search (tag-only row)"] += 1
+    cols = list(checks[0].keys())[:-3] if checks else None
+    if cols and a.matched:
+        cols = cols + ["Tag Only"]
+    write(a.out, out, cols)
     write(a.out[:-4] + " - checks.csv", checks)
     print(f"{len(out):,} speaker people rows -> {a.out}  (+ - checks.csv with every profile and why)")
     for k, n in tally.most_common():
@@ -462,6 +492,10 @@ def main():
     q.add_argument("--icp", required=True)
     q.add_argument("--rules", required=True)
     q.add_argument("--out", required=True)
+    q.add_argument("--titles", choices=["flag", "filter"], help="override speakers.titles for this run")
+    q.add_argument("--countries", choices=["filter", "flag"], default="filter")
+    q.add_argument("--source", default="Speaker", help="Source on every row; not Speaker = an attendee/contact list")
+    q.add_argument("--matched", help="speakers.py match output: its 'already found' people become tag-only rows")
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if a.cmd == "enrich-feed" and bool(a.finder_feed) != bool(a.finder_results):

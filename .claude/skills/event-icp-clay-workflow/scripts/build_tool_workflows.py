@@ -114,8 +114,13 @@ class Builder:
             r = self.run(["workflows", "nodes", "update", wf, nid],
                          {k: v for k, v in spec.items() if k != "nodeType"}, f"u_{key}")
         else:
-            r = self.run(["workflows", "nodes", "create", wf], spec, f"c_{key}")
-            nid = r["nodeId"]
+            # 19 Nov 2026 (CLI 1.15): a full code/agent spec on `nodes create` fails with a misleading
+            # "[nodeType] Invalid discriminator value"; creating with nodeType + name only, then updating
+            # the rest, works. Never re-create on retry: the node is found by name above.
+            nid = self.run(["workflows", "nodes", "create", wf],
+                           {"nodeType": spec["nodeType"], "name": spec["name"]}, f"c_{key}")["nodeId"]
+            r = self.run(["workflows", "nodes", "update", wf, nid],
+                         {k: v for k, v in spec.items() if k != "nodeType"}, f"u_{key}")
         bad = [(u.get("field"), u.get("message")) for u in r.get("appliedUpdates", []) if not u.get("success")]
         print(f"  {spec['name']:24} {nid}  {'applied: all ok' if not bad else 'NOT APPLIED: ' + str(bad)}")
         self.ids[key] = nid
@@ -186,6 +191,7 @@ def build_finder(a):
         "nodeType": "agent", "name": "LinkedIn Finder",
         "description": "Finds the speaker's personal LinkedIn profile; verifies name + employer before answering.",
         "agentName": a.agent_name, "agentModel": a.model, "agentInternetSearchEnabled": True,
+        **({"authAccountId": a.auth_account} if a.auth_account else {}),
         "agentPrompt": prompt,
         "inputSchema": {"type": "object", "properties": {
             snake: {"type": "string", "sourceNodeId": build, "sourcePath": f"$.{snake}"}
@@ -195,7 +201,8 @@ def build_finder(a):
     B.edge(wf, agent, build, "agent")
     node = B.run(["workflows", "nodes", "get", wf, agent])
     node = node.get("node") or node
-    print("agentModel:", node.get("agentModel"), "| web search:", node.get("agentInternetSearchEnabled"))
+    print("agentModel:", node.get("agentModel"), "| web search:", node.get("agentInternetSearchEnabled"),
+          "| account:", node.get("authAccountId") or "NONE (Clay managed key)")
     B.finish(wf)
 
 
@@ -208,6 +215,8 @@ def main():
     ap.add_argument("--model", help="linkedin-finder: agentModel id")
     ap.add_argument("--agent-name", default="Speaker LinkedIn Finder")
     ap.add_argument("--update", action="store_true", help="linkedin-finder: push a prompt change only")
+    ap.add_argument("--auth-account", help="linkedin-finder: the AI account id (aa_...) of the user's own OpenAI key. "
+                    "Without it the agent runs on Clay's managed key (user, 19 Nov 2026: always use our OpenAI key)")
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if a.kind == "linkedin-finder":

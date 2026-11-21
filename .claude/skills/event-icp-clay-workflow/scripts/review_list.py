@@ -14,7 +14,10 @@ company's firmographics on every row (Mining, Oct 2026).
         --rules post_filter.yaml --out-prefix "<S> - review" [--drop-cols "Title Check,Countries Override"]
 
 A speaker who is already in the people list is ONE row, tagged Source "Find People + Speaker" with
-their speaker events; never two. Speaker-only rows (Source "Speaker") are routed to the LinkedIn-only
+their speaker events; never two. Attendee / named-contact lists that took the speaker route (speakers.py people
+--source Attendee; Submarine, 19-20 Nov 2026) merge the same way but keep their own tag ("Find People + Attendee")
+and put their events in `Events`, not `Speaker Event(s)`, so deliver.py makes them SPEX / Attendee rows, never
+speakers. --speakers may be given more than once; one profile in several files is one row. Speaker-only rows (Source "Speaker") are routed to the LinkedIn-only
 file when they sit in a `linkedin_only_countries` country, exactly like everyone else. Which columns
 the manager sees is the user's call (--drop-cols): Mining dropped Title Check, Countries Override
 and the company's Country, because Mailing Country (the person's) is the one used.
@@ -180,6 +183,25 @@ def cmd_domains(a):
     print(f"{len(doms):,} domains to enrich ({len(done):,} already have a result) -> {a.out}")
 
 
+def merge_route(p, s, ev_col="Events"):
+    """Fold a speaker-route row `s` (Source Speaker / Attendee / Named contact, or several joined by " + ") into
+    the person row `p`: Source parts are united in order ("Find People + Speaker"), speaker events go to
+    `Speaker Event(s)` and the rest of the events to `ev_col` ("; "-joined, deduplicated): the people file's own
+    company-events column (`Events`, or `Event` where the run's lists hold several "; "-joined events in it)."""
+    def parts(v):
+        return [x.strip() for x in (v or "").split("+") if x.strip()]
+
+    def union(x, y):
+        return "; ".join(dict.fromkeys(e.strip() for v in (x, y) for e in (v or "").split(";") if e.strip()))
+    order = ["Find People", "Blitz", "Deepline", "Speaker", "Attendee", "Named contact"]
+    tags = dict.fromkeys(parts(p.get("Source")) + parts(s.get("Source") or "Speaker"))
+    p["Source"] = " + ".join(sorted(tags, key=lambda t: order.index(t) if t in order else len(order)))
+    p["Speaker Event(s)"] = union(p.get("Speaker Event(s)"), s.get("Speaker Event(s)"))
+    p[ev_col] = union(p.get(ev_col), s.get("Events"))
+    if s.get("Speaker Event Title") and not p.get("Speaker Event Title"):
+        p["Speaker Event Title"] = s["Speaker Event Title"]
+
+
 def cmd_build(a):
     rules = yaml.safe_load(open(a.rules, encoding="utf-8")) or {}
     li_countries = set(rules.get("linkedin_only_countries") or [])
@@ -190,10 +212,23 @@ def cmd_build(a):
     if not people:
         raise SystemExit(f"{a.people} is empty")
     base_cols = list(people[0].keys())
+    ev_col = "Events" if "Events" in base_cols or "Event" not in base_cols else "Event"
 
     spk = collections.OrderedDict()
-    for r in (read(a.speakers) if a.speakers else []):
-        spk.setdefault(slug(r["LinkedIn URL"]), r)
+    for f in a.speakers or []:
+        for r in read(f):
+            k = slug(r["LinkedIn URL"])
+            if k in spk:
+                # both are speaker-route rows: their events stay in `Events`. A full row (profile data) beats a
+                # tag-only one as the base; the merged row is tag-only only when both were.
+                old, new = spk[k], dict(r, Source=r.get("Source") or "Speaker")
+                if old.get("Tag Only") == "yes" and new.get("Tag Only") != "yes":
+                    old, new = new, old
+                merge_route(old, new)
+                old["Tag Only"] = "yes" if old.get("Tag Only") == "yes" and new.get("Tag Only") == "yes" else ""
+                spk[k] = old
+            else:
+                spk[k] = dict(r, Source=r.get("Source") or "Speaker")
 
     tagged = 0
     for lst in (people, li_only):
@@ -204,13 +239,17 @@ def cmd_build(a):
             p.update(comp.get(norm_domain(p.get("Domain")), {}))
             s = spk.pop(slug(p.get("LinkedIn URL")), None)
             if s:
-                p.update({"Source": "Find People + Speaker", "Speaker Event(s)": s.get("Speaker Event(s)", ""),
-                          "Speaker Event Title": s.get("Speaker Event Title", "")})
+                merge_route(p, s, ev_col)
                 tagged += 1
     added = collections.Counter()
     for s in spk.values():
+        if s.get("Tag Only") == "yes":      # an already-found person no longer in the lists: nothing to tag
+            added["tag-only, person not in the lists"] += 1
+            continue
         row = {c: "" for c in base_cols}
         row.update(s)
+        if ev_col != "Events":
+            row[ev_col] = s.get("Events", "")
         row.update(comp.get(norm_domain(s.get("Domain"))) or {c: s.get(c, "") for c in COMPANY_COLS})
         li = s.get("Mailing Country") in li_countries
         (li_only if li else people).append(row)
@@ -251,7 +290,8 @@ def main():
     b = sub.add_parser("build")
     b.add_argument("--people", required=True, help="post_filter.py email list")
     b.add_argument("--linkedin-only", help="post_filter.py LinkedIn-only file")
-    b.add_argument("--speakers", help="speakers.py people output")
+    b.add_argument("--speakers", action="append", default=[],
+                   help="speakers.py people output (repeatable: speakers, attendee lists, ...)")
     b.add_argument("--company-results", nargs="*", default=[])
     b.add_argument("--company-csv", nargs="*", default=[],
                    help="company list(s) that already carry firmographics (Domain, Size, Type, Industry, "
